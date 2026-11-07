@@ -25,13 +25,24 @@ jobs:
           fi
       - name: Pull build environment
         run: docker pull "$IMAGE"
+      - name: Prepare ccache
+        run: mkdir -p .ccache
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
       - name: Compile
         env:
           API_ID: ${{ secrets.TDESKTOP_API_ID }}
           API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
         run: |
           docker run --rm --user "$(id -u):$(id -g)" \
-            -v "$PWD:/usr/src/tdesktop" -e CONFIG=Release \
+            -v "$PWD:/usr/src/tdesktop" -v "$PWD/.ccache:/ccache" \
+            -e CONFIG=Release -e KEEP_GOING=1 \
+            -e CCACHE_DIR=/ccache -e CCACHE_MAXSIZE=3G -e CCACHE_COMPRESS=true \
             -e CMAKE_BUILD_PARALLEL_LEVEL=2 -e API_ID -e API_HASH "$IMAGE" \
             bash -c 'exec /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
               -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
