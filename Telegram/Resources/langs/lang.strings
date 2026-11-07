@@ -9617,3 +9617,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_link_preview_rule_domain" = "Domain";
 
 "lng_settings_online_spam" = "Online status spam";
+
+"lng_selected_screenshot" = "Screenshot";
+"lng_screenshot_too_large" = "The selected messages are too large for one image.";
+"lng_screenshot_unavailable" = "The selected messages are not ready to render.";
+"lng_screenshot_saved" = "Screenshot saved.";
+"lng_screenshot_save_failed" = "Could not save the screenshot.";

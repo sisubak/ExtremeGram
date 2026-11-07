@@ -1155,6 +1155,13 @@ HistoryWidget::HistoryWidget(
 	) | rpl::on_next([=](bool active) {
 		setMembersShowAreaActive(active);
 	}, _topBar->lifetime());
+	_topBar->enableScreenshot();
+	_topBar->screenshotSelectionRequest(
+	) | rpl::on_next([=] {
+		if (_list) {
+			_list->screenshotSelected();
+		}
+	}, _topBar->lifetime());
 	_topBar->forwardSelectionRequest(
 	) | rpl::on_next([=] {
 		forwardSelected();

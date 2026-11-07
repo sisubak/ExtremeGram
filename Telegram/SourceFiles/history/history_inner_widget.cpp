@@ -72,6 +72,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
+#include "window/section_widget.h"
 #include "window/window_peer_menu.h"
 #include "window/notifications_manager.h"
 #include "info/info_memento.h"
@@ -144,6 +145,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 
 #include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
+#include <QtGui/QImage>
+#include <algorithm>
+#include <vector>
 #include <QtWidgets/QApplication>
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMimeData>
@@ -5835,6 +5840,88 @@ void HistoryInner::clearSelected(bool onlyTextSelection) {
 		_widget->updateTopBarSelection();
 		_widget->update();
 	}
+}
+
+void HistoryInner::screenshotSelected() {
+	struct Row { Element *view; int top; };
+	auto rows = std::vector<Row>();
+	for (const auto &item : _selected) {
+		const auto view = viewByItem(item);
+		const auto top = itemTop(view);
+		if (!view || top < 0 || view->height() <= 0) {
+			_controller->showToast(tr::lng_screenshot_unavailable(tr::now));
+			return;
+		}
+		if (std::none_of(rows.begin(), rows.end(), [=](const Row &row) {
+				return row.view == view;
+			})) {
+			rows.push_back({ view, top });
+		}
+	}
+	if (rows.empty()) return;
+	std::sort(rows.begin(), rows.end(), [](const Row &a, const Row &b) {
+		return a.top < b.top;
+	});
+	constexpr auto kPadding = 16;
+	constexpr auto kMaxPixels = int64(32000000);
+	auto height = int64(kPadding * 2);
+	for (const auto &row : rows) height += row.view->height();
+	const auto dpr = devicePixelRatioF();
+	if (width() <= 0 || height > 30000
+		|| double(width()) * height * dpr * dpr > kMaxPixels) {
+		_controller->showToast(tr::lng_screenshot_too_large(tr::now));
+		return;
+	}
+	auto image = QImage(
+		int(width() * dpr), int(height * dpr), QImage::Format_ARGB32_Premultiplied);
+	if (image.isNull()) {
+		_controller->showToast(tr::lng_screenshot_unavailable(tr::now));
+		return;
+	}
+	image.setDevicePixelRatio(dpr);
+	image.fill(Qt::transparent);
+	{
+		Painter p(&image);
+		const auto full = QRect(0, 0, width(), int(height));
+		Window::SectionWidget::PaintBackground(p, _theme.get(), full.size(), full);
+		_pathGradient->startFrame(0, width(), std::min(st::msgMaxWidth / 2, width() / 2));
+		auto y = kPadding;
+		for (const auto &row : rows) {
+			const auto view = row.view;
+			auto context = preparePaintContext(QRect(0, 0, width(), view->height()));
+			context.viewport = context.clip;
+			context.area = context.clip;
+			context.selection = TextSelection();
+			context.fullMessageSelected = false;
+			context.messageSelection = nullptr;
+			context.outbg = view->hasOutLayout();
+			context.reactionInfo = _reactionsManager->currentReactionPaintInfo();
+			p.save();
+			p.translate(0, y);
+			view->draw(p, context);
+			if (view->displayFromPhoto()) {
+				if (const auto from = view->data()->displayFrom()) {
+					from->paintUserpicLeft(p, _userpics[from], st::historyPhotoLeft,
+						std::max(0, view->height() - st::msgPhotoSize), width(), st::msgPhotoSize);
+				}
+			}
+			p.restore();
+			y += view->height();
+		}
+	}
+	QGuiApplication::clipboard()->setImage(image);
+	FileDialog::GetWritePath(
+		this,
+		tr::lng_selected_screenshot(tr::now),
+		u"PNG Image (*.png)"_q,
+		filedialogDefaultName(u"screenshot"_q, u".png"_q),
+		crl::guard(this, [=](const QString &path) {
+			if (!path.isEmpty()) {
+				_controller->showToast(image.save(path, "PNG")
+					? tr::lng_screenshot_saved(tr::now)
+					: tr::lng_screenshot_save_failed(tr::now));
+			}
+		}));
 }
 
 bool HistoryInner::hasSelectedItems() const {

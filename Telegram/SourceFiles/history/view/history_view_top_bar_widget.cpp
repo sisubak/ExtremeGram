@@ -126,6 +126,7 @@ TopBarWidget::TopBarWidget(
 , _controller(controller)
 , _primaryWindow(controller->isPrimary())
 , _clear(this, tr::lng_selected_clear(), st::topBarClearButton)
+, _screenshot(this, tr::lng_selected_screenshot(), st::defaultActiveButton)
 , _forward(this, EnhancedSettings::Get(EnhancedSettings::Option::ShowEmojiButtonAsText) ? tr::lng_selected_forward() : tr::lng_selected_forward_emoji(), st::defaultActiveButton)
 , _sendNow(this, tr::lng_selected_send_now(), st::defaultActiveButton)
 , _delete(this, EnhancedSettings::Get(EnhancedSettings::Option::ShowEmojiButtonAsText) ? tr::lng_selected_delete() : tr::lng_selected_delete_emoji(), st::defaultActiveButton)
@@ -154,6 +155,8 @@ TopBarWidget::TopBarWidget(
 		refreshLang();
 	}, lifetime());
 
+	_screenshot->setClickedCallback([=] { _screenshotSelection.fire({}); });
+	_screenshot->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_forward->setClickedCallback([=] { _forwardSelection.fire({}); });
 	_forward->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_forwardNoQuote->setClickedCallback([=] { _forwardNoQuoteSelection.fire({}); });
@@ -1186,7 +1189,8 @@ void TopBarWidget::updateControlsGeometry() {
 	const auto backButtonTop = selectedButtonsTop + st::topBarHeight;
 	auto buttonsLeft = st::topBarActionSkip
 		+ (_controller->adaptive().isOneColumn() ? 0 : st::lineWidth);
-	auto buttonsWidth = (_forward->isHidden() ? 0 : _forward->contentWidth())
+	auto buttonsWidth = (_screenshot->isHidden() ? 0 : _screenshot->contentWidth())
+		+ (_forward->isHidden() ? 0 : _forward->contentWidth())
 		+ (_sendNow->isHidden() ? 0 : _sendNow->contentWidth())
 		+ (_delete->isHidden() ? 0 : _delete->contentWidth())
 		+ _clear->width();
@@ -1196,6 +1200,7 @@ void TopBarWidget::updateControlsGeometry() {
 		width() - buttonsWidth,
 		-2 * st::defaultActiveButton.width);
 	auto buttonFullWidth = std::min(-(widthLeft / 2), 0);
+	_screenshot->setFullWidth(buttonFullWidth);
 	_forward->setFullWidth(buttonFullWidth);
 	_forwardNoQuote->setFullWidth(buttonFullWidth);
 	_savedMessages->setFullWidth(buttonFullWidth);
@@ -1207,6 +1212,11 @@ void TopBarWidget::updateControlsGeometry() {
 	_forward->moveToLeft(buttonsLeft, selectedButtonsTop);
 	if (!_forward->isHidden()) {
 		buttonsLeft += _forward->width() + st::topBarActionSkip;
+	}
+
+	_screenshot->moveToLeft(buttonsLeft, selectedButtonsTop);
+	if (!_screenshot->isHidden()) {
+		buttonsLeft += _screenshot->width() + st::topBarActionSkip;
 	}
 
 	_forwardNoQuote->moveToLeft(buttonsLeft, selectedButtonsTop);
@@ -1233,6 +1243,7 @@ void TopBarWidget::updateControlsGeometry() {
 			: st::buttonRadius;
 		const auto buttons = std::array{
 			_forward.data(),
+			_screenshot.data(),
 			_forwardNoQuote.data(),
 			_savedMessages.data(),
 			_sendNow.data(),
@@ -1390,6 +1401,7 @@ void TopBarWidget::updateControlsVisibility() {
 	_clear->setVisible(visible);
 	_delete->setVisible(_canDelete && visible);
 	_forward->setVisible(_canForward && visible);
+	_screenshot->setVisible(_screenshotEnabled && _selectedCount > 0 && visible);
 	_forwardNoQuote->setVisible(_canForward && visible);
 	_savedMessages->setVisible(_canForward && visible);
 	_sendNow->setVisible(_canSendNow && visible);

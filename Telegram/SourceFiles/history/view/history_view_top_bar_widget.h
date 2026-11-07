@@ -70,6 +70,11 @@ public:
 
 	[[nodiscard]] Main::Session &session() const;
 
+	void enableScreenshot() { _screenshotEnabled = true; }
+	[[nodiscard]] rpl::producer<> screenshotSelectionRequest() const {
+		return _screenshotSelection.events();
+	}
+
 	void updateControlsVisibility();
 	void finishAnimating();
 	void showSelected(SelectedState state);
@@ -231,6 +236,7 @@ private:
 	int _titleNameVersion = 0;
 
 	int _selectedCount = 0;
+	bool _screenshotEnabled = false;
 	bool _canDelete = false;
 	bool _canForward = false;
 	bool _canSendNow = false;
@@ -240,6 +246,7 @@ private:
 	Ui::Animations::Simple _searchShown;
 
 	object_ptr<Ui::RoundButton> _clear;
+	object_ptr<Ui::RoundButton> _screenshot;
 	object_ptr<Ui::RoundButton> _forward, _sendNow, _delete, _forwardNoQuote, _savedMessages;
 	object_ptr<Ui::InputField> _searchField = { nullptr };
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _chooseFromUser
@@ -288,6 +295,7 @@ private:
 
 	base::Timer _onlineUpdater;
 
+	rpl::event_stream<> _screenshotSelection;
 	rpl::event_stream<> _forwardSelection;
 	rpl::event_stream<> _forwardNoQuoteSelection;
 	rpl::event_stream<> _savedMessagesSelection;
