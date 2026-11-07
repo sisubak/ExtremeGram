@@ -74,6 +74,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h"
 #include "window/window_peer_menu.h"
 #include "window/notifications_manager.h"
+#include "custom/client_badge_detector.h"
+#include "custom/smooth_animations.h"
 #include "info/info_memento.h"
 #include "info/statistics/info_statistics_widget.h"
 #include "boxes/about_sponsored_box.h"
@@ -444,6 +446,36 @@ HistoryInner::HistoryInner(
 
 	setMouseTracking(true);
 	setAccessibleName(tr::lng_sr_message_list(tr::now));
+	session().data().newItemAdded(
+	) | rpl::on_next([=](not_null<HistoryItem*> item) {
+		if (item->history() == _history || item->history() == _migrated) {
+			Custom::Animations::NotifyMessageAdded(
+				item,
+				[=] { update(); });
+		}
+	}, lifetime());
+	Custom::ClientBadgeFor(
+		&session()
+	).badgeDetectedChanges() | rpl::on_next([=](PeerId peerId) {
+		const auto resizePeerViews = [&](History *h) {
+			if (!h) {
+				return;
+			}
+			for (const auto &block : h->blocks) {
+				for (const auto &view : block->messages) {
+					const auto it = view->data();
+					if (it->from()->id == peerId
+						|| (it->displayFrom()
+							&& it->displayFrom()->id == peerId)) {
+						session().data().requestViewResize(view.get());
+					}
+				}
+			}
+		};
+		resizePeerViews(_history);
+		resizePeerViews(_migrated);
+		update();
+	}, lifetime());
 	Core::App().inAppKeyPressed(
 	) | rpl::on_next([=] {
 		registerReadMetricsActivity();
@@ -1670,7 +1702,11 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			context.fullMessageSelected = selection.fullMessageSelected;
 			context.messageSelection = selection.messageSelection;
 			context.highlight = _widget->itemHighlight(view->data());
-			view->draw(p, context);
+			Custom::Animations::ApplyElementPaintTransform(
+				p,
+				view,
+				QRect(0, 0, width(), height),
+				[&] { view->draw(p, context); });
 			processPainted(view, top, height);
 
 			top += height;
@@ -1739,7 +1775,11 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				context.fullMessageSelected = selection.fullMessageSelected;
 				context.messageSelection = selection.messageSelection;
 				context.highlight = _widget->itemHighlight(item);
-				view->draw(p, context);
+				Custom::Animations::ApplyElementPaintTransform(
+					p,
+					view,
+					QRect(0, 0, width(), height),
+					[&] { view->draw(p, context); });
 				processPainted(view, top, height);
 			}
 			top += height;

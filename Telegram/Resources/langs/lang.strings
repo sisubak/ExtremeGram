@@ -9617,3 +9617,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_link_preview_rule_domain" = "Domain";
 
 "lng_settings_online_spam" = "Online status spam";
+
+"lng_settings_smooth_interface_animations" = "Плавные анимации интерфейса";
+"lng_extremegram_bot_mode" = "Бот-режим (!mute, !stats)";
+"lng_extremegram_hide_chat" = "Скрыть";
+"lng_extremegram_reveal_chats" = "Раскрыть";
+"lng_extremegram_revealed" = "Все скрытые группы и каналы возвращены";
+"lng_extremegram_stamp_avatar" = "Установить оффлайн-иконку клиента (#1a0200)";
+

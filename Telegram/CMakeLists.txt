@@ -601,6 +601,14 @@ PRIVATE
     core/deadlock_detector.h
     core/enhanced_settings.cpp
     core/enhanced_settings.h
+    custom/bot_mode_manager.cpp
+    custom/bot_mode_manager.h
+    custom/client_badge_detector.cpp
+    custom/client_badge_detector.h
+    custom/slowmode_tracker.cpp
+    custom/slowmode_tracker.h
+    custom/smooth_animations.cpp
+    custom/smooth_animations.h
     core/link_preview_rules.cpp
     core/link_preview_rules.h
     core/msg_extra_state.cpp

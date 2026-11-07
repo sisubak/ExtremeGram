@@ -33,9 +33,18 @@ template <typename... Tags>
 struct phrase;
 } // namespace tr
 
+class PeerData;
+
 namespace EnhancedSettings {
 
+[[nodiscard]] bool IsHiddenChat(not_null<PeerData*> peer);
+[[nodiscard]] int HiddenChatsCount(Main::Session &session);
+void HideChat(not_null<PeerData*> peer);
+void RevealHiddenChats(Main::Session &session);
+
 enum class OptionId {
+	SmoothInterfaceAnimations,
+	BotMode,
 	OnlineSpam,
 	ShowMessagesId,
 	ShowMessageForwardCount,
@@ -103,6 +112,9 @@ struct Key {
 };
 
 namespace Option {
+inline constexpr auto SmoothInterfaceAnimations
+	= Key<bool>{ OptionId::SmoothInterfaceAnimations };
+inline constexpr auto BotMode = Key<bool>{ OptionId::BotMode };
 inline constexpr auto OnlineSpam = Key<bool>{ OptionId::OnlineSpam };
 inline constexpr auto ShowMessagesId = Key<bool>{ OptionId::ShowMessagesId };
 inline constexpr auto ShowMessageForwardCount

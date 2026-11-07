@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/enhanced_settings.h"
 #include "core/shortcuts.h"
+#include "custom/client_badge_detector.h"
 #include "data/components/recent_shared_media_gifts.h"
 #include "data/data_birthday.h"
 #include "data/data_changes.h"
@@ -562,6 +563,47 @@ TopBar::TopBar(
 		badgeUpdates = rpl::merge(
 			std::move(badgeUpdates),
 			_botVerify->updated());
+	}
+	if (_peer->isUser() && !_savedMessages) {
+		_extremeBadge = base::make_unique_q<Ui::RpWidget>(this);
+		_extremeBadge->resize(
+			style::ConvertScale(20),
+			std::max(_title->height(), style::ConvertScale(20)));
+		_extremeBadge->setAttribute(Qt::WA_TransparentForMouseEvents);
+		const auto refreshExtremeBadge = [=] {
+			const auto shown = Custom::ClientBadgeFor(
+				&_peer->session()).hasCustomClientBadge(_peer);
+			if (_extremeBadge->isHidden() == shown) {
+				_extremeBadge->setVisible(shown);
+				updateLabelsPosition();
+			}
+			_extremeBadge->update();
+		};
+		_extremeBadge->paintRequest(
+		) | rpl::on_next([=] {
+			QPainter p(_extremeBadge.get());
+			const auto bg = _solidBg.value_or(
+				_edgeColor.current().value_or(st::windowBg->c));
+			Custom::ClientBadgeFor(&_peer->session()).drawBadgeGetWidth(
+				p,
+				0,
+				0,
+				_extremeBadge->height(),
+				_peer,
+				bg);
+		}, _extremeBadge->lifetime());
+		Custom::ClientBadgeFor(
+			&_peer->session()
+		).badgeDetectedChanges() | rpl::on_next([=](PeerId id) {
+			if (id == _peer->id) {
+				refreshExtremeBadge();
+			}
+		}, _extremeBadge->lifetime());
+		style::PaletteChanged(
+		) | rpl::on_next([=] {
+			_extremeBadge->update();
+		}, _extremeBadge->lifetime());
+		refreshExtremeBadge();
 	}
 	_title->naturalWidthValue() | rpl::on_next([=](int w) {
 		_title->resizeToWidth(w);
@@ -1259,6 +1301,23 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 		return;
 	}
 	if (!canJoin && !topic && !sublist && (chat || channel)) {
+		if (!EnhancedSettings::IsHiddenChat(peer)) {
+			const auto hideButton = Ui::CreateChild<TopBarActionButton>(
+				this,
+				tr::lng_extremegram_hide_chat(tr::now),
+				st::infoProfileTopBarActionMute);
+			hideButton->setClickedCallback([=] {
+				controller->clearSectionStack();
+				EnhancedSettings::HideChat(peer);
+			});
+			hideButton->setAccessibleName(
+				tr::lng_extremegram_hide_chat(tr::now));
+			_actions->add(hideButton);
+			buttons.push_back(hideButton);
+			if (chechMax()) {
+				return;
+			}
+		}
 		const auto leaveButton = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_leave(tr::now),
@@ -2001,6 +2060,9 @@ void TopBar::updateTitlePosition(float64 progressCurrent) {
 	const auto verifiedWidget = _verified ? _verified->widget() : nullptr;
 	const auto badgeWidget = _badge ? _badge->widget() : nullptr;
 	const auto botVerifyWidget = _botVerify ? _botVerify->widget() : nullptr;
+	const auto extremeWidget = (_extremeBadge && !_extremeBadge->isHidden())
+		? _extremeBadge.get()
+		: nullptr;
 	auto badgesWidth = 0;
 	if (verifiedWidget) {
 		badgesWidth += verifiedWidget->width();
@@ -2008,10 +2070,13 @@ void TopBar::updateTitlePosition(float64 progressCurrent) {
 	if (badgeWidget) {
 		badgesWidth += badgeWidget->width();
 	}
+	if (extremeWidget) {
+		badgesWidth += extremeWidget->width();
+	}
 	if (botVerifyWidget) {
 		badgesWidth += botVerifyWidget->width();
 	}
-	if (verifiedWidget || badgeWidget) {
+	if (verifiedWidget || badgeWidget || extremeWidget) {
 		badgesWidth += st::infoVerifiedCheckPosition.x();
 	}
 	const auto titleWidth = width()
@@ -2042,7 +2107,10 @@ void TopBar::updateTitlePosition(float64 progressCurrent) {
 	if (badgeWidget) {
 		totalElementsWidth += badgeWidget->width();
 	}
-	if (verifiedWidget || badgeWidget) {
+	if (extremeWidget) {
+		totalElementsWidth += extremeWidget->width();
+	}
+	if (verifiedWidget || badgeWidget || extremeWidget) {
 		totalElementsWidth += st::infoVerifiedCheckPosition.x();
 	}
 	totalElementsWidth += botVerifySkip;
@@ -2070,6 +2138,15 @@ void TopBar::updateTitlePosition(float64 progressCurrent) {
 			badgeLeft + (badgeWidget ? badgeWidget->width() : 0),
 			badgeTop,
 			badgeBottom);
+	}
+	if (extremeWidget) {
+		extremeWidget->resize(extremeWidget->width(), _title->height());
+		extremeWidget->moveToLeft(
+			badgeLeft
+				+ (badgeWidget ? badgeWidget->width() : 0)
+				+ (verifiedWidget ? verifiedWidget->width() : 0)
+				+ st::infoVerifiedCheckPosition.x(),
+			badgeTop);
 	}
 }
 

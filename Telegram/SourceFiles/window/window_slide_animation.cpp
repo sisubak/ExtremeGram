@@ -6,6 +6,9 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_slide_animation.h"
+
+#include "core/enhanced_settings.h"
+#include "custom/smooth_animations.h"
 #include "styles/style_basic.h"
 
 
@@ -199,9 +202,19 @@ void SlideAnimation::start() {
 		std::swap(_cacheUnder, _cacheOver);
 	}
 	const auto fromBottom = (_direction == SlideDirection::FromBottom);
-	const auto curve = fromBottom ? anim::easeOutQuint : transition();
+	const auto smooth = EnhancedSettings::Get(
+		EnhancedSettings::Option::SmoothInterfaceAnimations);
+	const auto curve = fromBottom
+		? anim::transition(Custom::Animations::CubicSmoothOut)
+		: smooth
+		? (fromLeft
+			? anim::easeInQuint
+			: anim::transition(Custom::Animations::CubicSmoothOut))
+		: transition();
 	const auto duration = fromBottom
 		? (st::slideDuration * 2)
+		: smooth
+		? (st::slideDuration * 3 / 2)
 		: st::slideDuration;
 	_animation.start(
 		[this] { animationCallback(); },

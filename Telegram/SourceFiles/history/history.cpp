@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 
 #include "core/chat_enhanced_settings.h"
+#include "core/enhanced_settings.h"
 #include "core/msg_extra_state.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
@@ -3625,6 +3626,9 @@ int History::fixedOnTopIndex() const {
 }
 
 bool History::trackUnreadMessages() const {
+	if (EnhancedSettings::IsHiddenChat(peer)) {
+		return false;
+	}
 	if (const auto channel = peer->asChannel()) {
 		return channel->amIn();
 	}
@@ -3632,6 +3636,9 @@ bool History::trackUnreadMessages() const {
 }
 
 bool History::shouldBeInChatList() const {
+	if (EnhancedSettings::IsHiddenChat(peer)) {
+		return false;
+	}
 	if (peer->migrateTo() || !folderKnown()) {
 		return false;
 	} else if (const auto community = peer->asChannel()

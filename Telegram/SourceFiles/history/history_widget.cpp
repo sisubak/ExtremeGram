@@ -223,6 +223,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_autocomplete.h"
 #include "support/support_helper.h"
 #include "support/support_preload.h"
+#include "custom/bot_mode_manager.h"
 #include "dialogs/dialogs_key.h"
 #include "calls/calls_instance.h"
 #include "styles/style_boxes.h"
@@ -291,6 +292,9 @@ HistoryWidget::HistoryWidget(
 , _updateEditTimeLeftDisplay([=] { updateField(); })
 , _fieldBarCancel(this, st::historyReplyCancel)
 , _topBars(std::make_unique<Ui::RpWidget>(this))
+, _statsOverlay(std::make_unique<Custom::BotStatsOverlayWidget>(
+	this,
+	&controller->session()))
 , _topBar(this, controller)
 , _scroll(
 	this,
@@ -6370,6 +6374,20 @@ void HistoryWidget::sendTextWithTags(
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
+	if (!options.scheduled
+		&& _history
+		&& Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+			_history,
+			textWithTags.text,
+			message.action.replyTo.messageId,
+			controller())) {
+		clearFieldText();
+		saveDraftWithTextNow();
+		if (done) {
+			done();
+		}
+		return;
+	}
 	if (const auto bot = BotUse::Selected(_history)) {
 		if (const auto error = BotUse::ValidateSend(bot, message.action)) {
 			BotUse::ShowSendError(_history, error);
@@ -8860,6 +8878,17 @@ void HistoryWidget::updateControlsGeometry() {
 		}
 		if (_supportAutocomplete) {
 			_supportAutocomplete->setBoundings(_scroll->geometry());
+		}
+	}
+	if (_statsOverlay) {
+		_statsOverlay->setPeer(_peer);
+		_statsOverlay->setGeometry(
+			tabsLeftSkip,
+			scrollAreaTop + style::ConvertScale(4),
+			innerWidth,
+			_statsOverlay->height());
+		if (!_statsOverlay->isHidden()) {
+			_statsOverlay->raise();
 		}
 	}
 

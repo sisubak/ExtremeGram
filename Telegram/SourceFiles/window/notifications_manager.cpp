@@ -35,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "core/app_name.h"
 #include "core/application.h"
+#include "core/enhanced_settings.h"
 #include "mainwindow.h"
 #include "api/api_reactions_notify_settings.h"
 #include "api/api_updates.h"
@@ -322,7 +323,8 @@ System::SkipState System::skipNotification(
 	const auto type = notification.type;
 	const auto messageType = (type == Data::ItemNotificationType::Message);
 	const auto thread = item->maybeNotificationThread();
-	if (!thread
+	if (EnhancedSettings::IsHiddenChat(item->history()->peer)
+		|| !thread
 		|| !thread->currentNotification()
 		|| (messageType && item->skipNotification())
 		|| (type == Data::ItemNotificationType::Reaction

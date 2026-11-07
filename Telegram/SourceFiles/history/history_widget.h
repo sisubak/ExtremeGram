@@ -35,6 +35,10 @@ namespace MTP {
 class Error;
 } // namespace MTP
 
+namespace Custom {
+class BotStatsOverlayWidget;
+} // namespace Custom
+
 namespace Data {
 class ForumTopic;
 class PhotoMedia;
@@ -860,6 +864,7 @@ private:
 	object_ptr<Ui::IconButton> _fieldBarCancel;
 
 	std::unique_ptr<Ui::RpWidget> _topBars;
+	std::unique_ptr<Custom::BotStatsOverlayWidget> _statsOverlay;
 
 	std::unique_ptr<HistoryView::TranslateBar> _translateBar;
 	int _translateBarHeight = 0;

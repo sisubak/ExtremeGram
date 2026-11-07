@@ -320,6 +320,7 @@ private:
 	std::shared_ptr<style::InfoPeerBadge> _botVerifySt;
 	std::shared_ptr<style::InfoPeerBadge> _badgeSt;
 	std::shared_ptr<style::InfoPeerBadge> _verifiedSt;
+	base::unique_qptr<Ui::RpWidget> _extremeBadge;
 
 	rpl::variable<float64> _progress = 0.;
 	bool _roundEdges = true;

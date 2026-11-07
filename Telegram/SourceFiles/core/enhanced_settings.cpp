@@ -13,13 +13,16 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "core/application.h"
 #include "core/chat_enhanced_settings.h"
 #include "data/data_histories.h"
+#include "data/data_peer.h"
 #include "data/data_peer_id.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings.h"
+#include "storage/storage_account.h"
 #include "ui/toast/toast.h"
+#include "window/notifications_manager.h"
 #include "window/window_session_controller.h"
 
 #include <QtCore/QFile>
@@ -84,6 +87,20 @@ Descriptor Integer(
 
 const DescriptorList &DescriptorData() {
 	static const auto result = DescriptorList{
+		Bool(OptionId::SmoothInterfaceAnimations,
+			"smooth_interface_animations",
+			&tr::lng_settings_smooth_interface_animations,
+			"enhanced/smooth-interface-animations",
+			{},
+			false,
+			true),
+		Bool(OptionId::BotMode,
+			"extremegram_bot_mode",
+			&tr::lng_extremegram_bot_mode,
+			"enhanced/extremegram-bot-mode",
+			{},
+			false,
+			true),
 		Bool(OptionId::OnlineSpam, "online_spam",
 			&tr::lng_settings_online_spam, "enhanced/online-spam"),
 		Bool(OptionId::ShowMessagesId, "show_messages_id",
@@ -1040,6 +1057,65 @@ void RemoveIdFromBlocklist(int64 userId) {
 
 void ReadBlocklist() {
 	EnsureData().readBlocklist();
+}
+
+namespace {
+
+constexpr auto kHiddenChatsKey = "extremegram.hidden_chats";
+
+QStringList HiddenChatIds(Main::Session &session) {
+	return session.local().readPref<QString>(kHiddenChatsKey).split(
+		QLatin1Char(','),
+		Qt::SkipEmptyParts);
+}
+
+QString HiddenChatId(not_null<PeerData*> peer) {
+	return QString::number(SerializePeerId(peer->id));
+}
+
+} // namespace
+
+bool IsHiddenChat(not_null<PeerData*> peer) {
+	return HiddenChatIds(peer->session()).contains(HiddenChatId(peer));
+}
+
+int HiddenChatsCount(Main::Session &session) {
+	return int(HiddenChatIds(session).size());
+}
+
+void HideChat(not_null<PeerData*> peer) {
+	auto &session = peer->session();
+	auto ids = HiddenChatIds(session);
+	const auto id = HiddenChatId(peer);
+	if (ids.contains(id)) {
+		return;
+	}
+	ids.push_back(id);
+	session.local().writePref<QString>(
+		kHiddenChatsKey,
+		ids.join(QLatin1Char(',')));
+	if (const auto history = session.data().historyLoaded(peer)) {
+		Core::App().notifications().clearFromHistory(history);
+		history->updateChatListExistence();
+		history->updateChatListEntry();
+	}
+}
+
+void RevealHiddenChats(Main::Session &session) {
+	const auto ids = HiddenChatIds(session);
+	session.local().writePref<QString>(kHiddenChatsKey, QString());
+	for (const auto &text : ids) {
+		auto ok = false;
+		const auto serialized = text.toULongLong(&ok);
+		if (!ok) {
+			continue;
+		}
+		if (const auto history = session.data().historyLoaded(
+				DeserializePeerId(serialized))) {
+			history->updateChatListExistence();
+			history->updateChatListEntry();
+		}
+	}
 }
 
 void Start() {

@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "core/ui_integration.h"
 #include "core/update_checker.h"
+#include "custom/client_badge_detector.h"
+#include "custom/slowmode_tracker.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
@@ -1607,6 +1609,14 @@ QSize Message::performCountOptimalSize() {
 					+ (_fromNameStatus
 						? st::dialogsPremiumIcon.icon.width()
 						: 0)
+					+ (from
+						? (Custom::ClientBadgeFor(
+							&history()->session()).badgeWidth(from)
+							+ Custom::SlowmodeFor(
+								&history()->session()).iconWidth(
+									history()->peer,
+									from))
+						: 0)
 					+ st::msgPadding.right();
 				if (via && !displayForwardedFrom()) {
 					namew += st::msgServiceFont->spacew + via->maxWidth
@@ -2545,17 +2555,24 @@ void Message::paintFromName(
 	const auto statusWidth = _fromNameStatus
 		? st::dialogsPremiumIcon.icon.width()
 		: 0;
+	const auto customIconsWidth = from
+		? (Custom::ClientBadgeFor(&history()->session()).badgeWidth(from)
+			+ Custom::SlowmodeFor(&history()->session()).iconWidth(
+				history()->peer,
+				from))
+		: 0;
+	const auto totalBadgesWidth = statusWidth + customIconsWidth;
 	const auto via = item->Get<HistoryMessageVia>();
 	const auto viaShown = via && !displayForwardedFrom() && via->width;
 	const auto viaSkipWidth = viaShown
 		? (via->width + st::msgServiceFont->spacew)
 		: 0;
 	const auto nameAvailableWidth = std::max(
-		((statusWidth && availableWidth > statusWidth)
-			? (availableWidth - statusWidth)
+		((totalBadgesWidth && availableWidth > totalBadgesWidth)
+			? (availableWidth - totalBadgesWidth)
 			: availableWidth) - viaSkipWidth,
 		0);
-	if (statusWidth && availableWidth > statusWidth) {
+	if (statusWidth && availableWidth > totalBadgesWidth) {
 		const auto x = availableLeft
 			+ std::min(nameAvailableWidth, nameText->maxWidth());
 		const auto y = trect.top();
@@ -2592,6 +2609,32 @@ void Message::paintFromName(
 			st::dialogsPremiumIcon.icon.paint(p, x, y, width(), color);
 		}
 	}
+	auto drawnCustomWidth = 0;
+	if (from && customIconsWidth && availableWidth > totalBadgesWidth) {
+		auto customX = availableLeft
+			+ std::min(nameAvailableWidth, nameText->maxWidth())
+			+ statusWidth;
+		drawnCustomWidth += Custom::ClientBadgeFor(
+			&history()->session()
+		).drawBadgeGetWidth(
+			p,
+			customX,
+			trect.top(),
+			st::msgNameFont->height,
+			from,
+			stm->msgBg->c);
+		customX += drawnCustomWidth;
+		drawnCustomWidth += Custom::SlowmodeFor(
+			&history()->session()
+		).drawIconGetWidth(
+			p,
+			customX,
+			trect.top(),
+			st::msgNameFont->height,
+			history()->peer,
+			from,
+			nameFg);
+	}
 	p.setFont(st::msgNameFont);
 	p.setPen(nameFg);
 	const auto nameLinkHandler = fromLink();
@@ -2622,6 +2665,7 @@ void Message::paintFromName(
 			? (st::dialogsPremiumIcon.icon.width()
 				+ st::msgServiceFont->spacew)
 			: 0)
+		+ drawnCustomWidth
 		+ st::msgServiceFont->spacew;
 	availableLeft += skipWidth;
 	availableWidth -= skipWidth;

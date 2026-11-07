@@ -960,6 +960,19 @@ void Filler::addDeleteChat() {
 	if (_topic || (!_sublist && _peer->isChannel())) {
 		return;
 	}
+	if (!_sublist
+		&& (_peer->isUser() || _peer->isChat())
+		&& !EnhancedSettings::IsHiddenChat(_peer)) {
+		_addAction(
+			tr::lng_extremegram_hide_chat(tr::now),
+			[controller = _controller, peer = _peer] {
+				if (controller->activeChatCurrent().peer() == peer) {
+					controller->clearSectionStack();
+				}
+				EnhancedSettings::HideChat(peer);
+			},
+			&st::menuIconMute);
+	}
 	_addAction({
 		.text = ((_peer->isUser() || _sublist)
 			? tr::lng_profile_delete_conversation(tr::now)
@@ -976,6 +989,17 @@ void Filler::addLeaveChat() {
 	const auto channel = _peer->asChannel();
 	if (_topic || _sublist || !channel || !channel->amIn()) {
 		return;
+	}
+	if (!EnhancedSettings::IsHiddenChat(_peer)) {
+		_addAction(
+			tr::lng_extremegram_hide_chat(tr::now),
+			[controller = _controller, peer = _peer] {
+				if (controller->activeChatCurrent().peer() == peer) {
+					controller->clearSectionStack();
+				}
+				EnhancedSettings::HideChat(peer);
+			},
+			&st::menuIconMute);
 	}
 	_addAction({
 		.text = (_peer->isMegagroup()
