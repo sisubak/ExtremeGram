@@ -33,6 +33,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QRegularExpression>
 
+#include <algorithm>
+#include <cmath>
+
 namespace Custom {
 namespace {
 
@@ -518,7 +521,7 @@ void BotModeManager::requestNextHistoryBatch(PeerId peerId) {
 				entry.peerId = authorPeerId;
 				if (authorPeer) {
 					entry.name = authorPeer->name();
-					entry.username = authorPeer->userName();
+					entry.username = authorPeer->username();
 				} else if (entry.name.isEmpty()) {
 					entry.name = u"ID "_q + QString::number(authorPeerId.value);
 				}
@@ -696,7 +699,7 @@ void BotModeManager::sendTextWithRateLimitRetry(
 		FullMsgId replyTo,
 		Fn<void()> onDone) {
 	using SendFlag = MTPmessages_SendMessage::Flag;
-	auto flags = SendFlag(0);
+	auto flags = MTPmessages_SendMessage::Flags(0);
 	auto replyHeader = MTPInputReplyTo();
 	if (replyTo.msg) {
 		flags |= SendFlag::f_reply_to;
@@ -807,7 +810,7 @@ void BotModeManager::onLiveItemAdded(not_null<HistoryItem*> item) {
 	auto &entry = job.counts[sender->id];
 	entry.peerId = sender->id;
 	entry.name = sender->name();
-	entry.username = sender->userName();
+	entry.username = sender->username();
 	++entry.count;
 	++job.scannedMessages;
 

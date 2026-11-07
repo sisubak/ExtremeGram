@@ -11,6 +11,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flat_map.h"
 #include "data/data_peer_id.h"
 
+#include <algorithm>
+#include <optional>
+
 class QPainter;
 class QColor;
 class HistoryItem;

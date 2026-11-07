@@ -17,6 +17,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonValue>
 
+#include <vector>
+
 namespace Statistic {
 
 Data::StatisticalChart StatisticalChartFromJSON(const QByteArray &json) {

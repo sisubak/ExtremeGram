@@ -15,6 +15,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 
+#include <memory>
+#include <optional>
+#include <vector>
+
 class History;
 class HistoryItem;
 class PeerData;

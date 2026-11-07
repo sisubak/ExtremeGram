@@ -20,6 +20,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_basic.h"
 #include "ui/painter.h"
 
+#include <cmath>
+
 namespace Custom {
 namespace {
 

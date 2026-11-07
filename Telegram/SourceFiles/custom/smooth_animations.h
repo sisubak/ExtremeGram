@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/basic_types.h"
 #include <QtCore/QRect>
 #include <cmath>
+#include <algorithm>
 
 class QPainter;
 class HistoryItem;

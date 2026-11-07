@@ -28,6 +28,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QFile>
 #include <QtGui/QPainterPath>
 #include <queue>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 namespace Custom {
 namespace {
