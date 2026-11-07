@@ -11,7 +11,7 @@ jobs:
       IMAGE: ghcr.io/telegramdesktop/tdesktop/centos_env@sha256:29657d0ab22dde4f5fe7dff5f294828908a18548ab3f11c362c63b4d49d7dcc1
     steps:
       - name: Checkout source and submodules
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Check configuration
