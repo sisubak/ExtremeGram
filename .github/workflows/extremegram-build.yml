@@ -2,7 +2,7 @@ name: Build ExtremeGram AppImage
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -58,8 +58,9 @@ jobs:
             --mksquashfs-opt -Xcompression-level --mksquashfs-opt 19 \
             --mksquashfs-opt -b --mksquashfs-opt 1M "$appdir" ExtremeGram-x86_64.AppImage
           sha256sum ExtremeGram-x86_64.AppImage > ExtremeGram-x86_64.AppImage.sha256
-      - name: Upload AppImage
+      - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ExtremeGram-x86_64
           path: |
@@ -67,3 +68,18 @@ jobs:
             ExtremeGram-x86_64.AppImage.sha256
           if-no-files-found: error
           retention-days: 30
+      - name: Publish AppImage release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag="build-${GITHUB_RUN_ID}"
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "ExtremeGram build ${GITHUB_RUN_ID}" \
+            --notes "Automated AppImage build of ${GITHUB_REF_NAME} at ${GITHUB_SHA}." \
+            || true
+          gh release upload "$tag" \
+            ExtremeGram-x86_64.AppImage \
+            ExtremeGram-x86_64.AppImage.sha256 \
+            --clobber
