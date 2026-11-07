@@ -960,6 +960,11 @@ void Filler::addDeleteChat() {
 	if (_topic || (!_sublist && _peer->isChannel())) {
 		return;
 	}
+	if (!_sublist && (_peer->isUser() || _peer->isChat())) {
+		_addAction(tr::lng_extremegram_hide_chat(tr::now), [=] {
+			EnhancedSettings::HideChat(_peer);
+		}, &st::menuIconRemove);
+	}
 	_addAction({
 		.text = ((_peer->isUser() || _sublist)
 			? tr::lng_profile_delete_conversation(tr::now)
