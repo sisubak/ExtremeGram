@@ -59,7 +59,7 @@ jobs:
             --mksquashfs-opt -b --mksquashfs-opt 1M "$appdir" ExtremeGram-x86_64.AppImage
           sha256sum ExtremeGram-x86_64.AppImage > ExtremeGram-x86_64.AppImage.sha256
       - name: Upload AppImage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: ExtremeGram-x86_64
