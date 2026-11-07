@@ -9629,3 +9629,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_hide_chat" = "Hide chat";
 "lng_extremegram_reveal_chats" = "Reveal hidden chats";
 "lng_extremegram_revealed" = "Hidden chats restored";
+
+"lng_extremegram_moderation_commands" = "Moderation commands (!mute)";
+"lng_extremegram_mute_usage" = "Reply to a member with !mute 4d and an optional reason. Use 31 seconds to 365 days.";
+"lng_extremegram_mute_invalid" = "You cannot restrict this participant in this group.";
+"lng_extremegram_mute_existing" = "This member has existing restrictions; change them manually to avoid overwriting them.";
+"lng_extremegram_mute_success" = "The member has been muted.";

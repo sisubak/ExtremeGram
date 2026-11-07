@@ -43,6 +43,7 @@ void RevealHiddenChats(Main::Session &session);
 
 
 enum class OptionId {
+	ModerationCommands,
 	SmoothInterfaceAnimations,
 	OnlineSpam,
 	ShowMessagesId,
@@ -111,6 +112,7 @@ struct Key {
 };
 
 namespace Option {
+inline constexpr auto ModerationCommands = Key<bool>{ OptionId::ModerationCommands };
 inline constexpr auto SmoothInterfaceAnimations = Key<bool>{ OptionId::SmoothInterfaceAnimations };
 inline constexpr auto OnlineSpam = Key<bool>{ OptionId::OnlineSpam };
 inline constexpr auto ShowMessagesId = Key<bool>{ OptionId::ShowMessagesId };

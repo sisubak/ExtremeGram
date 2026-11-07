@@ -846,6 +846,7 @@ struct DecodeEnhancedSettingsResult {
 	}
 
 	void Enhanced::setupBehavior(not_null<Ui::VerticalLayout*> content) {
+		addToggleOption(content, EnhancedSettings::Option::ModerationCommands);
 		AddButtonWithIcon(content, tr::lng_extremegram_reveal_chats(), st::settingsButtonNoIcon
 		)->addClickHandler([=] {
 			EnhancedSettings::RevealHiddenChats(controller()->session());

@@ -87,6 +87,8 @@ Descriptor Integer(
 
 const DescriptorList &DescriptorData() {
 	static const auto result = DescriptorList{
+		Bool(OptionId::ModerationCommands, "moderation_commands",
+			&tr::lng_extremegram_moderation_commands, "enhanced/moderation-commands"),
 		Bool(OptionId::SmoothInterfaceAnimations, "smooth_interface_animations",
 			&tr::lng_settings_smooth_interface_animations, "enhanced/smooth-interface-animations"),
 		Bool(OptionId::OnlineSpam, "online_spam",

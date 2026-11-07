@@ -235,6 +235,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 
 #include <QtCore/QMimeData>
+#include <QtCore/QRegularExpression>
 #include <QtGui/QWindow>
 #include <QtWidgets/QApplication>
 
@@ -6377,6 +6378,74 @@ void HistoryWidget::sendTextWithTags(
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
+	if (EnhancedSettings::Get(EnhancedSettings::Option::ModerationCommands)
+		&& !options.scheduled
+		&& (textWithTags.text.trimmed() == u"!mute"_q
+			|| textWithTags.text.trimmed().startsWith(u"!mute "_q))) {
+		static const auto kMuteCommand = QRegularExpression(
+			u"^!mute\\s+([0-9]{1,8})([smhdw])(?:\\s+(.+))?$"_q,
+			QRegularExpression::CaseInsensitiveOption);
+		const auto match = kMuteCommand.match(textWithTags.text.trimmed());
+		const auto channel = _history->peer->asChannel();
+		const auto replied = message.action.replyTo.messageId
+			? session().data().message(message.action.replyTo.messageId)
+			: nullptr;
+		const auto participant = replied ? replied->from() : nullptr;
+		if (!match.hasMatch()) {
+			controller()->showToast(tr::lng_extremegram_mute_usage(tr::now));
+			return;
+		}
+		const auto multiplier = (match.captured(2).toLower() == u"s"_q) ? 1LL
+			: (match.captured(2).toLower() == u"m"_q) ? 60LL
+			: (match.captured(2).toLower() == u"h"_q) ? 3600LL
+			: (match.captured(2).toLower() == u"d"_q) ? 86400LL : 604800LL;
+		const auto duration = match.captured(1).toLongLong() * multiplier;
+		if (duration < 31 || duration > 365LL * 86400) {
+			controller()->showToast(tr::lng_extremegram_mute_usage(tr::now));
+			return;
+		}
+		if (!channel || !channel->isMegagroup() || !participant
+			|| !participant->isUser() || participant->isSelf()
+			|| !channel->canRestrictParticipant(participant)) {
+			controller()->showToast(tr::lng_extremegram_mute_invalid(tr::now));
+			return;
+		}
+		const auto reason = match.captured(3).trimmed();
+		const auto until = TimeId(base::unixtime::now() + duration);
+		session().api().request(MTPchannels_GetParticipant(
+			channel->inputChannel(), participant->input()
+		)).done(crl::guard(this, [=](const MTPchannels_ChannelParticipant &result) {
+			const auto member = Api::ChatParticipant(result.data().vparticipant(), channel);
+			const auto old = member.restrictions();
+			if (member.isCreatorOrAdmin() || member.isKicked()) {
+				controller()->showToast(tr::lng_extremegram_mute_invalid(tr::now));
+				return;
+			}
+			if (old.flags != ChatRestrictions()) {
+				controller()->showToast(tr::lng_extremegram_mute_existing(tr::now));
+				return;
+			}
+			using R = ChatRestriction;
+			const auto flags = R::SendOther | R::SendStickers | R::SendGifs
+				| R::SendGames | R::SendInline | R::SendPolls | R::SendPhotos
+				| R::SendVideos | R::SendVideoMessages | R::SendMusic
+				| R::SendVoiceMessages | R::SendFiles | R::EmbedLinks;
+			Api::ChatParticipants::Restrict(channel, participant, old,
+				ChatRestrictionsInfo(flags, until),
+				crl::guard(this, [=] {
+					controller()->showToast(tr::lng_extremegram_mute_success(tr::now)
+						+ (reason.isEmpty() ? QString() : (u" "_q + reason)));
+				}),
+				crl::guard(this, [=](const QString &error) { controller()->showToast(error); }));
+		})).fail(crl::guard(this, [=](const MTP::Error &error) {
+			controller()->showToast(error.type());
+		})).send();
+		clearFieldText();
+		saveDraftWithTextNow();
+		if (done) done();
+		return;
+	}
+
 	if (const auto bot = BotUse::Selected(_history)) {
 		if (const auto error = BotUse::ValidateSend(bot, message.action)) {
 			BotUse::ShowSendError(_history, error);
