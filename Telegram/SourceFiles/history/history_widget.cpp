@@ -6390,7 +6390,7 @@ void HistoryWidget::sendTextWithTags(
 		const auto replied = message.action.replyTo.messageId
 			? session().data().message(message.action.replyTo.messageId)
 			: nullptr;
-		const auto participant = replied ? replied->from() : nullptr;
+		const auto participant = replied ? replied->from().get() : nullptr;
 		if (!match.hasMatch()) {
 			controller()->showToast(tr::lng_extremegram_mute_usage(tr::now));
 			return;
