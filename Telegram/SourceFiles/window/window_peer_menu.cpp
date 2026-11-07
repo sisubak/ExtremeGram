@@ -71,6 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/feature_list.h"
 #include "ui/ui_utility.h"
 #include "core/application.h"
+#include "core/enhanced_settings.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -137,7 +138,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer_values.h"
 #include "dialogs/dialogs_key.h"
 #include "core/application.h"
-#include "core/enhanced_settings.h"
 #include "core/ui_integration.h"
 #include "export/export_manager.h"
 #include "boxes/peers/edit_participants_box.h"
@@ -977,6 +977,9 @@ void Filler::addLeaveChat() {
 	if (_topic || _sublist || !channel || !channel->amIn()) {
 		return;
 	}
+	_addAction(tr::lng_extremegram_hide_chat(tr::now), [=] {
+		EnhancedSettings::HideChat(_peer);
+	}, &st::menuIconRemove);
 	_addAction({
 		.text = (_peer->isMegagroup()
 			? tr::lng_profile_leave_group(tr::now)

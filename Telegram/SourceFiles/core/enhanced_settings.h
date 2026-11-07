@@ -33,7 +33,14 @@ template <typename... Tags>
 struct phrase;
 } // namespace tr
 
+class PeerData;
+
 namespace EnhancedSettings {
+
+[[nodiscard]] bool IsHiddenChat(not_null<PeerData*> peer);
+void HideChat(not_null<PeerData*> peer);
+void RevealHiddenChats(Main::Session &session);
+
 
 enum class OptionId {
 	SmoothInterfaceAnimations,

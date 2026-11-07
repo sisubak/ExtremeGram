@@ -9625,3 +9625,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_screenshot_save_failed" = "Could not save the screenshot.";
 
 "lng_settings_smooth_interface_animations" = "Smooth interface transitions";
+
+"lng_extremegram_hide_chat" = "Hide chat";
+"lng_extremegram_reveal_chats" = "Reveal hidden chats";
+"lng_extremegram_revealed" = "Hidden chats restored";

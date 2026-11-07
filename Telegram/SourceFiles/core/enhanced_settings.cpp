@@ -15,6 +15,9 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "data/data_histories.h"
 #include "data/data_peer_id.h"
 #include "data/data_session.h"
+#include "data/data_peer.h"
+#include "storage/storage_account.h"
+#include "window/notifications_manager.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
@@ -1042,6 +1045,47 @@ void RemoveIdFromBlocklist(int64 userId) {
 
 void ReadBlocklist() {
 	EnsureData().readBlocklist();
+}
+
+namespace {
+constexpr auto kHiddenChatsKey = "extremegram.hidden_chats";
+QStringList HiddenChatIds(Main::Session &session) {
+	return session.local().readPref<QString>(kHiddenChatsKey).split(
+		QLatin1Char(','), Qt::SkipEmptyParts);
+}
+QString HiddenChatId(not_null<PeerData*> peer) {
+	return QString::number(SerializePeerId(peer->id));
+}
+} // namespace
+
+bool IsHiddenChat(not_null<PeerData*> peer) {
+	return HiddenChatIds(peer->session()).contains(HiddenChatId(peer));
+}
+
+void HideChat(not_null<PeerData*> peer) {
+	auto &session = peer->session();
+	auto ids = HiddenChatIds(session);
+	const auto id = HiddenChatId(peer);
+	if (ids.contains(id)) return;
+	ids.push_back(id);
+	session.local().writePref<QString>(kHiddenChatsKey, ids.join(QLatin1Char(',')));
+	if (const auto history = session.data().historyLoaded(peer)) {
+		Core::App().notifications().clearFromHistory(history);
+		history->updateChatListExistence();
+	}
+}
+
+void RevealHiddenChats(Main::Session &session) {
+	const auto ids = HiddenChatIds(session);
+	session.local().writePref<QString>(kHiddenChatsKey, QString());
+	for (const auto &text : ids) {
+		auto ok = false;
+		const auto serialized = text.toULongLong(&ok);
+		if (!ok) continue;
+		if (const auto history = session.data().historyLoaded(DeserializePeerId(serialized))) {
+			history->updateChatListExistence();
+		}
+	}
 }
 
 void Start() {

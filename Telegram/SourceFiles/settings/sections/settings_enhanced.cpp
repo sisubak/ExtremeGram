@@ -846,6 +846,11 @@ struct DecodeEnhancedSettingsResult {
 	}
 
 	void Enhanced::setupBehavior(not_null<Ui::VerticalLayout*> content) {
+		AddButtonWithIcon(content, tr::lng_extremegram_reveal_chats(), st::settingsButtonNoIcon
+		)->addClickHandler([=] {
+			EnhancedSettings::RevealHiddenChats(controller()->session());
+			controller()->showToast(tr::lng_extremegram_revealed(tr::now));
+		});
 		addToggleOption(content, EnhancedSettings::Option::OnlineSpam);
 		addToggleOption(content, EnhancedSettings::Option::ShowSimilarOnJoined);
 		addToggleOption(
