@@ -806,6 +806,7 @@ struct DecodeEnhancedSettingsResult {
 	}
 
 	void Enhanced::setupInterface(not_null<Ui::VerticalLayout*> content) {
+		addToggleOption(content, EnhancedSettings::Option::SmoothInterfaceAnimations);
 		addToggleOption(
 			content,
 			EnhancedSettings::Option::DisablePremiumAnimation);

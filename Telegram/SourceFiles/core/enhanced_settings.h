@@ -36,6 +36,7 @@ struct phrase;
 namespace EnhancedSettings {
 
 enum class OptionId {
+	SmoothInterfaceAnimations,
 	OnlineSpam,
 	ShowMessagesId,
 	ShowMessageForwardCount,
@@ -103,6 +104,7 @@ struct Key {
 };
 
 namespace Option {
+inline constexpr auto SmoothInterfaceAnimations = Key<bool>{ OptionId::SmoothInterfaceAnimations };
 inline constexpr auto OnlineSpam = Key<bool>{ OptionId::OnlineSpam };
 inline constexpr auto ShowMessagesId = Key<bool>{ OptionId::ShowMessagesId };
 inline constexpr auto ShowMessageForwardCount

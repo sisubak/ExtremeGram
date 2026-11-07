@@ -84,6 +84,8 @@ Descriptor Integer(
 
 const DescriptorList &DescriptorData() {
 	static const auto result = DescriptorList{
+		Bool(OptionId::SmoothInterfaceAnimations, "smooth_interface_animations",
+			&tr::lng_settings_smooth_interface_animations, "enhanced/smooth-interface-animations"),
 		Bool(OptionId::OnlineSpam, "online_spam",
 			&tr::lng_settings_online_spam, "enhanced/online-spam"),
 		Bool(OptionId::ShowMessagesId, "show_messages_id",

@@ -9623,3 +9623,5 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_screenshot_unavailable" = "The selected messages are not ready to render.";
 "lng_screenshot_saved" = "Screenshot saved.";
 "lng_screenshot_save_failed" = "Could not save the screenshot.";
+
+"lng_settings_smooth_interface_animations" = "Smooth interface transitions";
