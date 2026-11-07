@@ -1,0 +1,22 @@
+[Desktop Entry]
+Name=Yurigram
+Comment=Unofficial desktop version of Telegram messaging app
+TryExec=yurigram
+Exec=yurigram -- %U
+Icon=rua.Yurigram
+Terminal=false
+StartupWMClass=rua.Yurigram
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;x-scheme-handler/ton;
+Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;
+Actions=quit;
+DBusActivatable=true
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=yurigram -quit
+Name=Quit Yurigram
+Icon=application-exit

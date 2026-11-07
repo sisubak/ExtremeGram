@@ -1,0 +1,69 @@
+name: Build ExtremeGram AppImage
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      IMAGE: ghcr.io/telegramdesktop/tdesktop/centos_env@sha256:29657d0ab22dde4f5fe7dff5f294828908a18548ab3f11c362c63b4d49d7dcc1
+    steps:
+      - name: Checkout source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Check configuration
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
+            echo 'Missing repository secrets TDESKTOP_API_ID or TDESKTOP_API_HASH.' >&2
+            exit 1
+          fi
+      - name: Pull build environment
+        run: docker pull "$IMAGE"
+      - name: Compile
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/usr/src/tdesktop" -e CONFIG=Release \
+            -e CMAKE_BUILD_PARALLEL_LEVEL=2 -e API_ID -e API_HASH "$IMAGE" \
+            bash -c 'exec /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+              -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+              -D DESKTOP_APP_USE_PANGO=OFF \
+              -D TDESKTOP_API_ID="$API_ID" -D TDESKTOP_API_HASH="$API_HASH"'
+      - name: Install application
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/usr/src/tdesktop" -e DESTDIR=/usr/src/tdesktop \
+            -w /usr/src/tdesktop/Telegram "$IMAGE" \
+            cmake --install /usr/src/tdesktop/out --config Release --prefix /pkg/usr
+      - name: Package AppImage
+        run: |
+          set -eu
+          appdir="$PWD/pkg"
+          cp "$appdir/usr/share/applications/rua.Yurigram.desktop" "$appdir/rua.Yurigram.desktop"
+          sed -i -e 's/^Name=Yurigram$/Name=ExtremeGram/' -e 's/^DBusActivatable=true$/DBusActivatable=false/' "$appdir/rua.Yurigram.desktop"
+          cp "$appdir/usr/share/icons/hicolor/256x256/apps/rua.Yurigram.png" "$appdir/rua.Yurigram.png"
+          printf '%s\n' '#!/bin/sh' 'HERE="$(dirname "$(readlink -f "$0")")"' 'exec "$HERE/usr/bin/yurigram" "$@"' > "$appdir/AppRun"
+          chmod +x "$appdir/AppRun"
+          curl -fL --retry 3 -o appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool.AppImage \
+            --mksquashfs-opt -Xcompression-level --mksquashfs-opt 19 \
+            --mksquashfs-opt -b --mksquashfs-opt 1M "$appdir" ExtremeGram-x86_64.AppImage
+          sha256sum ExtremeGram-x86_64.AppImage > ExtremeGram-x86_64.AppImage.sha256
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExtremeGram-x86_64
+          path: |
+            ExtremeGram-x86_64.AppImage
+            ExtremeGram-x86_64.AppImage.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="/tlv">
+    <file alias="tlv.html">../../tlv/tlv.html</file>
+    <file alias="style.css">../../tlv/style.css</file>
+    <file alias="app.js">../../tlv/app.js</file>
+    <file alias="schema.js">../../tlv/schema.js</file>
+  </qresource>
+</RCC>
