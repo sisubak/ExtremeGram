@@ -238,6 +238,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QMimeData>
+#include <QtCore/QRegularExpression>
 #include <QtGui/QWindow>
 
 #include <algorithm>
