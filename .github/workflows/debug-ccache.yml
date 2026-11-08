@@ -1,0 +1,21 @@
+name: Debug ccache
+on:
+  workflow_dispatch:
+jobs:
+  debug:
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE: ghcr.io/telegramdesktop/tdesktop/centos_env@sha256:29657d0ab22dde4f5fe7dff5f294828908a18548ab3f11c362c63b4d49d7dcc1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull build environment
+        run: docker pull "$IMAGE"
+      - name: Debug
+        run: |
+          mkdir -p .ccache
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/usr/src/tdesktop" -v "$PWD/.ccache:/ccache" \
+            -e CCACHE_DIR=/ccache -e CCACHE_MAXSIZE=3G -e CCACHE_COMPRESS=true \
+            "$IMAGE" bash -c 'echo CCACHE_DIR=$CCACHE_DIR; ccache --version; ccache -s; ls -la /ccache; echo test > /ccache/testfile; ls -la /ccache'
+      - name: Host check
+        run: ls -la .ccache; cat .ccache/testfile
