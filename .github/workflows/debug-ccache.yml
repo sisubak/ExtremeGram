@@ -16,6 +16,16 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$PWD:/usr/src/tdesktop" -v "$PWD/.ccache:/ccache" \
             -e CCACHE_DIR=/ccache -e CCACHE_MAXSIZE=3G -e CCACHE_COMPRESS=true \
-            "$IMAGE" bash -c 'echo CCACHE_DIR=$CCACHE_DIR; ccache --version; ccache -s; ls -la /ccache; echo test > /ccache/testfile; ls -la /ccache'
+            "$IMAGE" bash -c '
+              set -x
+              echo "CCACHE_DIR=$CCACHE_DIR"
+              printf "%s\n" "int main(){return 0;}" > /tmp/t.cpp
+              ccache -z
+              /usr/bin/ccache g++ -O3 -c /tmp/t.cpp -o /tmp/t1.o
+              ccache -s
+              /usr/bin/ccache g++ -O3 -fhardened -c /tmp/t.cpp -o /tmp/t2.o
+              ccache -s
+              ls -la /ccache
+            '
       - name: Host check
-        run: ls -la .ccache; cat .ccache/testfile
+        run: ls -la .ccache; du -sh .ccache
