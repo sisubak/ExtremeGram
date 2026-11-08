@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/send_action_animations.h"
 #include "api/api_send_progress.h"
 
+#include <vector>
+
 class UserData;
 
 namespace Main {
@@ -60,6 +62,7 @@ public:
 	[[nodiscard]] QString actionText() const {
 		return _sendActionString;
 	}
+	[[nodiscard]] std::vector<not_null<UserData*>> typingUsers() const;
 
 private:
 	const not_null<History*> _history;

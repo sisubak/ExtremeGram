@@ -239,6 +239,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QMimeData>
 #include <QtGui/QWindow>
+
+#include <algorithm>
+#include <vector>
+
 #include <QtWidgets/QApplication>
 
 namespace {
@@ -261,6 +265,94 @@ constexpr auto kCommonModifiers = 0
 	| Qt::ControlModifier;
 
 const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
+
+[[nodiscard]] bool LooksLikeMarkdown(const QString &text) {
+	return text.contains(u"**"_q)
+		|| text.contains(u"__"_q)
+		|| text.contains(u"~~"_q)
+		|| text.contains(u"`"_q)
+		|| text.contains(u"]("_q)
+		|| text.contains(u"\n# "_q)
+		|| text.startsWith(u"# "_q)
+		|| text.startsWith(u"> "_q)
+		|| text.contains(u"\n- "_q)
+		|| text.startsWith(u"- "_q);
+}
+
+[[nodiscard]] TextWithTags ApplyMentionNames(
+		not_null<Main::Session*> session,
+		TextWithTags text) {
+	struct Replacement {
+		int start = 0;
+		int length = 0;
+		int newLength = 0;
+	};
+	static const auto expression = QRegularExpression(
+		u"@([A-Za-z][A-Za-z0-9_]{4,31})"_q);
+	auto replacements = std::vector<Replacement>();
+	auto result = TextWithTags();
+	auto position = 0;
+	auto iterator = expression.globalMatch(text.text);
+	while (iterator.hasNext()) {
+		const auto match = iterator.next();
+		const auto start = int(match.capturedStart());
+		const auto length = int(match.capturedLength());
+		const auto username = match.captured(1);
+		const auto peer = session->data().peerByUsername(username);
+		const auto user = peer ? peer->asUser() : nullptr;
+		if (!user) {
+			continue;
+		}
+		const auto name = user->name();
+		result.text.append(text.text.mid(position, start - position));
+		const auto mentionStart = int(result.text.size());
+		result.text.append(name);
+		result.tags.push_back({
+			mentionStart,
+			int(name.size()),
+			u"mention://"_q + TextUtilities::MentionNameDataFromFields({
+				.selfId = session->userId().bare,
+				.userId = user->id.bare,
+				.accessHash = user->accessHash(),
+			}),
+		});
+		replacements.push_back({ start, length, int(name.size()) });
+		position = start + length;
+	}
+	if (replacements.empty()) {
+		return text;
+	}
+	result.text.append(text.text.mid(position));
+
+	const auto mapOffset = [&](int offset, bool end) {
+		auto delta = 0;
+		for (const auto &replacement : replacements) {
+			if (offset <= replacement.start) {
+				break;
+			} else if (offset >= replacement.start + replacement.length) {
+				delta += replacement.newLength - replacement.length;
+			} else {
+				return replacement.start + delta
+					+ (end ? replacement.newLength : 0);
+			}
+		}
+		return offset + delta;
+	};
+	for (const auto &tag : text.tags) {
+		const auto start = mapOffset(tag.offset, false);
+		const auto finish = mapOffset(tag.offset + tag.length, true);
+		if (finish > start) {
+			result.tags.push_back({ start, finish - start, tag.id });
+		}
+	}
+	std::sort(
+		result.tags.begin(),
+		result.tags.end(),
+		[](const TextWithTags::Tag &a, const TextWithTags::Tag &b) {
+			return a.offset < b.offset;
+		});
+	return result;
+}
 
 [[nodiscard]] rpl::producer<PeerData*> ActivePeerValue(
 		not_null<Window::SessionController*> controller) {
@@ -670,11 +762,27 @@ HistoryWidget::HistoryWidget(
 		if (action == Ui::InputField::MimeAction::Check) {
 			return canSendFiles(data);
 		} else if (action == Ui::InputField::MimeAction::Insert) {
-			if (confirmSendingFiles(
-					data,
-					std::nullopt,
-					Core::ReadMimeText(data))) {
+			const auto pasted = Core::ReadMimeText(data);
+			if (confirmSendingFiles(data, std::nullopt, pasted)) {
 				return true;
+			}
+			if (EnhancedSettings::Get(
+					EnhancedSettings::Option::MarkdownPaste)
+				&& LooksLikeMarkdown(pasted)) {
+				auto parsed = TextUtilities::ParseEntities(
+					pasted,
+					TextParseMarkdown);
+				if (!parsed.entities.empty()) {
+					const auto cursor = _field->textCursor();
+					_field->insertWithTags(
+						{ cursor.selectionStart(), cursor.selectionEnd() },
+						{
+							parsed.text,
+							TextUtilities::ConvertEntitiesToTextTags(
+								parsed.entities),
+						});
+					return true;
+				}
 			}
 			offerRichPaste(data);
 			return false;
@@ -6393,6 +6501,12 @@ void HistoryWidget::sendTextWithTags(
 			done();
 		}
 		return;
+	}
+	if (EnhancedSettings::Get(
+			EnhancedSettings::Option::MentionAsName)) {
+		message.textWithTags = ApplyMentionNames(
+			&session(),
+			std::move(message.textWithTags));
 	}
 	if (const auto bot = BotUse::Selected(_history)) {
 		if (const auto error = BotUse::ValidateSend(bot, message.action)) {

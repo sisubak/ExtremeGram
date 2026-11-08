@@ -279,6 +279,8 @@ PRIVATE
     boxes/peers/edit_tag_control.h
     boxes/peers/edit_participants_box.cpp
     boxes/peers/edit_participants_box.h
+    boxes/peers/extremegram_mute_box.cpp
+    boxes/peers/extremegram_mute_box.h
     boxes/peers/peer_ban_box.cpp
     boxes/peers/peer_ban_box.h
     boxes/peers/edit_peer_color_box.cpp
@@ -605,6 +607,10 @@ PRIVATE
     custom/bot_mode_manager.h
     custom/client_badge_detector.cpp
     custom/client_badge_detector.h
+    custom/eternal_tags.cpp
+    custom/eternal_tags.h
+    custom/mention_pins.cpp
+    custom/mention_pins.h
     custom/slowmode_tracker.cpp
     custom/slowmode_tracker.h
     custom/smooth_animations.cpp

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 
 namespace Ui {
+class Checkbox;
 class InputField;
 } // namespace Ui
 
@@ -33,12 +34,14 @@ public:
 	EditTagControl(
 		QWidget *parent,
 		not_null<Main::Session*> session,
+		not_null<PeerData*> peer,
 		not_null<UserData*> user,
 		const QString &currentRank,
 		HistoryView::BadgeRole role);
 	~EditTagControl();
 
 	[[nodiscard]] QString currentRank() const;
+	[[nodiscard]] bool eternal() const;
 	[[nodiscard]] not_null<Ui::InputField*> field() const;
 
 private:
@@ -46,5 +49,6 @@ private:
 
 	not_null<PreviewWidget*> _preview;
 	not_null<Ui::InputField*> _field;
+	not_null<Ui::Checkbox*> _eternal;
 
 };

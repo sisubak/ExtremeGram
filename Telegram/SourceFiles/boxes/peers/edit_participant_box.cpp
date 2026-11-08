@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peers/edit_participant_box.h"
 
+#include "custom/eternal_tags.h"
+
 #include "boxes/peers/edit_tag_control.h"
 #include "boxes/peers/edit_participants_box.h"
 #include "history/view/history_view_message.h"
@@ -674,6 +676,7 @@ void EditAdminBox::prepare() {
 				object_ptr<EditTagControl>(
 					inner,
 					&peer()->session(),
+					peer(),
 					user(),
 					_oldRank,
 					role),
@@ -743,6 +746,17 @@ void EditAdminBox::prepare() {
 					? ~Flags(0)
 					: myEditableRights);
 			confirmGuardBotSave(ChatAdminRightsInfo(newFlags), [=] {
+				if (_tagControl) {
+					auto &tags = Custom::EternalTagsFor(&peer()->session());
+					if (_tagControl->eternal()) {
+						tags.set(
+							peer(),
+							user(),
+							_tagControl->currentRank());
+					} else {
+						tags.remove(peer(), user());
+					}
+				}
 				_saveCallback(
 					_oldRights,
 					ChatAdminRightsInfo(newFlags),
@@ -967,6 +981,7 @@ void EditRestrictedBox::prepare() {
 			object_ptr<EditTagControl>(
 				this,
 				&peer()->session(),
+				peer(),
 				user(),
 				_oldRank,
 				HistoryView::BadgeRole::User),
@@ -1137,6 +1152,9 @@ void EditRestrictedBox::prepare() {
 				? _tagControl->currentRank()
 				: _oldRank;
 			const auto saveRank = (rank != _oldRank);
+			const auto eternal = _tagControl
+				? std::optional<bool>(_tagControl->eternal())
+				: std::nullopt;
 
 			// May destroy the box.
 			_saveCallback(
@@ -1150,7 +1168,15 @@ void EditRestrictedBox::prepare() {
 					rankUser,
 					rank,
 					nullptr,
-					nullptr);
+					nullptr,
+					eternal);
+			} else if (eternal) {
+				auto &tags = Custom::EternalTagsFor(&rankPeer->session());
+				if (*eternal) {
+					tags.set(rankPeer, rankUser, rank);
+				} else {
+					tags.remove(rankPeer, rankUser);
+				}
 			}
 		};
 		addButton(tr::lng_settings_save(), save);

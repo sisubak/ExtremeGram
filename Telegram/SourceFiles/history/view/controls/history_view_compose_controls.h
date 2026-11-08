@@ -632,6 +632,7 @@ private:
 
 	friend class FieldHeader;
 	const std::unique_ptr<FieldHeader> _header;
+	const std::unique_ptr<TypingIndicator> _typingIndicator;
 	const std::unique_ptr<Controls::VoiceRecordBar> _voiceRecordBar;
 	std::unique_ptr<Controls::AiTooltipManager> _aiTooltipManager;
 	std::unique_ptr<Controls::AiTooltipManager> _sendAsFileTooltipManager;

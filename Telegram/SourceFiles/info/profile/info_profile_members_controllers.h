@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peer_list_box.h"
 #include "base/flat_map.h"
+#include "base/timer.h"
 #include "ui/effects/animations.h"
 #include "ui/unread_badge.h"
 
@@ -41,6 +42,8 @@ public:
 		bool canAddTag = false;
 		bool canEditTag = false;
 		bool canRemove = false;
+		bool restricted = false;
+		TimeId restrictedUntil = 0;
 	};
 
 	static constexpr auto kTagElement = 1;
@@ -71,6 +74,16 @@ public:
 		crl::time now,
 		int nameLeft,
 		int nameTop,
+		int outerWidth,
+		bool selected) override;
+	int paintNameIconGetWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int nameWidth,
+		int availableWidth,
 		int outerWidth,
 		bool selected) override;
 	void elementsPaint(
@@ -135,6 +148,7 @@ private:
 	std::unique_ptr<Ui::RippleAnimation> _tagRipple;
 	std::unique_ptr<Ui::RippleAnimation> _removeRipple;
 	Fn<void()> _refreshCallback;
+	base::Timer _restrictionTimer;
 	bool _wasHovered = false;
 
 };

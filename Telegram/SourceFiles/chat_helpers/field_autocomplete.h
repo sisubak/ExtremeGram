@@ -27,6 +27,8 @@ namespace Main {
 class Session;
 } // namespace Main
 
+class PeerData;
+
 namespace SendMenu {
 struct Details;
 } // namespace SendMenu
@@ -153,6 +155,7 @@ private:
 
 	void updateFiltered(bool resetScroll = false);
 	void recount(bool resetScroll = false);
+	[[nodiscard]] PeerData *peer() const;
 	[[nodiscard]] StickerRows getStickerSuggestions();
 	void createEphemeralHint(QRect rect);
 	void ephemeralIconHovered(QRect iconRect);

@@ -9,13 +9,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peers/edit_participants_box.h"
 #include "info/profile/info_profile_values.h"
+#include "dialogs/dialogs_three_state_icon.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
+#include "base/unixtime.h"
+#include "ui/text/format_values.h"
 #include "ui/unread_badge.h"
 #include "lang/lang_keys.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/painter.h"
 #include "styles/style_info.h"
+#include "styles/style_dialogs_layout.h"
 #include "styles/style_boxes.h"
 #include "styles/style_widgets.h"
 
@@ -27,6 +31,17 @@ MemberListRow::MemberListRow(
 	Type type)
 : PeerListRow(peer)
 , _type(type) {
+	_restrictionTimer.setCallback([=] {
+		const auto now = base::unixtime::now();
+		if (_type.restrictedUntil > 0 && _type.restrictedUntil <= now) {
+			_type.restricted = false;
+			_type.restrictedUntil = 0;
+			_restrictionTimer.cancel();
+		}
+		if (_refreshCallback) {
+			_refreshCallback();
+		}
+	});
 	setType(type);
 }
 
@@ -34,6 +49,11 @@ MemberListRow::~MemberListRow() = default;
 
 void MemberListRow::setType(Type type) {
 	_type = type;
+	if (_type.restrictedUntil > 0) {
+		_restrictionTimer.callEach(1000);
+	} else {
+		_restrictionTimer.cancel();
+	}
 	_tagRipple = nullptr;
 	_removeRipple = nullptr;
 	if (_type.canAddTag) {
@@ -498,7 +518,7 @@ int MemberListRow::paintNameIconGetLeadingWidth(
 	if (!_refreshCallback) {
 		_refreshCallback = repaint;
 	}
-	return PeerListRow::paintNameIconGetLeadingWidth(
+	const auto base = PeerListRow::paintNameIconGetLeadingWidth(
 		p,
 		std::move(repaint),
 		now,
@@ -506,6 +526,56 @@ int MemberListRow::paintNameIconGetLeadingWidth(
 		nameTop,
 		outerWidth,
 		selected);
+	if (!_type.restricted) {
+		return base;
+	}
+	const auto &icon = Dialogs::ThreeStateIcon(
+		st::dialogsLockIcon,
+		false,
+		selected);
+	const auto left = nameLeft + base;
+	icon.paint(p, left, nameTop, outerWidth);
+	return base + icon.width() + st::normalFont->spacew;
+}
+
+int MemberListRow::paintNameIconGetWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int nameWidth,
+		int availableWidth,
+		int outerWidth,
+		bool selected) {
+	const auto base = PeerListRow::paintNameIconGetWidth(
+		p,
+		std::move(repaint),
+		now,
+		nameLeft,
+		nameTop,
+		nameWidth,
+		availableWidth,
+		outerWidth,
+		selected);
+	if (!_type.restricted || _type.restrictedUntil <= 0) {
+		return base;
+	}
+	const auto nowSeconds = base::unixtime::now();
+	if (_type.restrictedUntil <= nowSeconds) {
+		return base;
+	}
+	const auto text = Ui::FormatMuteForTiny(
+		_type.restrictedUntil - nowSeconds);
+	const auto left = nameLeft + nameWidth + base + st::normalFont->spacew;
+	const auto width = st::normalFont->width(text);
+	if (left + width > outerWidth) {
+		return base;
+	}
+	p.setFont(st::normalFont);
+	p.setPen(selected ? st::windowSubTextFgOver : st::windowSubTextFg);
+	p.drawText(left, nameTop + st::normalFont->ascent, text);
+	return base + width + st::normalFont->spacew;
 }
 
 void MemberListRow::elementsPaint(

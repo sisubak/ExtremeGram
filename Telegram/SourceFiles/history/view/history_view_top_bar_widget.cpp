@@ -782,7 +782,7 @@ bool TopBarWidget::paintSendAction(
 		int outerWidth,
 		style::color fg,
 		crl::time now) {
-	if (!_sendAction) {
+	if (!_sendAction || !_sendAction->typingUsers().empty()) {
 		return false;
 	}
 	const auto seen = _emojiInteractionSeen.get();

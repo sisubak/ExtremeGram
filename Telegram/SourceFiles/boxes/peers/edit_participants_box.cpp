@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peers/edit_participants_box.h"
 
+#include "custom/eternal_tags.h"
 #include "api/api_chat_participants.h"
 #include "boxes/peers/edit_participant_box.h"
 #include "boxes/peers/edit_tag_control.h"
@@ -308,7 +309,8 @@ void SaveMemberRank(
 		not_null<UserData*> user,
 		const QString &rank,
 		Fn<void()> onDone,
-		Fn<void()> onFail) {
+		Fn<void()> onFail,
+		std::optional<bool> eternal) {
 	peer->session().api().request(MTPmessages_EditChatParticipantRank(
 		peer->input(),
 		user->input(),
@@ -339,6 +341,14 @@ void SaveMemberRank(
 			peer,
 			user,
 			rank);
+		if (eternal) {
+			auto &tags = Custom::EternalTagsFor(&peer->session());
+			if (*eternal) {
+				tags.set(peer, user, rank);
+			} else {
+				tags.remove(peer, user);
+			}
+		}
 		if (onDone) {
 			onDone();
 		}
@@ -2539,6 +2549,10 @@ auto ParticipantsBoxController::computeType(
 	if (user) {
 		result.rank = _additional.memberRank(user);
 	}
+	if (const auto restricted = _additional.restrictedRights(participant)) {
+		result.restricted = true;
+		result.restrictedUntil = restricted->until;
+	}
 
 	const auto chat = _peer->asChat();
 	const auto channel = _peer->asChannel();
@@ -3066,6 +3080,7 @@ void EditCustomRankBox(
 		object_ptr<EditTagControl>(
 			box,
 			&peer->session(),
+			peer,
 			user,
 			currentRank,
 			role),
@@ -3100,7 +3115,8 @@ void EditCustomRankBox(
 				}
 				close();
 			},
-			[=] { state->saving = false; });
+			[=] { state->saving = false; },
+			control->eternal());
 	};
 	field->submits(
 	) | rpl::on_next([=] { save(); }, field->lifetime());

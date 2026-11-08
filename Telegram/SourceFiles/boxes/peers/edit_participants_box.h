@@ -13,6 +13,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/weak_ptr.h"
 #include "info/profile/info_profile_members_controllers.h"
 
+#include <optional>
+
 class PeerListStories;
 struct ChatAdminRightsInfo;
 struct ChatRestrictionsInfo;
@@ -65,7 +67,8 @@ void SaveMemberRank(
 	not_null<UserData*> user,
 	const QString &rank,
 	Fn<void()> onDone,
-	Fn<void()> onFail);
+	Fn<void()> onFail,
+	std::optional<bool> eternal = std::nullopt);
 
 void SubscribeToMigration(
 	not_null<PeerData*> peer,

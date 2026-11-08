@@ -97,6 +97,27 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_auto_stamp_avatar(),
 		EnhancedSettings::Option::AutoStampAvatar,
 		{ u"avatar"_q, u"badge"_q, u"stamp"_q });
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/mute-dialog"_q,
+		tr::lng_extremegram_mute_dialog(),
+		EnhancedSettings::Option::ExtremeMuteDialog,
+		{ u"mute"_q, u"restrict"_q, u"reason"_q, u"duration"_q });
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/markdown-paste"_q,
+		tr::lng_extremegram_markdown_paste(),
+		EnhancedSettings::Option::MarkdownPaste,
+		{ u"markdown"_q, u"paste"_q, u"formatting"_q });
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/mention-as-name"_q,
+		tr::lng_extremegram_mention_as_name(),
+		EnhancedSettings::Option::MentionAsName,
+		{ u"mention"_q, u"username"_q, u"name"_q });
 
 	builder.addButton({
 		.id = u"extremegram/reveal-hidden-chats"_q,

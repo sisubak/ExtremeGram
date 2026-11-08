@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_forum_topic_box.h"
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/peers/edit_participant_box.h"
+#include "boxes/peers/extremegram_mute_box.h"
 #include "boxes/peers/edit_participants_box.h"
 #include "boxes/peers/peer_ban_box.h"
 #include "boxes/share_box.h"
@@ -262,6 +263,16 @@ void ShowSenderRestrictions(
 		const auto &data = result.data();
 		channel->owner().processUsers(data.vusers());
 		const auto participant = Api::ChatParticipant(data.vparticipant(), channel);
+		if (EnhancedSettings::Get(
+				EnhancedSettings::Option::ExtremeMuteDialog)
+			&& !participant.isCreatorOrAdmin()) {
+			ShowExtremeGramMuteBox(
+				controller,
+				channel,
+				user,
+				participant.restrictions());
+			return;
+		}
 		const auto since = participant.restrictedSince();
 		auto box = Box<EditRestrictedBox>(
 			channel,

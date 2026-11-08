@@ -87,6 +87,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/history_view_compose_ai_tooltip.h"
 #include "history/view/controls/history_view_bot_menu_hold.h"
 #include "history/view/controls/history_view_compose_media_edit_manager.h"
+#include "history/view/history_view_send_action.h"
 #include "history/view/controls/history_view_compose_stash_hint.h"
 #include "history/view/controls/history_view_forward_panel.h"
 #include "history/view/controls/history_view_rich_draft_preview.h"
@@ -147,6 +148,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_credits.h"
 #include "styles/style_iv.h"
 #include "styles/style_layers.h"
+#include "styles/style_dialogs.h"
+
+#include <algorithm>
 
 #include <QtWidgets/QApplication>
 
@@ -167,6 +171,8 @@ constexpr auto kMouseEvents = {
 constexpr auto kRefreshSlowmodeLabelTimeout = crl::time(200);
 constexpr auto kMaxStarSendEffects = 4;
 constexpr auto kMaxStarEffects = 4;
+constexpr auto kTypingIndicatorHeight = 20;
+constexpr auto kTypingIndicatorAvatar = 16;
 constexpr auto kStarEffectDuration = 2 * crl::time(1000);
 constexpr auto kStarEffectRotationMax = 12;
 constexpr auto kStarEffectScaleMin = 0.3;
@@ -203,6 +209,104 @@ const char kOptionMacCmdReplyImmediately[] = "mac-cmd-reply-immediately";
 
 const ChatHelpers::PauseReason kDefaultPanelsLevel
 	= ChatHelpers::PauseReason::TabbedPanel;
+
+class TypingIndicator final : public Ui::RpWidget {
+public:
+	TypingIndicator(QWidget *parent, Fn<void()> changed)
+	: RpWidget(parent)
+	, _changed(std::move(changed)) {
+		setFixedHeight(kTypingIndicatorHeight);
+		_timer.setCallback([=] { refresh(); });
+		_timer.callEach(100);
+		hide();
+	}
+
+	void setHistory(History *history) {
+		if (_history == history) {
+			return;
+		}
+		_history = history;
+		_userpics.clear();
+		refresh();
+	}
+
+private:
+	void refresh() {
+		if (!_history) {
+			if (!isHidden()) {
+				setVisible(false);
+				if (_changed) {
+					_changed();
+				}
+			}
+			return;
+		}
+		const auto painter = _history->sendActionPainter();
+		painter->updateNeedsAnimating(crl::now(), true);
+		const auto shown = !painter->typingUsers().empty();
+		if (shown != !isHidden()) {
+			setVisible(shown);
+			if (_changed) {
+				_changed();
+			}
+		}
+		if (shown) {
+			update();
+		}
+	}
+
+	void paintEvent(QPaintEvent *e) override {
+		if (!_history) {
+			return;
+		}
+		auto p = Painter(this);
+		const auto painter = _history->sendActionPainter();
+		const auto users = painter->typingUsers();
+		if (users.empty()) {
+			_userpics.clear();
+		}
+		auto x = st::historySendPadding;
+		const auto top = (height() - kTypingIndicatorAvatar) / 2;
+		for (auto i = 0; i != int(users.size()) && i != 3; ++i) {
+			const auto user = users[i];
+			auto &view = _userpics[user->id];
+			user->paintUserpicLeft(
+				p,
+				view,
+				x,
+				top,
+				width(),
+				kTypingIndicatorAvatar);
+			x += kTypingIndicatorAvatar + st::lineWidth * 2;
+			if (user->isPremium()) {
+				const auto &icon = st::dialogsPremiumIcon.icon;
+				icon.paint(
+					p,
+					x,
+					top + kTypingIndicatorAvatar - icon.height(),
+					width(),
+					st::windowSubTextFg);
+				x += icon.width();
+			}
+			x += st::lineWidth * 2;
+		}
+		const auto textTop = (height() - st::normalFont->height) / 2;
+		painter->paint(
+			p,
+			x,
+			textTop,
+			std::max(width() - x, 0),
+			width(),
+			st::windowSubTextFg,
+			crl::now());
+	}
+
+	History *_history = nullptr;
+	base::flat_map<UserId, Ui::PeerUserpicView> _userpics;
+	base::Timer _timer;
+	Fn<void()> _changed;
+
+};
 
 class FieldHeader final : public Ui::RpWidget {
 public:
@@ -1288,6 +1392,12 @@ ComposeControls::ComposeControls(
 	_wrap.get(),
 	_show,
 	[=] { return _field->isVisible() && HasSendText(_field); }))
+, _typingIndicator(std::make_unique<TypingIndicator>(
+	_wrap.get(),
+	[=] {
+		updateHeight();
+		updateControlsGeometry(_wrap->size());
+	}))
 , _voiceRecordBar(std::make_unique<VoiceRecordBar>(
 	_wrap.get(),
 	Controls::VoiceRecordBarDescriptor{
@@ -1526,6 +1636,7 @@ void ComposeControls::setHistory(SetHistoryArgs &&args) {
 	untrackThreadFieldVisibility();
 	unregisterDraftSources();
 	_history = history;
+	_typingIndicator->setHistory(history);
 	_fieldDisabled = nullptr;
 	_topicRootId = args.topicRootId;
 	_monoforumPeerId = args.monoforumPeerId;
@@ -5223,7 +5334,16 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		}
 	}
 
-	const auto buttonsTop = size.height() - _st.attach.height;
+	const auto fieldHeight = composeFieldHeight();
+	const auto typingHeight = (_typingIndicator
+		&& !_typingIndicator->isHidden())
+		? _typingIndicator->height()
+		: 0;
+	const auto fieldTop = size.height()
+		- _st.padding.bottom()
+		- typingHeight
+		- fieldHeight;
+	const auto buttonsTop = size.height() - typingHeight - _st.attach.height;
 
 	auto left = 0;
 	if (commentsShown) {
@@ -5250,8 +5370,6 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		_sendAs->moveToLeft(left, buttonsTop);
 		left += _sendAs->width();
 	}
-	const auto fieldHeight = composeFieldHeight();
-	const auto fieldTop = size.height() - _st.padding.bottom() - fieldHeight;
 	_field->moveToLeft(left, fieldTop);
 	if (_richDraftPreview) {
 		_richDraftPreview->moveToLeft(left, fieldTop);
@@ -5261,6 +5379,12 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		_fieldDisabled->moveToLeft(left, fieldTop);
 	}
 
+	if (_typingIndicator) {
+		_typingIndicator->resizeToWidth(size.width());
+		_typingIndicator->moveToLeft(
+			0,
+			fieldTop + fieldHeight + _st.padding.bottom());
+	}
 	_header->resizeToWidth(size.width());
 	_header->moveToLeft(
 		0,
@@ -6032,7 +6156,12 @@ int ComposeControls::composeFieldHeight() const {
 }
 
 void ComposeControls::updateHeight() {
-	const auto height = (_header->isDisplayed() ? _header->height() : 0)
+	const auto typingHeight = (_typingIndicator
+		&& !_typingIndicator->isHidden())
+		? _typingIndicator->height()
+		: 0;
+	const auto height = typingHeight
+		+ (_header->isDisplayed() ? _header->height() : 0)
 		+ _st.padding.top()
 		+ composeFieldHeight()
 		+ _st.padding.bottom();

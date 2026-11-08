@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_tag_control.h"
 
 #include "base/unixtime.h"
+#include "custom/eternal_tags.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_session.h"
@@ -25,12 +26,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/painter.h"
 #include "ui/text/text_utilities.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
 #include "window/section_widget.h"
 #include "window/themes/window_theme.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_layers.h"
+#include "styles/style_widgets.h"
 
 namespace {
 
@@ -353,6 +356,7 @@ void EditTagControl::PreviewWidget::paintEvent(QPaintEvent *e) {
 EditTagControl::EditTagControl(
 	QWidget *parent,
 	not_null<Main::Session*> session,
+	not_null<PeerData*> peer,
 	not_null<UserData*> user,
 	const QString &currentRank,
 	HistoryView::BadgeRole role)
@@ -371,7 +375,11 @@ EditTagControl::EditTagControl(
 		: role == HistoryView::BadgeRole::Creator
 		? tr::lng_owner_badge()
 		: tr::lng_rights_edit_admin_rank_name()),
-	TextUtilities::RemoveEmoji(currentRank))) {
+	TextUtilities::RemoveEmoji(currentRank)))
+, _eternal(Ui::CreateChild<Ui::Checkbox>(
+	this,
+	tr::lng_extremegram_eternal_tag(),
+	Custom::EternalTagsFor(session).has(peer, user))) {
 	_field->setMaxLength(kRankLimit);
 	_field->setInstantReplaces(Ui::InstantReplaces::TextOnly());
 
@@ -385,23 +393,29 @@ EditTagControl::EditTagControl(
 		_preview->setTagText(_field->getLastText());
 	}, _field->lifetime());
 
-	widthValue(
-	) | rpl::on_next([=](int w) {
-		_preview->resizeToWidth(w);
+	const auto updateLayout = [=] {
 		const auto inputMargins = st::boxRowPadding;
-		_field->resizeToWidth(w - inputMargins.left() - inputMargins.right());
+		_preview->resizeToWidth(width());
+		_field->resizeToWidth(
+			width() - inputMargins.left() - inputMargins.right());
 		_field->moveToLeft(
 			inputMargins.left(),
 			_preview->height() + st::tagPreviewInputSkip);
-		resize(w, _field->y() + _field->height());
+		_eternal->resizeToNaturalWidth(
+			width() - inputMargins.left() - inputMargins.right());
+		_eternal->moveToLeft(
+			inputMargins.left(),
+			_field->y() + _field->height() + st::tagPreviewInputSkip);
+		resize(width(), _eternal->y() + _eternal->height());
+	};
+	widthValue(
+	) | rpl::on_next([=](int) {
+		updateLayout();
 	}, lifetime());
 
 	_preview->heightValue(
 	) | rpl::skip(1) | rpl::on_next([=] {
-		_field->moveToLeft(
-			st::boxRowPadding.left(),
-			_preview->height() + st::tagPreviewInputSkip);
-		resize(width(), _field->y() + _field->height());
+		updateLayout();
 	}, lifetime());
 }
 
@@ -410,6 +424,10 @@ EditTagControl::~EditTagControl() = default;
 QString EditTagControl::currentRank() const {
 	return TextUtilities::RemoveEmoji(
 		TextUtilities::SingleLine(_field->getLastText().trimmed()));
+}
+
+bool EditTagControl::eternal() const {
+	return _eternal->checked();
 }
 
 not_null<Ui::InputField*> EditTagControl::field() const {

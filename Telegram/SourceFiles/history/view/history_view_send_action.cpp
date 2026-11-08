@@ -204,6 +204,15 @@ void SendActionPainter::paintSpeaking(
 	}
 }
 
+std::vector<not_null<UserData*>> SendActionPainter::typingUsers() const {
+	auto result = std::vector<not_null<UserData*>>();
+	result.reserve(_typing.size());
+	for (const auto &entry : _typing) {
+		result.push_back(entry.first);
+	}
+	return result;
+}
+
 bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 	if (!_weak) {
 		return false;

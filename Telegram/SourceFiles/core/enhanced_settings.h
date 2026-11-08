@@ -102,6 +102,9 @@ enum class OptionId {
 	ShowRecentForwardTargets,
 	HideGramBalance,
 	ShowPeerInfo,
+	ExtremeMuteDialog,
+	MarkdownPaste,
+	MentionAsName,
 	Count,
 };
 
@@ -202,6 +205,10 @@ inline constexpr auto HideGramBalance
 inline constexpr auto ShowPeerId = Key<bool>{ OptionId::ShowPeerId };
 inline constexpr auto PeerIdType = Key<int>{ OptionId::PeerIdType };
 inline constexpr auto ShowPeerInfo = Key<bool>{ OptionId::ShowPeerInfo };
+inline constexpr auto ExtremeMuteDialog
+	= Key<bool>{ OptionId::ExtremeMuteDialog };
+inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
+inline constexpr auto MentionAsName = Key<bool>{ OptionId::MentionAsName };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel

@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/field_autocomplete.h"
 
+#include "custom/mention_pins.h"
+
 #include "api/api_chat_participants.h"
 #include "api/api_common.h"
 #include "apiwrap.h"
@@ -27,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_peer.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
@@ -57,6 +60,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
+
+#include <algorithm>
 
 #include <QtWidgets/QApplication>
 
@@ -380,6 +385,14 @@ void FieldAutocomplete::paintEvent(QPaintEvent *e) {
 	p.fillRect(rect(), _st.bg);
 }
 
+PeerData *FieldAutocomplete::peer() const {
+	return _chat
+		? static_cast<PeerData*>(_chat)
+		: _user
+		? static_cast<PeerData*>(_user)
+		: static_cast<PeerData*>(_channel);
+}
+
 void FieldAutocomplete::showFiltered(
 		not_null<PeerData*> peer,
 		QString query,
@@ -656,6 +669,26 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					}
 					pushMentionRow(user, Source::MentionCandidate);
 				}
+			}
+		}
+		if (const auto peer = this->peer()) {
+			const auto &pins = Custom::MentionPinsFor(_session).list(peer);
+			if (!pins.empty()) {
+				const auto indexOf = [&](not_null<UserData*> user) {
+					const auto i = std::find(
+						pins.begin(),
+						pins.end(),
+						user->id);
+					return (i != pins.end())
+						? int(i - pins.begin())
+						: int(pins.size());
+				};
+				std::stable_sort(
+					mrows.begin(),
+					mrows.end(),
+					[&](const MentionRow &a, const MentionRow &b) {
+						return indexOf(a.user) < indexOf(b.user);
+					});
 			}
 		}
 	} else if (_type == Type::Hashtags) {
@@ -1720,6 +1753,48 @@ void FieldAutocomplete::Inner::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void FieldAutocomplete::Inner::contextMenuEvent(QContextMenuEvent *e) {
+	if (_srows->empty()
+		&& _parent->_type == FieldAutocomplete::Type::Mentions
+		&& _sel >= 0
+		&& _sel < int(_mrows->size())) {
+		const auto peer = _parent->peer();
+		if (!peer) {
+			return;
+		}
+		const auto user = _mrows->at(_sel).user;
+		auto &pins = Custom::MentionPinsFor(_session);
+		const auto pinned = pins.has(peer, user);
+		_menu = base::make_unique_q<Ui::PopupMenu>(
+			this,
+			st::popupMenuWithIcons);
+		_menu->addAction(
+			pinned ? tr::lng_pinned_unpin(tr::now) : tr::lng_pinned_pin(tr::now),
+			crl::guard(this, [=] {
+				auto &manager = Custom::MentionPinsFor(_session);
+				if (manager.has(peer, user)) {
+					manager.unpin(peer, user);
+				} else {
+					manager.pin(peer, user);
+				}
+				_parent->updateFiltered();
+			}));
+		if (pinned) {
+			_menu->addAction(
+				tr::lng_caption_move_up(tr::now),
+				crl::guard(this, [=] {
+					Custom::MentionPinsFor(_session).moveUp(peer, user);
+					_parent->updateFiltered();
+				}));
+			_menu->addAction(
+				tr::lng_caption_move_down(tr::now),
+				crl::guard(this, [=] {
+					Custom::MentionPinsFor(_session).moveDown(peer, user);
+					_parent->updateFiltered();
+				}));
+		}
+		_menu->popup(QCursor::pos());
+		return;
+	}
 	if (_sel < 0 || _srows->empty() || _down >= 0) {
 		return;
 	}
