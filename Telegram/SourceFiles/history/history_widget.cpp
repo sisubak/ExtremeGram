@@ -308,7 +308,7 @@ const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
 		result.text.append(text.text.mid(position, start - position));
 		const auto mentionStart = int(result.text.size());
 		result.text.append(name);
-		result.tags.push_back({
+		result.tags.push_back(TextWithTags::Tag{
 			mentionStart,
 			int(name.size()),
 			u"mention://"_q + TextUtilities::MentionNameDataFromFields({
@@ -343,7 +343,11 @@ const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
 		const auto start = mapOffset(tag.offset, false);
 		const auto finish = mapOffset(tag.offset + tag.length, true);
 		if (finish > start) {
-			result.tags.push_back({ start, finish - start, tag.id });
+			result.tags.push_back(TextWithTags::Tag{
+				start,
+				finish - start,
+				tag.id,
+			});
 		}
 	}
 	std::sort(

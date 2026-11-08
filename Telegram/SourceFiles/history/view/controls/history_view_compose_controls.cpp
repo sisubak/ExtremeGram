@@ -285,7 +285,7 @@ private:
 					x,
 					top + kTypingIndicatorAvatar - icon.height(),
 					width(),
-					st::windowSubTextFg);
+					st::windowSubTextFg->c);
 				x += icon.width();
 			}
 			x += st::lineWidth * 2;
