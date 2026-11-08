@@ -1021,9 +1021,11 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		}
 	}
 	auto ms = crl::now();
-	if (EnhancedSettings::Get(EnhancedSettings::Option::OnlineSpam)
-		&& !Core::Quitting()) {
-		constexpr auto kInterval = crl::time(100);
+	const auto onlineSpamActive = EnhancedSettings::Get(
+		EnhancedSettings::Option::OnlineSpam)
+		&& !Core::Quitting();
+	if (onlineSpamActive) {
+		constexpr auto kInterval = crl::time(2500);
 		isOnline = (ms / kInterval) % 2 == 0;
 		updateIn = int(kInterval - (ms % kInterval));
 	}
@@ -1055,8 +1057,10 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		session().changes().peerUpdated(
 			self,
 			Data::PeerUpdate::Flag::OnlineStatus);
-		if (!isOnline) { // Went offline, so we need to save message draft to the cloud.
-			api().saveCurrentDraftToCloud();
+		if (!isOnline) {
+			if (!onlineSpamActive) {
+				api().saveCurrentDraftToCloud();
+			}
 			session().data().maybeStopWatchForOffline(self);
 		}
 

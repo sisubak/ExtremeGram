@@ -37,6 +37,7 @@ class Error;
 
 namespace Custom {
 class BotStatsOverlayWidget;
+class TypingIndicator;
 } // namespace Custom
 
 namespace Data {
@@ -834,6 +835,7 @@ private:
 
 	void switchToSearch(QString query);
 	void captureChatScreenshot();
+	[[nodiscard]] int typingIndicatorHeight() const;
 
 	void validateSubsectionTabs();
 
@@ -995,6 +997,7 @@ private:
 	const std::unique_ptr<VoiceRecordBar> _voiceRecordBar;
 	const std::unique_ptr<ForwardPanel> _forwardPanel;
 	std::unique_ptr<HistoryView::ComposeSearch> _composeSearch;
+	std::unique_ptr<Custom::TypingIndicator> _typingIndicator;
 	std::unique_ptr<HistoryView::SubsectionTabs> _subsectionTabs;
 	rpl::lifetime _subsectionTabsLifetime;
 	rpl::lifetime _subsectionCheckLifetime;

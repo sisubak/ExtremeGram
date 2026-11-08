@@ -95,6 +95,7 @@ private:
 	bool _autoStampPending = false;
 	std::shared_ptr<Data::PhotoMedia> _videoMedia;
 	int _autoStampAttempts = 0;
+	int _videoWaitChecks = 0;
 	Fn<void(bool, QString)> _waitingDone;
 	rpl::lifetime _lifetime;
 };

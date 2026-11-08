@@ -378,6 +378,7 @@ private:
 	void setupComposeStash();
 
 	void searchRequested();
+	void captureChatScreenshot();
 	void searchInTopic();
 	void updatePinnedVisibility();
 

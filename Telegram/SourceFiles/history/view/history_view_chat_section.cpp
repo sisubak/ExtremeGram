@@ -87,9 +87,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "core/application.h"
+#include "core/file_utilities.h"
 #include "core/shortcuts.h"
 #include "core/click_handler_types.h"
 #include "core/mime_type.h"
+
+#include <QtCore/QDateTime>
+#include <QtCore/QDir>
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 #include "main/main_session.h"
 #include "main/main_domain.h"
 #include "main/main_session_settings.h"
@@ -542,6 +548,10 @@ ChatWidget::ChatWidget(
 	_topBar->searchRequest(
 	) | rpl::on_next([=] {
 		searchRequested();
+	}, _topBar->lifetime());
+	_topBar->screenshotRequest(
+	) | rpl::on_next([=] {
+		captureChatScreenshot();
 	}, _topBar->lifetime());
 	_topBar->membersShowAreaActive(
 	) | rpl::on_next([=](bool active) {
@@ -6654,6 +6664,36 @@ void ChatWidget::searchRequested() {
 		controller()->searchInChat(_history);
 	} else if (!preventsClose(crl::guard(this, [=] { searchInTopic(); }))) {
 		searchInTopic();
+	}
+}
+
+void ChatWidget::captureChatScreenshot() {
+	if (!_inner || _inner->isHidden()) {
+		return;
+	}
+	const auto origin = _inner->mapTo(this, QPoint(0, 0));
+	const auto rect = QRect(origin, _inner->size()).intersected(
+		QRect(QPoint(0, 0), size()));
+	if (rect.isEmpty()) {
+		return;
+	}
+	const auto image = grab().copy(rect);
+	if (const auto clipboard = QGuiApplication::clipboard()) {
+		clipboard->setImage(image);
+	}
+	const auto folder = File::DefaultDownloadPath(&session());
+	QDir().mkpath(folder);
+	const auto filename = u"ExtremeGram_"_q
+		+ QDateTime::currentDateTime().toString(u"yyyyMMdd_HHmmss_zzz"_q)
+		+ u".png"_q;
+	const auto path = QDir(folder).filePath(filename);
+	if (image.save(path, "PNG")) {
+		controller()->showToast(
+			QString::fromUtf8("Фото чата скопировано и сохранено: %1")
+				.arg(QDir::toNativeSeparators(path)));
+	} else {
+		controller()->showToast(
+			QString::fromUtf8("Не удалось сохранить фото чата."));
 	}
 }
 

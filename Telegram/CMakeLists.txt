@@ -615,6 +615,8 @@ PRIVATE
     custom/slowmode_tracker.h
     custom/smooth_animations.cpp
     custom/smooth_animations.h
+    custom/typing_indicator.cpp
+    custom/typing_indicator.h
     core/link_preview_rules.cpp
     core/link_preview_rules.h
     core/msg_extra_state.cpp

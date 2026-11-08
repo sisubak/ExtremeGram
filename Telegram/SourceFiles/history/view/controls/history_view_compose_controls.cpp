@@ -38,8 +38,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/core_settings.h"
+#include "core/enhanced_settings.h"
+#include "core/mime_type.h"
 #include "core/shortcuts.h"
 #include "core/ui_integration.h"
+#include "custom/mention_pins.h"
+#include "custom/typing_indicator.h"
 #include "data/components/ephemeral_messages.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_birthday.h"
@@ -171,8 +175,6 @@ constexpr auto kMouseEvents = {
 constexpr auto kRefreshSlowmodeLabelTimeout = crl::time(200);
 constexpr auto kMaxStarSendEffects = 4;
 constexpr auto kMaxStarEffects = 4;
-constexpr auto kTypingIndicatorHeight = 20;
-constexpr auto kTypingIndicatorAvatar = 16;
 constexpr auto kStarEffectDuration = 2 * crl::time(1000);
 constexpr auto kStarEffectRotationMax = 12;
 constexpr auto kStarEffectScaleMin = 0.3;
@@ -209,104 +211,6 @@ const char kOptionMacCmdReplyImmediately[] = "mac-cmd-reply-immediately";
 
 const ChatHelpers::PauseReason kDefaultPanelsLevel
 	= ChatHelpers::PauseReason::TabbedPanel;
-
-class TypingIndicator final : public Ui::RpWidget {
-public:
-	TypingIndicator(QWidget *parent, Fn<void()> changed)
-	: RpWidget(parent)
-	, _changed(std::move(changed)) {
-		setFixedHeight(kTypingIndicatorHeight);
-		_timer.setCallback([=] { refresh(); });
-		_timer.callEach(100);
-		hide();
-	}
-
-	void setHistory(History *history) {
-		if (_history == history) {
-			return;
-		}
-		_history = history;
-		_userpics.clear();
-		refresh();
-	}
-
-private:
-	void refresh() {
-		if (!_history) {
-			if (!isHidden()) {
-				setVisible(false);
-				if (_changed) {
-					_changed();
-				}
-			}
-			return;
-		}
-		const auto painter = _history->sendActionPainter();
-		painter->updateNeedsAnimating(crl::now(), true);
-		const auto shown = !painter->typingUsers().empty();
-		if (shown != !isHidden()) {
-			setVisible(shown);
-			if (_changed) {
-				_changed();
-			}
-		}
-		if (shown) {
-			update();
-		}
-	}
-
-	void paintEvent(QPaintEvent *e) override {
-		if (!_history) {
-			return;
-		}
-		auto p = Painter(this);
-		const auto painter = _history->sendActionPainter();
-		const auto users = painter->typingUsers();
-		if (users.empty()) {
-			_userpics.clear();
-		}
-		auto x = st::historySendPadding;
-		const auto top = (height() - kTypingIndicatorAvatar) / 2;
-		for (auto i = 0; i != int(users.size()) && i != 3; ++i) {
-			const auto user = users[i];
-			auto &view = _userpics[peerToUser(user->id)];
-			user->paintUserpicLeft(
-				p,
-				view,
-				x,
-				top,
-				width(),
-				kTypingIndicatorAvatar);
-			x += kTypingIndicatorAvatar + st::lineWidth * 2;
-			if (user->isPremium()) {
-				const auto &icon = st::dialogsPremiumIcon.icon;
-				icon.paint(
-					p,
-					x,
-					top + kTypingIndicatorAvatar - icon.height(),
-					width(),
-					st::windowSubTextFg->c);
-				x += icon.width();
-			}
-			x += st::lineWidth * 2;
-		}
-		const auto textTop = (height() - st::normalFont->height) / 2;
-		painter->paint(
-			p,
-			x,
-			textTop,
-			std::max(width() - x, 0),
-			width(),
-			st::windowSubTextFg,
-			crl::now());
-	}
-
-	History *_history = nullptr;
-	base::flat_map<UserId, Ui::PeerUserpicView> _userpics;
-	base::Timer _timer;
-	Fn<void()> _changed;
-
-};
 
 class FieldHeader final : public Ui::RpWidget {
 public:
@@ -1392,7 +1296,7 @@ ComposeControls::ComposeControls(
 	_wrap.get(),
 	_show,
 	[=] { return _field->isVisible() && HasSendText(_field); }))
-, _typingIndicator(std::make_unique<TypingIndicator>(
+, _typingIndicator(std::make_unique<Custom::TypingIndicator>(
 	_wrap.get(),
 	[=] {
 		updateHeight();
@@ -1596,6 +1500,9 @@ void ComposeControls::updateTopicRootId(MsgId topicRootId) {
 	untrackThreadFieldVisibility();
 	unregisterDraftSources();
 	_topicRootId = topicRootId;
+	if (_typingIndicator) {
+		_typingIndicator->setTopicRootId(_topicRootId);
+	}
 	_header->updateTopicRootId(_topicRootId);
 	trackThreadFieldVisibility();
 	registerDraftSource();
@@ -1636,7 +1543,7 @@ void ComposeControls::setHistory(SetHistoryArgs &&args) {
 	untrackThreadFieldVisibility();
 	unregisterDraftSources();
 	_history = history;
-	_typingIndicator->setHistory(history);
+	_typingIndicator->setHistory(history, args.topicRootId);
 	_fieldDisabled = nullptr;
 	_topicRootId = args.topicRootId;
 	_monoforumPeerId = args.monoforumPeerId;
@@ -2396,6 +2303,36 @@ void ComposeControls::setMimeDataHook(MimeDataHook hook) {
 				} else if (originalHook && originalHook(data, action)) {
 					return true;
 				} else if (action == Ui::InputField::MimeAction::Insert) {
+					const auto pasted = Core::ReadMimeText(data);
+					if (EnhancedSettings::Get(
+							EnhancedSettings::Option::MarkdownPaste)
+						&& Custom::LooksLikeMarkdown(pasted)) {
+						auto parsed = TextUtilities::ParseEntities(
+							pasted,
+							TextParseMarkdown);
+						if (!parsed.entities.empty()) {
+							const auto cursor = _field->textCursor();
+							const auto from = cursor.selectionStart();
+							const auto till = cursor.selectionEnd();
+							const auto was = _field->getTextWithTags();
+							const auto tail = int(was.text.size()) - till;
+							_field->setTextWithTags(
+								ChatHelpers::TextWithTagsReplaced(
+									was,
+									from,
+									till,
+									{
+										parsed.text,
+										TextUtilities::ConvertEntitiesToTextTags(
+											parsed.entities),
+									}));
+							_field->setCursorPosition(std::max(
+								0,
+								int(_field->getTextWithTags().text.size())
+									- tail));
+							return true;
+						}
+					}
 					offerRichPaste(data);
 				}
 				return false;
@@ -2602,7 +2539,11 @@ void ComposeControls::showForGrab() {
 }
 
 TextWithTags ComposeControls::getTextWithAppliedMarkdown() const {
-	return _field->getTextWithAppliedMarkdown();
+	auto result = _field->getTextWithAppliedMarkdown();
+	if (EnhancedSettings::Get(EnhancedSettings::Option::MentionAsName)) {
+		result = Custom::ApplyMentionNames(&session(), std::move(result));
+	}
+	return result;
 }
 
 void ComposeControls::clear(bool keepReply) {
@@ -5336,7 +5277,8 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 
 	const auto fieldHeight = composeFieldHeight();
 	const auto typingHeight = (_typingIndicator
-		&& !_typingIndicator->isHidden())
+		&& !_typingIndicator->isHidden()
+		&& !_voiceRecordBar->isActive())
 		? _typingIndicator->height()
 		: 0;
 	const auto fieldTop = size.height()
@@ -6157,7 +6099,8 @@ int ComposeControls::composeFieldHeight() const {
 
 void ComposeControls::updateHeight() {
 	const auto typingHeight = (_typingIndicator
-		&& !_typingIndicator->isHidden())
+		&& !_typingIndicator->isHidden()
+		&& !_voiceRecordBar->isActive())
 		? _typingIndicator->height()
 		: 0;
 	const auto height = typingHeight

@@ -86,9 +86,23 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 	_session->downloaderTaskFinished(
 	) | rpl::on_next([=, this] {
 		if (_waitingForVideo) {
-			_waitingForVideo = false;
-			auto done = base::take(_waitingDone);
-			stampAndReuploadSelfAvatar(std::move(done));
+			const auto ready = _videoMedia
+				&& !_videoMedia->videoContent(Data::PhotoSize::Large).isEmpty();
+			if (ready || (++_videoWaitChecks >= 50)) {
+				_waitingForVideo = false;
+				_videoWaitChecks = 0;
+				auto done = base::take(_waitingDone);
+				if (ready) {
+					stampAndReuploadSelfAvatar(std::move(done));
+				} else {
+					_videoMedia = nullptr;
+					if (done) {
+						done(
+							false,
+							QString::fromUtf8("Не удалось загрузить видео-аватарку."));
+					}
+				}
+			}
 		}
 		pollPendingPeers();
 		maybeAutoStampSelfAvatar();
@@ -570,23 +584,30 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 	}
 
 	auto videoBytes = QByteArray();
-	_videoMedia = nullptr;
 	if (self->userpicHasVideo()) {
 		const auto photo = _session->data().photo(self->userpicPhotoId());
 		if (photo->hasVideo()) {
-			_videoMedia = photo->createMediaView();
+			if (!_videoMedia || (_videoMedia->owner() != photo)) {
+				_videoMedia = photo->createMediaView();
+			}
 			videoBytes = _videoMedia->videoContent(Data::PhotoSize::Large);
 			if (videoBytes.isEmpty()) {
 				photo->loadVideo(
 					Data::PhotoSize::Large,
 					self->userpicOrigin());
 				_waitingForVideo = true;
+				_videoWaitChecks = 0;
 				_waitingDone = std::move(done);
 				return;
 			}
+		} else {
+			_videoMedia = nullptr;
 		}
+	} else {
+		_videoMedia = nullptr;
 	}
 	_waitingForVideo = false;
+	_videoWaitChecks = 0;
 	_waitingDone = nullptr;
 
 	const QImage stamped = StampAvatarWithClientMarker(*cloudImg);

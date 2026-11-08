@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/required.h"
 #include "data/data_peer_id.h"
 #include "rpl/lifetime.h"
+#include "ui/text/text_entity.h"
 
 #include <memory>
 #include <vector>
@@ -33,6 +34,12 @@ public:
 	[[nodiscard]] bool has(
 		not_null<PeerData*> peer,
 		not_null<UserData*> user) const;
+	[[nodiscard]] bool canMoveUp(
+		not_null<PeerData*> peer,
+		not_null<UserData*> user) const;
+	[[nodiscard]] bool canMoveDown(
+		not_null<PeerData*> peer,
+		not_null<UserData*> user) const;
 	void pin(
 		not_null<PeerData*> peer,
 		not_null<UserData*> user);
@@ -47,6 +54,10 @@ public:
 		not_null<UserData*> user);
 
 private:
+	[[nodiscard]] QString storageFilePath() const;
+	void loadFromDisk();
+	void saveToDisk() const;
+
 	const not_null<Main::Session*> _session;
 	base::flat_map<PeerId, std::vector<UserId>> _pins;
 	rpl::lifetime _lifetime;
@@ -54,5 +65,10 @@ private:
 };
 
 [[nodiscard]] MentionPins &MentionPinsFor(not_null<Main::Session*> session);
+
+[[nodiscard]] bool LooksLikeMarkdown(const QString &text);
+[[nodiscard]] TextWithTags ApplyMentionNames(
+	not_null<Main::Session*> session,
+	TextWithTags text);
 
 } // namespace Custom

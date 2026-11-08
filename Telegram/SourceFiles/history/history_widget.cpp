@@ -224,6 +224,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_helper.h"
 #include "support/support_preload.h"
 #include "custom/bot_mode_manager.h"
+#include "custom/mention_pins.h"
+#include "custom/typing_indicator.h"
 #include "dialogs/dialogs_key.h"
 #include "calls/calls_instance.h"
 #include "styles/style_boxes.h"
@@ -238,11 +240,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QMimeData>
-#include <QtCore/QRegularExpression>
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 #include <QtGui/QWindow>
 
 #include <algorithm>
-#include <vector>
 
 #include <QtWidgets/QApplication>
 
@@ -266,98 +268,6 @@ constexpr auto kCommonModifiers = 0
 	| Qt::ControlModifier;
 
 const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
-
-[[nodiscard]] bool LooksLikeMarkdown(const QString &text) {
-	return text.contains(u"**"_q)
-		|| text.contains(u"__"_q)
-		|| text.contains(u"~~"_q)
-		|| text.contains(u"`"_q)
-		|| text.contains(u"]("_q)
-		|| text.contains(u"\n# "_q)
-		|| text.startsWith(u"# "_q)
-		|| text.startsWith(u"> "_q)
-		|| text.contains(u"\n- "_q)
-		|| text.startsWith(u"- "_q);
-}
-
-[[nodiscard]] TextWithTags ApplyMentionNames(
-		not_null<Main::Session*> session,
-		TextWithTags text) {
-	struct Replacement {
-		int start = 0;
-		int length = 0;
-		int newLength = 0;
-	};
-	static const auto expression = QRegularExpression(
-		u"@([A-Za-z][A-Za-z0-9_]{4,31})"_q);
-	auto replacements = std::vector<Replacement>();
-	auto result = TextWithTags();
-	auto position = 0;
-	auto iterator = expression.globalMatch(text.text);
-	while (iterator.hasNext()) {
-		const auto match = iterator.next();
-		const auto start = int(match.capturedStart());
-		const auto length = int(match.capturedLength());
-		const auto username = match.captured(1);
-		const auto peer = session->data().peerByUsername(username);
-		const auto user = peer ? peer->asUser() : nullptr;
-		if (!user) {
-			continue;
-		}
-		const auto name = user->name();
-		result.text.append(text.text.mid(position, start - position));
-		const auto mentionStart = int(result.text.size());
-		result.text.append(name);
-		result.tags.push_back(TextWithTags::Tag{
-			mentionStart,
-			int(name.size()),
-			u"mention://"_q + TextUtilities::MentionNameDataFromFields({
-				.selfId = session->userId().bare,
-				.userId = peerToUser(user->id).bare,
-				.accessHash = user->accessHash(),
-			}),
-		});
-		replacements.push_back({ start, length, int(name.size()) });
-		position = start + length;
-	}
-	if (replacements.empty()) {
-		return text;
-	}
-	result.text.append(text.text.mid(position));
-
-	const auto mapOffset = [&](int offset, bool end) {
-		auto delta = 0;
-		for (const auto &replacement : replacements) {
-			if (offset <= replacement.start) {
-				break;
-			} else if (offset >= replacement.start + replacement.length) {
-				delta += replacement.newLength - replacement.length;
-			} else {
-				return replacement.start + delta
-					+ (end ? replacement.newLength : 0);
-			}
-		}
-		return offset + delta;
-	};
-	for (const auto &tag : text.tags) {
-		const auto start = mapOffset(tag.offset, false);
-		const auto finish = mapOffset(tag.offset + tag.length, true);
-		if (finish > start) {
-			result.tags.push_back(TextWithTags::Tag{
-				start,
-				finish - start,
-				tag.id,
-			});
-		}
-	}
-	std::sort(
-		result.tags.begin(),
-		result.tags.end(),
-		[](const TextWithTags::Tag &a, const TextWithTags::Tag &b) {
-			return a.offset < b.offset;
-		});
-	return result;
-}
 
 [[nodiscard]] rpl::producer<PeerData*> ActivePeerValue(
 		not_null<Window::SessionController*> controller) {
@@ -710,6 +620,12 @@ HistoryWidget::HistoryWidget(
 	initSendAsFileButton();
 	initExpandButton();
 	initDiscardRichDraftButton();
+	_typingIndicator = std::make_unique<Custom::TypingIndicator>(
+		this,
+		[=] {
+			updateControlsGeometry();
+			update();
+		});
 
 	_fieldCharsCountManager.limitExceeds(
 	) | rpl::on_next([=] {
@@ -773,7 +689,7 @@ HistoryWidget::HistoryWidget(
 			}
 			if (EnhancedSettings::Get(
 					EnhancedSettings::Option::MarkdownPaste)
-				&& LooksLikeMarkdown(pasted)) {
+				&& Custom::LooksLikeMarkdown(pasted)) {
 				auto parsed = TextUtilities::ParseEntities(
 					pasted,
 					TextParseMarkdown);
@@ -4016,6 +3932,9 @@ void HistoryWidget::setHistory(History *history) {
 			_preview = nullptr;
 		}
 	}
+	if (_typingIndicator) {
+		_typingIndicator->setHistory(_history);
+	}
 	refreshAttachBotsMenu();
 }
 
@@ -6518,7 +6437,7 @@ void HistoryWidget::sendTextWithTags(
 	}
 	if (EnhancedSettings::Get(
 			EnhancedSettings::Option::MentionAsName)) {
-		message.textWithTags = ApplyMentionNames(
+		message.textWithTags = Custom::ApplyMentionNames(
 			&session(),
 			std::move(message.textWithTags));
 	}
@@ -7724,6 +7643,18 @@ bool HistoryWidget::searchInChatEmbedded(
 	return true;
 }
 
+int HistoryWidget::typingIndicatorHeight() const {
+	return (_typingIndicator
+		&& !_typingIndicator->isHidden()
+		&& (editingMessage() || _canSendMessages)
+		&& fieldOrDisabledShown()
+		&& !isRecording()
+		&& !isSearching()
+		&& !_chooseTheme)
+		? _typingIndicator->height()
+		: 0;
+}
+
 void HistoryWidget::captureChatScreenshot() {
 	if (!_history || !_list || _list->isHidden()) {
 		return;
@@ -7735,15 +7666,18 @@ void HistoryWidget::captureChatScreenshot() {
 		return;
 	}
 	const auto image = grab().copy(rect);
+	if (const auto clipboard = QGuiApplication::clipboard()) {
+		clipboard->setImage(image);
+	}
 	const auto folder = File::DefaultDownloadPath(&session());
 	QDir().mkpath(folder);
-	const auto path = folder
-		+ u"ExtremeGram_"_q
-		+ QDateTime::currentDateTime().toString(u"yyyyMMdd_hhmmss"_q)
+	const auto filename = u"ExtremeGram_"_q
+		+ QDateTime::currentDateTime().toString(u"yyyyMMdd_HHmmss_zzz"_q)
 		+ u".png"_q;
+	const auto path = QDir(folder).filePath(filename);
 	if (image.save(path, "PNG")) {
 		controller()->showToast(
-			QString::fromUtf8("Фото чата сохранено: %1")
+			QString::fromUtf8("Фото чата скопировано и сохранено: %1")
 				.arg(QDir::toNativeSeparators(path)));
 	} else {
 		controller()->showToast(
@@ -8236,6 +8170,14 @@ void HistoryWidget::moveFieldControls() {
 		bottom -= keyboardHeight;
 		_kbScroll->setGeometryToLeft(0, bottom, width(), keyboardHeight);
 	}
+	const auto typingHeight = typingIndicatorHeight();
+	if (_typingIndicator) {
+		_typingIndicator->resizeToWidth(width());
+		_typingIndicator->moveToLeft(
+			0,
+			(typingHeight > 0) ? (bottom - typingHeight) : height());
+	}
+	bottom -= typingHeight;
 
 // (_botMenu) (_attachToggle|_replaceMedia) (_sendAs) ---- _inlineResults ------------------------------ _tabbedPanel ------ _fieldBarCancel
 // (_attachDocument|_attachPhoto) _field (_ttlInfo) (_scheduled) (_giftToUser) (_silent|_cmdStart|_kbShow) (_toggleSuggestPost) (_kbHide|_tabbedSelectorToggle) _send
@@ -9338,7 +9280,9 @@ void HistoryWidget::updateHistoryGeometry(
 		newScrollHeight -= _unblock->height();
 	} else {
 		if (editingMessage() || _canSendMessages) {
-			newScrollHeight -= (fieldHeight() + 2 * st::historySendPadding);
+			newScrollHeight -= (fieldHeight()
+				+ 2 * st::historySendPadding
+				+ typingIndicatorHeight());
 		} else if (_sendRestriction) {
 			newScrollHeight -= _sendRestriction->height();
 		}
@@ -12331,7 +12275,9 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 	_repaintFieldScheduled = false;
 
 	auto backy = _field->y() - st::historySendPadding;
-	auto backh = fieldHeight() + 2 * st::historySendPadding;
+	auto backh = fieldHeight()
+		+ 2 * st::historySendPadding
+		+ typingIndicatorHeight();
 	auto hasForward = readyToForward();
 	auto drawMsgText = (_editMsgId || _replyTo) ? _replyEditMsg : _kbReplyTo;
 	if (_editMsgId

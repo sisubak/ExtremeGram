@@ -30,29 +30,56 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace {
 
-constexpr auto kSecondsInDay = 24 * 60 * 60;
-constexpr auto kMaxRestrictDays = 366;
+constexpr auto kSecondsInMinute = 60;
+constexpr auto kSecondsInHour = 60 * kSecondsInMinute;
+constexpr auto kSecondsInDay = 24 * kSecondsInHour;
+constexpr auto kMinRestrictSeconds = 30;
+constexpr auto kMaxRestrictSeconds = 366 * kSecondsInDay;
 
-[[nodiscard]] bool ParseDuration(const QString &text, int &days) {
+[[nodiscard]] bool ParseDurationSeconds(const QString &text, int &seconds) {
 	const auto value = text.trimmed().toLower();
 	if (value.isEmpty()) {
-		days = 0;
+		seconds = 0;
 		return true;
 	}
 	static const auto expression = QRegularExpression(
-		u"^(\\d+)\\s*(д|дн|дня|дней|день|d|day|days|г|год|года|лет|y|year|years)?$"_q);
+		u"^(\\d+)\\s*(с|сек|секунд|s|sec|secs|"
+		u"м|мин|минут|минуты|m|min|mins|"
+		u"ч|час|часа|часов|h|hr|hrs|hour|hours|"
+		u"д|дн|дня|дней|день|d|day|days|"
+		u"н|нед|недели|недель|w|wk|week|weeks|"
+		u"г|год|года|лет|y|yr|year|years)?$"_q);
 	const auto match = expression.match(value);
 	if (!match.hasMatch()) {
 		return false;
 	}
-	auto number = match.captured(1).toInt();
+	bool ok = false;
+	const auto number = match.captured(1).toLongLong(&ok);
+	if (!ok || number <= 0) {
+		return false;
+	}
 	const auto unit = match.captured(2);
-	if (unit.startsWith(u"г"_q)
+	auto multiplier = qint64(kSecondsInDay);
+	if (unit.startsWith(u"с"_q) || unit.startsWith(u"s"_q)) {
+		multiplier = 1;
+	} else if (unit.startsWith(u"м"_q) || unit.startsWith(u"m"_q)) {
+		multiplier = kSecondsInMinute;
+	} else if (unit.startsWith(u"ч"_q) || unit.startsWith(u"h"_q)) {
+		multiplier = kSecondsInHour;
+	} else if (unit.startsWith(u"н"_q) || unit.startsWith(u"w"_q)) {
+		multiplier = 7 * qint64(kSecondsInDay);
+	} else if (unit.startsWith(u"г"_q)
 		|| unit.startsWith(u"лет"_q)
 		|| unit.startsWith(u"y"_q)) {
-		number *= 365;
+		multiplier = 365 * qint64(kSecondsInDay);
 	}
-	days = std::clamp(number, 0, kMaxRestrictDays);
+	const auto rawSeconds = (number > kMaxRestrictSeconds / multiplier)
+		? qint64(kMaxRestrictSeconds)
+		: (number * multiplier);
+	seconds = int(std::clamp<qint64>(
+		rawSeconds,
+		kMinRestrictSeconds,
+		kMaxRestrictSeconds));
 	return true;
 }
 
@@ -139,21 +166,21 @@ void ShowExtremeGramMuteBox(
 			duration->setFocusFast();
 		});
 
-		box->addButton(tr::lng_settings_save(), [=] {
-			auto days = 0;
-			if (!ParseDuration(duration->getLastText(), days)) {
+		const auto submit = [=] {
+			auto seconds = 0;
+			if (!ParseDurationSeconds(duration->getLastText(), seconds)) {
 				duration->showError();
 				return;
 			}
-			const auto term = days > 0
+			const auto term = seconds > 0
 				? duration->getLastText().trimmed()
 				: QString::fromUtf8("навсегда");
 			const auto reasonText = reason->getLastText().trimmed();
-			const auto until = days > 0
-				? base::unixtime::now() + days * kSecondsInDay
+			const auto until = seconds > 0
+				? base::unixtime::now() + seconds
 				: TimeId(0);
 			const auto newRights = ChatRestrictionsInfo{
-				MuteRestrictions(),
+				oldRights.flags | MuteRestrictions(),
 				until,
 			};
 			box->closeBox();
@@ -172,7 +199,19 @@ void ShowExtremeGramMuteBox(
 						+ u": "_q
 						+ error);
 				});
-		});
+		};
+
+		duration->submits(
+		) | rpl::on_next([=] {
+			reason->setFocus();
+		}, duration->lifetime());
+
+		reason->submits(
+		) | rpl::on_next([=] {
+			submit();
+		}, reason->lifetime());
+
+		box->addButton(tr::lng_settings_save(), submit);
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 	}));
 }

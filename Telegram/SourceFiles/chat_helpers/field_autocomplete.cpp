@@ -1753,6 +1753,9 @@ void FieldAutocomplete::Inner::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void FieldAutocomplete::Inner::contextMenuEvent(QContextMenuEvent *e) {
+	if (e->reason() == QContextMenuEvent::Mouse) {
+		selectByMouse(e->globalPos());
+	}
 	if (_srows->empty()
 		&& _parent->_type == FieldAutocomplete::Type::Mentions
 		&& _sel >= 0
@@ -1779,20 +1782,24 @@ void FieldAutocomplete::Inner::contextMenuEvent(QContextMenuEvent *e) {
 				_parent->updateFiltered();
 			}));
 		if (pinned) {
-			_menu->addAction(
-				tr::lng_caption_move_up(tr::now),
-				crl::guard(this, [=] {
-					Custom::MentionPinsFor(_session).moveUp(peer, user);
-					_parent->updateFiltered();
-				}));
-			_menu->addAction(
-				tr::lng_caption_move_down(tr::now),
-				crl::guard(this, [=] {
-					Custom::MentionPinsFor(_session).moveDown(peer, user);
-					_parent->updateFiltered();
-				}));
+			if (pins.canMoveUp(peer, user)) {
+				_menu->addAction(
+					tr::lng_caption_move_up(tr::now),
+					crl::guard(this, [=] {
+						Custom::MentionPinsFor(_session).moveUp(peer, user);
+						_parent->updateFiltered();
+					}));
+			}
+			if (pins.canMoveDown(peer, user)) {
+				_menu->addAction(
+					tr::lng_caption_move_down(tr::now),
+					crl::guard(this, [=] {
+						Custom::MentionPinsFor(_session).moveDown(peer, user);
+						_parent->updateFiltered();
+					}));
+			}
 		}
-		_menu->popup(QCursor::pos());
+		_menu->popup(e->globalPos());
 		return;
 	}
 	if (_sel < 0 || _srows->empty() || _down >= 0) {
