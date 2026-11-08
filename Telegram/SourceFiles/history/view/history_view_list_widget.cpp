@@ -1893,6 +1893,9 @@ bool ListWidget::wasSelectedText() const {
 }
 
 SelectionModeResult ListWidget::inSelectionMode() const {
+	if (_capturingScreenshot) {
+		return { false, 0. };
+	}
 	const auto now = hasSelectedItems()
 		|| !_dragSelected.empty()
 		|| _chooseForReportReason.has_value()
@@ -4108,6 +4111,156 @@ MessageIdsList ListWidget::getSelectedIds() const {
 
 SelectedItems ListWidget::getSelectedItems() const {
 	return collectSelectedItems();
+}
+
+QImage ListWidget::renderSelectedMessagesToImage() {
+	if (_selected.empty() || width() <= 0) {
+		return QImage();
+	}
+	auto views = std::vector<not_null<Element*>>();
+	views.reserve(_selected.size());
+	for (const auto &[item, _] : _selected) {
+		if (const auto view = viewForItem(item)) {
+			if (!view->isHidden()
+				&& view->height() > 0
+				&& !ranges::contains(views, not_null<Element*>(view))) {
+				views.push_back(view);
+			}
+		}
+	}
+	if (views.empty()) {
+		return QImage();
+	}
+	ranges::sort(views, {}, [&](not_null<Element*> view) {
+		const auto top = itemTop(view);
+		return std::pair(
+			top >= 0 ? top : std::numeric_limits<int>::max(),
+			view->data()->fullId());
+	});
+
+	const auto pad = style::ConvertScale(14);
+	auto totalHeight = pad * 2;
+	for (const auto &view : views) {
+		totalHeight += view->height();
+	}
+	totalHeight = std::clamp(totalHeight, style::ConvertScale(32), 16384);
+
+	const auto ratio = style::DevicePixelRatio();
+	auto image = QImage(
+		QSize(width(), totalHeight) * ratio,
+		QImage::Format_ARGB32_Premultiplied);
+	if (image.isNull()) {
+		return QImage();
+	}
+	image.setDevicePixelRatio(ratio);
+	image.fill(Qt::transparent);
+
+	_capturingScreenshot = true;
+	const auto resetGuard = gsl::finally([&] {
+		_capturingScreenshot = false;
+	});
+
+	Painter p(&image);
+	const auto theme = _delegate->listChatTheme();
+	const auto tileHeight = std::max(
+		controller()->content()->height(),
+		style::ConvertScale(600));
+	for (auto bgY = 0; bgY < totalHeight; bgY += tileHeight) {
+		const auto sliceH = std::min(tileHeight, totalHeight - bgY);
+		p.save();
+		p.translate(0, bgY);
+		Window::SectionWidget::PaintBackground(
+			p,
+			theme,
+			QSize(width(), tileHeight),
+			QRect(0, 0, width(), sliceH),
+			true);
+		p.restore();
+	}
+
+	auto context = _delegate->listPreparePaintContext({
+		.theme = theme,
+		.clip = QRect(0, 0, width(), totalHeight),
+		.visibleAreaPositionGlobal = mapToGlobal(QPoint(0, 0)),
+		.visibleAreaTop = 0,
+		.visibleAreaWidth = width(),
+		.visibleAreaHeight = totalHeight,
+	});
+	context.paused = true;
+	context.highlightPathCache = &_highlightPathCache;
+	_pathGradient->startFrame(
+		0,
+		width(),
+		std::min(st::msgMaxWidth / 2, width() / 2));
+
+	auto curY = pad;
+	for (auto i = size_t(0); i != views.size(); ++i) {
+		const auto view = views[i];
+		const auto h = view->height();
+		if (curY + h > totalHeight) {
+			break;
+		}
+		context.outbg = view->hasOutLayout();
+		context.selection = {};
+		context.fullMessageSelected = false;
+		context.messageSelection = {};
+		context.highlight = {};
+
+		context.translate(0, -curY);
+		p.translate(0, curY);
+		view->draw(p, context);
+		p.translate(0, -curY);
+		context.translate(0, curY);
+
+		const auto item = view->data();
+		const auto nextSamePack = (i + 1 < views.size())
+			&& view->isAttachedToNext()
+			&& (views[i + 1]->displayFrom() == view->displayFrom());
+		if (!item->isService()
+			&& view->hasFromPhoto()
+			&& (view->displayFromPhoto() || !nextSamePack)) {
+			const auto userpicTop = std::max(
+				curY + view->marginTop(),
+				curY + h - view->marginBottom() - st::msgPhotoSize);
+			if (const auto from = view->displayFrom()) {
+				Dialogs::Ui::PaintUserpicWithOnlineBadge(
+					p,
+					from,
+					nullptr,
+					_userpics[from],
+					st::historyPhotoLeft,
+					userpicTop,
+					view->width(),
+					st::msgPhotoSize,
+					true,
+					st::historySenderOnlineBadgeSize,
+					st::historySenderOnlineBadgeStroke,
+					st::historySenderOnlineBadgeSkip,
+					0.);
+			} else if (const auto info = item->displayHiddenSenderInfo()) {
+				if (info->customUserpic.empty()) {
+					info->emptyUserpic.paintCircle(
+						p,
+						st::historyPhotoLeft,
+						userpicTop,
+						view->width(),
+						st::msgPhotoSize);
+				} else {
+					auto &userpic = _hiddenSenderUserpics[item->id];
+					info->paintCustomUserpic(
+						p,
+						userpic,
+						st::historyPhotoLeft,
+						userpicTop,
+						view->width(),
+						st::msgPhotoSize);
+				}
+			}
+		}
+
+		curY += h;
+	}
+	return image;
 }
 
 TextSelection ListWidget::getSelectedTextRange(

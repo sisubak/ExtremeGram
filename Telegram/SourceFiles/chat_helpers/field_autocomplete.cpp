@@ -7,7 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/field_autocomplete.h"
 
+#include "custom/client_badge_detector.h"
 #include "custom/mention_pins.h"
+#include "dialogs/dialogs_three_state_icon.h"
+#include "dialogs/ui/dialogs_layout.h"
 
 #include "api/api_chat_participants.h"
 #include "api/api_common.h"
@@ -42,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/clip/media_clip_reader.h"
 #include "menu/menu_send.h" // SendMenu::FillSendMenu
 #include "storage/storage_account.h"
+#include "ui/effects/animations.h"
 #include "ui/effects/message_sending_animation_common.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/image/image.h"
@@ -143,6 +147,13 @@ private:
 	void paintEvent(QPaintEvent *e) override;
 	void paintStickers(Painter &p, QRect clip);
 	void paintRows(Painter &p, QRect clip);
+	void paintMentionRowAt(
+		Painter &p,
+		int index,
+		int rowTop,
+		bool selected,
+		bool dragged,
+		bool isPinned);
 	void paintShadow(QPainter &p, int top);
 	void resizeEvent(QResizeEvent *e) override;
 
@@ -156,6 +167,8 @@ private:
 
 	[[nodiscard]] QRect selectedRect(int index) const;
 	[[nodiscard]] int rowsCount() const;
+	[[nodiscard]] int pinnedMentionRowsCount() const;
+	[[nodiscard]] int visualSlotForPinnedRow(int index) const;
 	[[nodiscard]] bool commandsWithUsername() const;
 	[[nodiscard]] bool isRemovableMentionRow(int index) const;
 	void updateSelectedRow();
@@ -197,6 +210,17 @@ private:
 	bool _previewShown = false;
 	bool _dragSelect = false;
 	bool _adjustShadowLeft = false;
+
+	bool _pinDragCandidate = false;
+	bool _pinDragActive = false;
+	int _pinDragOriginIndex = -1;
+	int _pinDragTargetIndex = -1;
+	int _pinDragGrabOffsetY = 0;
+	int _pinDragCurrentTop = 0;
+	QPoint _pinDragStartPos;
+	base::flat_map<UserId, Ui::Animations::Simple> _pinIconAnims;
+	base::flat_set<UserId> _pinClosingUsers;
+	base::flat_map<UserId, Ui::Animations::Simple> _rowShiftAnims;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
 	StickerPremiumMark _premiumMark;
@@ -678,7 +702,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					const auto i = std::find(
 						pins.begin(),
 						pins.end(),
-						user->id);
+						peerToUser(user->id));
 					return (i != pins.end())
 						? int(i - pins.begin())
 						: int(pins.size());
@@ -1278,7 +1302,274 @@ void FieldAutocomplete::Inner::paintStickers(Painter &p, QRect clip) {
 	}
 }
 
+int FieldAutocomplete::Inner::pinnedMentionRowsCount() const {
+	if (_mrows->empty() || !_srows->empty() || (_parent->_type != Type::Mentions)) {
+		return 0;
+	}
+	const auto peer = _parent->peer();
+	if (!peer) {
+		return 0;
+	}
+	const auto &pins = Custom::MentionPinsFor(_session);
+	auto count = 0;
+	for (const auto &row : *_mrows) {
+		if (pins.has(peer, row.user)) {
+			++count;
+		} else {
+			break;
+		}
+	}
+	return count;
+}
+
+int FieldAutocomplete::Inner::visualSlotForPinnedRow(int index) const {
+	if (!_pinDragActive || index < 0) {
+		return index;
+	}
+	if (index == _pinDragOriginIndex) {
+		return _pinDragTargetIndex;
+	}
+	if (_pinDragOriginIndex < _pinDragTargetIndex) {
+		if (index > _pinDragOriginIndex && index <= _pinDragTargetIndex) {
+			return index - 1;
+		}
+	} else if (_pinDragOriginIndex > _pinDragTargetIndex) {
+		if (index >= _pinDragTargetIndex && index < _pinDragOriginIndex) {
+			return index + 1;
+		}
+	}
+	return index;
+}
+
+void FieldAutocomplete::Inner::paintMentionRowAt(
+		Painter &p,
+		int index,
+		int rowTop,
+		bool selected,
+		bool dragged,
+		bool isPinned) {
+	if (index < 0 || index >= int(_mrows->size())) {
+		return;
+	}
+	auto &row = _mrows->at(index);
+	const auto user = row.user;
+	const auto uid = peerToUser(user->id);
+
+	if (dragged) {
+		p.fillRect(0, rowTop, width(), st::mentionHeight, st::mentionBgOver);
+		p.fillRect(0, rowTop, width(), st::lineWidth, st::shadowFg);
+		p.fillRect(
+			0,
+			rowTop + st::mentionHeight - st::lineWidth,
+			width(),
+			st::lineWidth,
+			st::shadowFg);
+	} else if (selected) {
+		p.fillRect(0, rowTop, width(), st::mentionHeight, st::mentionBgOver);
+	}
+
+	auto pinRatio = isPinned ? 1.0 : 0.0;
+	if (const auto it = _pinIconAnims.find(uid); it != _pinIconAnims.end()) {
+		if (it->second.animating()) {
+			pinRatio = it->second.value(isPinned ? 1.0 : 0.0);
+		} else if (_pinClosingUsers.contains(uid)) {
+			_pinClosingUsers.remove(uid);
+			_pinIconAnims.erase(it);
+		} else {
+			_pinIconAnims.erase(it);
+		}
+	}
+
+	const auto removable = !isPinned && isRemovableMentionRow(index);
+	const auto &pinIcon = Dialogs::ThreeStateIcon(
+		st::dialogsPinnedIcon,
+		false,
+		selected || dragged);
+	const auto rightReserved = (pinRatio > 0.001)
+		? (pinIcon.width() + st::mentionPadding.right())
+		: (selected && removable)
+		? (st::smallCloseIconOver.width() + st::mentionPadding.right())
+		: 0;
+
+	if (selected && removable && pinRatio <= 0.001) {
+		const auto &closeIcon = st::smallCloseIconOver;
+		const auto skip = (st::mentionHeight - closeIcon.height()) / 2;
+		closeIcon.paint(
+			p,
+			QPoint(width() - closeIcon.width() - skip, rowTop + skip),
+			width());
+	}
+
+	const auto mentionLeft = 2 * st::mentionPadding.left()
+		+ st::mentionPhotoSize;
+	auto &badgeDetector = Custom::ClientBadgeFor(_session);
+	const auto badgeWidth = badgeDetector.badgeWidth(user);
+	const auto mentionWidth = std::max(
+		0,
+		width()
+			- mentionLeft
+			- 2 * st::mentionPadding.right()
+			- rightReserved
+			- badgeWidth);
+
+	const auto filter = _parent->filter();
+	const auto filterSize = int(filter.size());
+	const auto filterIsEmpty = filter.isEmpty();
+	const auto &font = st::mentionFont;
+	const auto username = PrimaryUsername(user);
+	auto first = (!filterIsEmpty
+		&& username.startsWith(filter, Qt::CaseInsensitive))
+		? ('@' + username.mid(0, filterSize))
+		: QString();
+	auto second = first.isEmpty()
+		? (username.isEmpty() ? QString() : ('@' + username))
+		: username.mid(filterSize);
+	const auto firstWidth = font->width(first);
+	const auto secondWidth = font->width(second);
+	auto usernameWidth = firstWidth + secondWidth;
+	if (row.name.isEmpty()) {
+		row.name.setText(
+			st::msgNameStyle,
+			user->name(),
+			Ui::NameTextOptions());
+	}
+	auto nameWidth = row.name.maxWidth();
+	const auto gapWidth = username.isEmpty() ? 0 : st::mentionPadding.right();
+	if (mentionWidth < usernameWidth + gapWidth + nameWidth) {
+		const auto availText = std::max(0, mentionWidth - gapWidth);
+		nameWidth = (usernameWidth + nameWidth > 0)
+			? ((availText * nameWidth) / (nameWidth + usernameWidth))
+			: 0;
+		usernameWidth = std::max(0, availText - nameWidth);
+		if (firstWidth < usernameWidth + font->elidew) {
+			if (firstWidth < usernameWidth) {
+				first = font->elided(first, usernameWidth);
+			} else if (!second.isEmpty()) {
+				first = font->elided(first + second, usernameWidth);
+				second = QString();
+			}
+		} else {
+			second = font->elided(second, usernameWidth - firstWidth);
+		}
+	}
+
+	const auto photoTop = rowTop
+		+ (st::mentionHeight - st::mentionPhotoSize) / 2;
+	user->loadUserpic();
+	user->paintUserpicLeft(
+		p,
+		row.userpic,
+		st::mentionPadding.left(),
+		photoTop,
+		width(),
+		st::mentionPhotoSize);
+
+	const auto nameFontHeight = st::msgNameStyle.font->height;
+	const auto nameTop = rowTop + (st::mentionHeight - nameFontHeight) / 2;
+	p.setPen((selected || dragged) ? st::mentionNameFgOver : st::mentionNameFg);
+	row.name.drawElided(p, mentionLeft, nameTop, nameWidth);
+
+	auto cursorX = mentionLeft + std::min(nameWidth, row.name.maxWidth());
+	if (badgeWidth > 0) {
+		const auto surfaceBg = (selected || dragged)
+			? st::mentionBgOver->c
+			: st::mentionBg->c;
+		const auto badgeTint = (selected || dragged)
+			? st::mentionNameFgOver->c
+			: st::dialogsVerifiedIconBg->c;
+		cursorX += badgeDetector.drawBadgeGetWidth(
+			p,
+			cursorX,
+			nameTop,
+			nameFontHeight,
+			user,
+			surfaceBg,
+			badgeTint);
+	}
+
+	if (!first.isEmpty() || !second.isEmpty()) {
+		const auto usernameLeft = cursorX + gapWidth;
+		const auto baselineY = nameTop + st::msgNameStyle.font->ascent;
+		p.setFont(font);
+		if (!first.isEmpty()) {
+			p.setPen((selected || dragged)
+				? st::mentionFgOverActive
+				: st::mentionFgActive);
+			p.drawText(usernameLeft, baselineY, first);
+		}
+		if (!second.isEmpty()) {
+			p.setPen((selected || dragged)
+				? st::mentionFgOver
+				: st::mentionFg);
+			p.drawText(usernameLeft + firstWidth, baselineY, second);
+		}
+	}
+
+	if (pinRatio > 0.001) {
+		const auto pinLeft = width()
+			- st::mentionPadding.right()
+			- pinIcon.width();
+		const auto pinTop = rowTop
+			+ (st::mentionHeight - pinIcon.height()) / 2;
+		const auto center = QPointF(
+			pinLeft + pinIcon.width() / 2.0,
+			pinTop + pinIcon.height() / 2.0);
+		p.save();
+		auto hq = PainterHighQualityEnabler(p);
+		p.setOpacity(p.opacity() * std::clamp(pinRatio, 0.0, 1.0));
+		p.translate(center);
+		const auto scale = 0.35 + 0.65 * pinRatio;
+		p.scale(scale, scale);
+		p.rotate((1.0 - pinRatio) * -35.0);
+		p.translate(-center);
+		pinIcon.paint(p, pinLeft, pinTop, width());
+		p.restore();
+	}
+}
+
 void FieldAutocomplete::Inner::paintRows(Painter &p, QRect clip) {
+	if (!_mrows->empty()) {
+		const auto last = int(_mrows->size());
+		const auto pinnedCount = pinnedMentionRowsCount();
+		for (auto i = 0; i != last; ++i) {
+			if (_pinDragActive && i == _pinDragOriginIndex) {
+				continue;
+			}
+			const auto isPinned = (i < pinnedCount);
+			const auto slot = isPinned ? visualSlotForPinnedRow(i) : i;
+			const auto uid = peerToUser(_mrows->at(i).user->id);
+			auto shift = 0.0;
+			if (const auto it = _rowShiftAnims.find(uid)
+				; it != _rowShiftAnims.end()) {
+				if (it->second.animating()) {
+					shift = it->second.value(0.0);
+				} else {
+					_rowShiftAnims.erase(it);
+				}
+			}
+			const auto rowTop = slot * st::mentionHeight
+				+ int(base::SafeRound(shift));
+			if (rowTop + st::mentionHeight <= clip.top()
+				|| rowTop > clip.bottom()) {
+				continue;
+			}
+			const auto selected = !_pinDragActive && (i == _sel);
+			paintMentionRowAt(p, i, rowTop, selected, false, isPinned);
+		}
+		if (_pinDragActive
+			&& _pinDragOriginIndex >= 0
+			&& _pinDragOriginIndex < last) {
+			paintMentionRowAt(
+				p,
+				_pinDragOriginIndex,
+				_pinDragCurrentTop,
+				true,
+				true,
+				true);
+		}
+		return;
+	}
+
 	const auto mentionLeft = 2 * st::mentionPadding.left()
 		+ st::mentionPhotoSize;
 	const auto mentionWidth = width()
@@ -1323,70 +1614,7 @@ void FieldAutocomplete::Inner::paintRows(Painter &p, QRect clip) {
 					width());
 			}
 		}
-		if (!_mrows->empty()) {
-			auto &row = _mrows->at(i);
-			const auto user = row.user;
-			const auto username = PrimaryUsername(user);
-			auto first = (!filterIsEmpty
-				&& username.startsWith(filter, Qt::CaseInsensitive))
-				? ('@' + username.mid(0, filterSize))
-				: QString();
-			auto second = first.isEmpty()
-				? (username.isEmpty() ? QString() : ('@' + username))
-				: username.mid(filterSize);
-			const auto firstWidth = font->width(first);
-			const auto secondWidth = font->width(second);
-			auto usernameWidth = firstWidth + secondWidth;
-			if (row.name.isEmpty()) {
-				row.name.setText(
-					st::msgNameStyle,
-					user->name(),
-					Ui::NameTextOptions());
-			}
-			auto nameWidth = row.name.maxWidth();
-			if (mentionWidth < usernameWidth + nameWidth) {
-				nameWidth = (mentionWidth * nameWidth)
-					/ (nameWidth + usernameWidth);
-				usernameWidth = mentionWidth - nameWidth;
-				if (firstWidth < usernameWidth + font->elidew) {
-					if (firstWidth < usernameWidth) {
-						first = font->elided(first, usernameWidth);
-					} else if (!second.isEmpty()) {
-						first = font->elided(first + second, usernameWidth);
-						second = QString();
-					}
-				} else {
-					second = font->elided(second, usernameWidth - firstWidth);
-				}
-			}
-			user->loadUserpic();
-			user->paintUserpicLeft(
-				p,
-				row.userpic,
-				st::mentionPadding.left(),
-				top + st::mentionPadding.top(),
-				width(),
-				st::mentionPhotoSize);
-
-			p.setPen(selected ? st::mentionNameFgOver : st::mentionNameFg);
-			row.name.drawElided(p, mentionLeft, textTop, nameWidth);
-
-			const auto usernameLeft = mentionLeft
-				+ nameWidth
-				+ st::mentionPadding.right();
-			p.setFont(font);
-			p.setPen(selected
-				? st::mentionFgOverActive
-				: st::mentionFgActive);
-			p.drawText(usernameLeft, textTop + font->ascent, first);
-			if (!second.isEmpty()) {
-				p.setPen(selected ? st::mentionFgOver : st::mentionFg);
-				p.drawText(
-					usernameLeft + firstWidth,
-					textTop + font->ascent,
-					second);
-			}
-		} else if (!_hrows->empty()) {
+		if (!_hrows->empty()) {
 			const auto &hashtag = _hrows->at(i);
 			auto first = filterIsEmpty
 				? QString()
@@ -1496,6 +1724,59 @@ void FieldAutocomplete::Inner::resizeEvent(QResizeEvent *e) {
 }
 
 void FieldAutocomplete::Inner::mouseMoveEvent(QMouseEvent *e) {
+	if (_pinDragCandidate && (e->buttons() & Qt::LeftButton)) {
+		const auto pinnedCount = pinnedMentionRowsCount();
+		if (!_pinDragActive
+			&& pinnedCount > 1
+			&& _down >= 0
+			&& _down < pinnedCount
+			&& (std::abs(e->pos().y() - _pinDragStartPos.y())
+				>= style::ConvertScale(5))) {
+			_pinDragActive = true;
+			_pinDragOriginIndex = _down;
+			_pinDragTargetIndex = _down;
+			setCursor(Qt::ClosedHandCursor);
+		}
+		if (_pinDragActive && pinnedCount > 1) {
+			_pinDragCurrentTop = std::clamp(
+				e->pos().y() - _pinDragGrabOffsetY,
+				0,
+				(pinnedCount - 1) * st::mentionHeight);
+			const auto newTarget = std::clamp(
+				(_pinDragCurrentTop + st::mentionHeight / 2)
+					/ st::mentionHeight,
+				0,
+				pinnedCount - 1);
+			if (newTarget != _pinDragTargetIndex) {
+				auto oldVisual = std::vector<int>(pinnedCount, 0);
+				for (auto k = 0; k != pinnedCount; ++k) {
+					oldVisual[k] = visualSlotForPinnedRow(k);
+				}
+				_pinDragTargetIndex = newTarget;
+				for (auto k = 0; k != pinnedCount; ++k) {
+					if (k == _pinDragOriginIndex) {
+						continue;
+					}
+					const auto nowSlot = visualSlotForPinnedRow(k);
+					if (nowSlot != oldVisual[k]) {
+						const auto uid = peerToUser(_mrows->at(k).user->id);
+						const auto prevDelta = _rowShiftAnims[uid].value(0.0);
+						const auto startOffset = prevDelta
+							+ (oldVisual[k] - nowSlot) * st::mentionHeight;
+						_rowShiftAnims[uid].start(
+							[this] { update(); },
+							startOffset,
+							0.0,
+							170,
+							anim::easeOutCubic);
+					}
+				}
+			}
+			update();
+			return;
+		}
+	}
+
 	const auto globalPosition = e->globalPos();
 	updateEphemeralIconHover(e->pos());
 	if (!_lastMousePosition) {
@@ -1555,6 +1836,13 @@ void FieldAutocomplete::Inner::clearSel(bool hidden) {
 	_overDelete = false;
 	_mouseSelection = false;
 	_lastMousePosition = std::nullopt;
+	if (hidden) {
+		_pinDragCandidate = false;
+		_pinDragActive = false;
+		_pinDragOriginIndex = -1;
+		_pinDragTargetIndex = -1;
+		unsetCursor();
+	}
 	setSel((_mrows->empty() && _brows->empty() && _hrows->empty())
 		? -1
 		: (_brows->size() > 1
@@ -1708,7 +1996,17 @@ void FieldAutocomplete::Inner::mousePressEvent(QMouseEvent *e) {
 
 			selectByMouse(e->globalPos());
 		} else if (_srows->empty()) {
-			chooseSelected(FieldAutocomplete::ChooseMethod::ByClick);
+			const auto pinnedCount = pinnedMentionRowsCount();
+			if (!_mrows->empty() && _sel >= 0 && _sel < pinnedCount) {
+				_down = _sel;
+				_pinDragCandidate = true;
+				_pinDragActive = false;
+				_pinDragStartPos = e->pos();
+				_pinDragGrabOffsetY = e->pos().y() - (_sel * st::mentionHeight);
+				_pinDragCurrentTop = _sel * st::mentionHeight;
+			} else {
+				chooseSelected(FieldAutocomplete::ChooseMethod::ByClick);
+			}
 		} else {
 			_down = _sel;
 			_previewTimer.callOnce(QApplication::startDragTime());
@@ -1729,6 +2027,60 @@ void FieldAutocomplete::Inner::mouseReleaseEvent(QMouseEvent *e) {
 	_previewTimer.cancel();
 
 	const auto pressed = std::exchange(_down, -1);
+
+	if (_pinDragCandidate) {
+		_pinDragCandidate = false;
+		unsetCursor();
+		if (_pinDragActive) {
+			const auto wasOrigin = _pinDragOriginIndex;
+			const auto wasTarget = _pinDragTargetIndex;
+			const auto dropTop = _pinDragCurrentTop;
+			_pinDragActive = false;
+			_pinDragOriginIndex = -1;
+			_pinDragTargetIndex = -1;
+
+			const auto peer = _parent->peer();
+			const auto pinnedCount = pinnedMentionRowsCount();
+			if (peer
+				&& wasOrigin >= 0
+				&& wasOrigin < pinnedCount
+				&& wasTarget >= 0
+				&& wasTarget < pinnedCount) {
+				const auto draggedUid = peerToUser(
+					_mrows->at(wasOrigin).user->id);
+				if (wasOrigin != wasTarget) {
+					auto subset = std::vector<UserId>();
+					subset.reserve(pinnedCount);
+					for (auto k = 0; k != pinnedCount; ++k) {
+						if (k != wasOrigin) {
+							subset.push_back(peerToUser(_mrows->at(k).user->id));
+						}
+					}
+					subset.insert(subset.begin() + wasTarget, draggedUid);
+					Custom::MentionPinsFor(_session).reorderPinned(peer, subset);
+					_parent->updateFiltered();
+				}
+				const auto settleOffset = dropTop
+					- (wasTarget * st::mentionHeight);
+				if (std::abs(settleOffset) > 0) {
+					_rowShiftAnims[draggedUid].start(
+						[this] { update(); },
+						double(settleOffset),
+						0.0,
+						150,
+						anim::easeOutCubic);
+				}
+				setSel(wasTarget);
+			}
+			update();
+			return;
+		}
+		selectByMouse(e->globalPos());
+		if (_sel >= 0 && _sel == pressed && _srows->empty()) {
+			chooseSelected(FieldAutocomplete::ChooseMethod::ByClick);
+		}
+		return;
+	}
 
 	selectByMouse(e->globalPos());
 
@@ -1773,32 +2125,47 @@ void FieldAutocomplete::Inner::contextMenuEvent(QContextMenuEvent *e) {
 		_menu->addAction(
 			pinned ? tr::lng_pinned_unpin(tr::now) : tr::lng_pinned_pin(tr::now),
 			crl::guard(this, [=] {
+				auto oldRowIndex = base::flat_map<UserId, int>();
+				for (auto k = 0; k != int(_mrows->size()); ++k) {
+					oldRowIndex[peerToUser(_mrows->at(k).user->id)] = k;
+				}
+				const auto uid = peerToUser(user->id);
 				auto &manager = Custom::MentionPinsFor(_session);
-				if (manager.has(peer, user)) {
+				const auto wasPinned = manager.has(peer, user);
+				if (wasPinned) {
 					manager.unpin(peer, user);
+					_pinClosingUsers.emplace(uid);
+					_pinIconAnims[uid].start(
+						[this] { update(); },
+						1.0,
+						0.0,
+						190,
+						anim::easeOutCubic);
 				} else {
 					manager.pin(peer, user);
+					_pinClosingUsers.remove(uid);
+					_pinIconAnims[uid].start(
+						[this] { update(); },
+						0.0,
+						1.0,
+						230,
+						anim::easeOutBack);
 				}
 				_parent->updateFiltered();
+				for (auto k = 0; k != int(_mrows->size()); ++k) {
+					const auto rowUid = peerToUser(_mrows->at(k).user->id);
+					if (const auto it = oldRowIndex.find(rowUid)
+						; it != oldRowIndex.end() && it->second != k) {
+						_rowShiftAnims[rowUid].start(
+							[this] { update(); },
+							double((it->second - k) * st::mentionHeight),
+							0.0,
+							220,
+							anim::easeOutCubic);
+					}
+				}
+				update();
 			}));
-		if (pinned) {
-			if (pins.canMoveUp(peer, user)) {
-				_menu->addAction(
-					tr::lng_caption_move_up(tr::now),
-					crl::guard(this, [=] {
-						Custom::MentionPinsFor(_session).moveUp(peer, user);
-						_parent->updateFiltered();
-					}));
-			}
-			if (pins.canMoveDown(peer, user)) {
-				_menu->addAction(
-					tr::lng_caption_move_down(tr::now),
-					crl::guard(this, [=] {
-						Custom::MentionPinsFor(_session).moveDown(peer, user);
-						_parent->updateFiltered();
-					}));
-			}
-		}
 		_menu->popup(e->globalPos());
 		return;
 	}

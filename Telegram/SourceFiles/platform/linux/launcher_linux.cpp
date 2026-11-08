@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include <glib/glib.hpp>
 #include <ksandbox.h>
 
@@ -164,14 +165,16 @@ bool Launcher::launchUpdater(UpdaterLaunch action) {
 		argumentsList.push_back("--latest-version");
 		argumentsList.push_back((cExeDir() + cExeName()).toStdString());
 	} else if (justRelaunch) {
-		// What we are launching.
-		const auto launching = (cExeDir() + cExeName());
+		const auto appImage = qEnvironmentVariable("APPIMAGE");
+		const auto useAppImage = !appImage.isEmpty()
+			&& QFileInfo::exists(appImage);
+		const auto launching = useAppImage
+			? appImage
+			: (cExeDir() + cExeName());
 		argumentsList.push_back(launching.toStdString());
-		// argv[0] that is passed to what we are launching.
-		// It should be added explicitly in case of FILE_AND_ARGV_ZERO_.
-		const auto argv0 = !arguments().isEmpty()
-			? arguments().first()
-			: launching;
+		const auto argv0 = useAppImage
+			? appImage
+			: (!arguments().isEmpty() ? arguments().first() : launching);
 		argumentsList.push_back(argv0.toStdString());
 	} else {
 		argumentsList.push_back(cExeDir().toStdString() + "Updater");

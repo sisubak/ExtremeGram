@@ -52,6 +52,9 @@ public:
 	void moveDown(
 		not_null<PeerData*> peer,
 		not_null<UserData*> user);
+	void reorderPinned(
+		not_null<PeerData*> peer,
+		const std::vector<UserId> &orderedSubset);
 
 private:
 	[[nodiscard]] QString storageFilePath() const;

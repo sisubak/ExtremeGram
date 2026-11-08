@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_sublist.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/enhanced_settings.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -211,6 +212,13 @@ bool Entry::needUpdateInChatList() const {
 }
 
 void Entry::updateChatListSortPosition() {
+	if (const auto history = asHistory()) {
+		if (EnhancedSettings::IsHiddenChat(history->peer)) {
+			_sortKeyInChatList = _sortKeyByDate = 0;
+			setChatListExistence(false);
+			return;
+		}
+	}
 	if (session().supportMode()
 		&& _sortKeyInChatList != 0
 		&& session().settings().supportFixChatsOrder()) {

@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_chat_section.h"
 
+#include "core/enhanced_settings.h"
+#include "custom/bot_mode_manager.h"
+#include "custom/mention_pins.h"
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/controls/history_view_top_controls.h"
 #include "history/view/controls/history_view_bottom_controls.h"
@@ -520,6 +523,11 @@ ChatWidget::ChatWidget(
 	_topBar->move(0, 0);
 	_topBar->resizeToWidth(width());
 	_topBar->show();
+
+	_statsOverlay = std::make_unique<Custom::BotStatsOverlayWidget>(
+		this,
+		&controller->session());
+	_statsOverlay->setPeer(_peer);
 
 	_topBar->deleteSelectionRequest(
 	) | rpl::on_next([=] {
@@ -2517,8 +2525,17 @@ void ChatWidget::send(Api::SendOptions options) {
 		return;
 	}
 	if (!options.scheduled) {
+		const auto candidate = _composeControls->getTextWithAppliedMarkdown();
+		if (Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+				_history,
+				candidate.text,
+				replyTo().messageId,
+				controller())) {
+			_composeControls->clear();
+			return;
+		}
 		auto message = Api::MessageToSend(prepareSendAction(options));
-		message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
+		message.textWithTags = candidate;
 		if (!session().ephemeralMessages().wouldSend(message)
 			&& showSlowmodeError()) {
 			return;
@@ -2719,6 +2736,23 @@ void ChatWidget::sendTextWithTags(
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
+	if (!options.scheduled
+		&& Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+			_history,
+			textWithTags.text,
+			message.action.replyTo.messageId,
+			controller())) {
+		_composeControls->clear();
+		if (done) {
+			done();
+		}
+		return;
+	}
+	if (EnhancedSettings::Get(EnhancedSettings::Option::MentionAsName)) {
+		message.textWithTags = Custom::ApplyMentionNames(
+			&session(),
+			std::move(message.textWithTags));
+	}
 	if (const auto bot = BotUse::Selected(_history)) {
 		if (const auto error = BotUse::ValidateSend(bot, message.action)) {
 			BotUse::ShowSendError(_history, error);
@@ -4842,6 +4876,17 @@ void ChatWidget::updateControlsGeometry() {
 		_membersDropdown->moveToLeft(0, _topBar->height());
 		_membersDropdown->setMaxHeight(countMembersDropdownHeightMax());
 	}
+	if (_statsOverlay) {
+		_statsOverlay->setPeer(_peer);
+		_statsOverlay->setGeometry(
+			tabsLeftSkip,
+			top + style::ConvertScale(4),
+			innerWidth,
+			_statsOverlay->height());
+		if (!_statsOverlay->isHidden()) {
+			_statsOverlay->raise();
+		}
+	}
 }
 
 void ChatWidget::updateSubsectionTabsGeometry() {
@@ -6668,16 +6713,14 @@ void ChatWidget::searchRequested() {
 }
 
 void ChatWidget::captureChatScreenshot() {
-	if (!_inner || _inner->isHidden()) {
+	if (!_inner || !_inner->hasSelectedItems()) {
 		return;
 	}
-	const auto origin = _inner->mapTo(this, QPoint(0, 0));
-	const auto rect = QRect(origin, _inner->size()).intersected(
-		QRect(QPoint(0, 0), size()));
-	if (rect.isEmpty()) {
+	const auto image = _inner->renderSelectedMessagesToImage();
+	if (image.isNull()) {
 		return;
 	}
-	const auto image = grab().copy(rect);
+	clearSelected();
 	if (const auto clipboard = QGuiApplication::clipboard()) {
 		clipboard->setImage(image);
 	}
@@ -6689,11 +6732,11 @@ void ChatWidget::captureChatScreenshot() {
 	const auto path = QDir(folder).filePath(filename);
 	if (image.save(path, "PNG")) {
 		controller()->showToast(
-			QString::fromUtf8("Фото чата скопировано и сохранено: %1")
+			QString::fromUtf8("Фото выделенных сообщений скопировано и сохранено: %1")
 				.arg(QDir::toNativeSeparators(path)));
 	} else {
 		controller()->showToast(
-			QString::fromUtf8("Не удалось сохранить фото чата."));
+			QString::fromUtf8("Не удалось сохранить фото сообщений."));
 	}
 }
 

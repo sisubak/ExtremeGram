@@ -75,6 +75,10 @@ class Autocomplete;
 struct Contact;
 } // namespace Support
 
+namespace Custom {
+class BotStatsOverlayWidget;
+} // namespace Custom
+
 namespace HistoryView {
 
 namespace Controls {
@@ -623,6 +627,7 @@ private:
 	bool _kbShown = false;
 	bool _fieldHasSendText = false;
 	std::unique_ptr<HistoryView::StickerToast> _stickerToast;
+	std::unique_ptr<Custom::BotStatsOverlayWidget> _statsOverlay;
 	InfoTooltip _topToast;
 
 	FullMsgId _lastShownAt;

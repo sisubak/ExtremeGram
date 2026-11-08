@@ -596,13 +596,17 @@ TopBar::TopBar(
 			QPainter p(_extremeBadge.get());
 			const auto bg = _solidBg.value_or(
 				_edgeColor.current().value_or(st::windowBg->c));
+			const auto tint = _badgeSt
+				? _badgeSt->premiumFg->c
+				: st::infoPeerBadge.premiumFg->c;
 			Custom::ClientBadgeFor(&_peer->session()).drawBadgeGetWidth(
 				p,
 				0,
 				0,
 				_extremeBadge->height(),
 				_peer,
-				bg);
+				bg,
+				tint);
 		}, _extremeBadge->lifetime());
 		Custom::ClientBadgeFor(
 			&_peer->session()

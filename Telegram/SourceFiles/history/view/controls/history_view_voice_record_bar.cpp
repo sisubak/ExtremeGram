@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/calls_instance.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "core/application.h"
+#include "core/file_utilities.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_session.h"
@@ -42,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_image.h"
 #include "ui/painter.h"
 #include "ui/widgets/fields/input_field.h" // ShouldSubmit.
+#include "ui/widgets/popup_menu.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
@@ -51,7 +53,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_history_view_voice_record_bar.h"
 #include "styles/style_layers.h"
 #include "styles/style_media_player.h"
+#include "styles/style_menu_icons.h"
 
+#include <crl/crl_async.h>
 #include <tgcalls/VideoCaptureInterface.h>
 
 namespace HistoryView::Controls {
@@ -2432,7 +2436,9 @@ void VoiceRecordBar::init() {
 			&& !_showAnimation.animating()
 			&& !_lock->isLocked()
 			&& (e->type() == QEvent::MouseButtonPress
-				|| e->type() == QEvent::MouseButtonRelease);
+				|| e->type() == QEvent::MouseButtonRelease)
+			&& (static_cast<QMouseEvent*>(e.get())->button()
+				== Qt::LeftButton);
 	}) | rpl::on_next([=](not_null<QEvent*> e) {
 		if (e->type() == QEvent::MouseButtonPress) {
 			if (_startRecordingFilter && _startRecordingFilter()) {
@@ -2445,6 +2451,18 @@ void VoiceRecordBar::init() {
 			_startTimer.cancel();
 		}
 	}, lifetime());
+
+	base::install_event_filter(this, _send.get(), [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu
+			&& isTypeRecord()
+			&& !isRecording()
+			&& !isListenState()
+			&& !_showAnimation.animating()) {
+			showRecordButtonMenu();
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
+	});
 
 	_listenChanges.events(
 	) | rpl::filter([=] {
@@ -2591,6 +2609,112 @@ void VoiceRecordBar::startRecordingAndLock(bool round) {
 	_lock->show();
 	_lock->requestPaintProgress(1.);
 	startRecording();
+}
+
+void VoiceRecordBar::showRecordButtonMenu() {
+	if (_importingVoice) {
+		return;
+	}
+	_recordContextMenu = base::make_unique_q<Ui::PopupMenu>(
+		_send.get(),
+		st::popupMenuWithIcons);
+	_recordContextMenu->addAction(
+		tr::lng_extremegram_edit_audio_as_voice(tr::now),
+		[=] { importAudioFileAsVoice(true); },
+		&st::menuIconEdit);
+	_recordContextMenu->addAction(
+		tr::lng_extremegram_send_audio_as_voice(tr::now),
+		[=] { importAudioFileAsVoice(false); },
+		&st::menuIconSend);
+	_recordContextMenu->popup(QCursor::pos());
+}
+
+void VoiceRecordBar::importAudioFileAsVoice(bool openInEditor) {
+	if (_importingVoice || isRecording() || isListenState()) {
+		return;
+	}
+	if (_startRecordingFilter && _startRecordingFilter()) {
+		return;
+	}
+	const auto filter = QString::fromUtf8(
+		"Аудио / видео файлы (*.mp3 *.mp4 *.m4a *.ogg *.opus *.wav *.flac *.aac);;"
+		"Все файлы (*.*)");
+	const auto weak = base::make_weak(this);
+	FileDialog::GetOpenPath(
+		QPointer<QWidget>(window()),
+		openInEditor
+			? tr::lng_extremegram_edit_audio_as_voice(tr::now)
+			: tr::lng_extremegram_send_audio_as_voice(tr::now),
+		filter,
+		[=](FileDialog::OpenResult &&result) {
+			if (!weak || result.paths.isEmpty()) {
+				return;
+			}
+			const auto filepath = result.paths.front();
+			if (filepath.isEmpty()) {
+				return;
+			}
+			weak->_importingVoice = true;
+			weak->_show->showToast(QString::fromUtf8(
+				"Конвертация аудио в голосовое сообщение..."));
+			crl::async([=] {
+				auto converted = ::Media::ConvertFileToVoice(filepath);
+				crl::on_main(weak, [=, voice = std::move(converted)]() mutable {
+					_importingVoice = false;
+					if (voice.content.isEmpty()) {
+						_show->showToast(QString::fromUtf8(
+							"Не удалось обработать выбранный аудио/видео файл."));
+						return;
+					}
+					if (openInEditor) {
+						showImportedVoice(std::move(voice));
+					} else {
+						_sendVoiceRequests.fire({
+							.bytes = std::move(voice.content),
+							.waveform = std::move(voice.waveform),
+							.duration = voice.duration,
+						});
+					}
+				});
+			});
+		});
+}
+
+bool VoiceRecordBar::showImportedVoice(::Media::AudioEditResult &&voice) {
+	if (voice.content.isEmpty()
+		|| isRecording()
+		|| isRecordingByAnotherBar()
+		|| isListenState()) {
+		return false;
+	}
+	clearResumeState();
+	_recordingVideo = false;
+	_fullRecord = true;
+	_lockShowing = false;
+	_pausedRawDuration = voice.duration;
+	_paused = true;
+	_data = Ui::RoundVideoResult{
+		.content = std::move(voice.content),
+		.waveform = std::move(voice.waveform),
+		.duration = voice.duration,
+	};
+
+	show();
+	raise();
+	orderControls();
+
+	_listen = std::make_unique<ListenWrap>(
+		this,
+		_st,
+		_send,
+		&_show->session(),
+		&_data,
+		true,
+		_cancelFont);
+	_showListenAnimation.stop();
+	_listenChanges.fire({});
+	visibilityAnimate(true, nullptr);
+	return true;
 }
 
 void VoiceRecordBar::startRecording() {
@@ -3145,10 +3269,16 @@ void VoiceRecordBar::hideAnimated() {
 	if (isHidden()) {
 		return;
 	}
+	const auto hadCapture = isRecording()
+		|| ::Media::Capture::instance()->started();
 	_lockShowing = false;
 	visibilityAnimate(false, [=] {
 		hideFast();
-		stopRecording(StopType::Cancel);
+		if (hadCapture) {
+			stopRecording(StopType::Cancel);
+		} else {
+			_cancelRequests.fire({});
+		}
 	});
 }
 

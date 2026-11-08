@@ -394,6 +394,7 @@ public:
 	void copySelectedText(bool withImageText = false);
 	[[nodiscard]] MessageIdsList getSelectedIds() const;
 	[[nodiscard]] SelectedItems getSelectedItems() const;
+	[[nodiscard]] QImage renderSelectedMessagesToImage();
 	[[nodiscard]] TextSelection getSelectedTextRange(
 		not_null<HistoryItem*> item) const;
 	[[nodiscard]] MessageSelection getSelectedTextSelection(
@@ -1112,6 +1113,7 @@ private:
 	bool _mouseActive = false;
 
 	bool _selectEnabled = false;
+	bool _capturingScreenshot = false;
 	HistoryItem *_selectedTextItem = nullptr;
 	MessageSelection _selectedTextSelection;
 	TextForMimeData _selectedText;

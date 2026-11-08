@@ -1,4 +1,4 @@
-﻿/*
+/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -518,7 +518,7 @@ int MemberListRow::paintNameIconGetLeadingWidth(
 	if (!_refreshCallback) {
 		_refreshCallback = repaint;
 	}
-	const auto base = PeerListRow::paintNameIconGetLeadingWidth(
+	return PeerListRow::paintNameIconGetLeadingWidth(
 		p,
 		std::move(repaint),
 		now,
@@ -526,16 +526,6 @@ int MemberListRow::paintNameIconGetLeadingWidth(
 		nameTop,
 		outerWidth,
 		selected);
-	if (!_type.restricted) {
-		return base;
-	}
-	const auto &icon = Dialogs::ThreeStateIcon(
-		st::dialogsLockIcon,
-		false,
-		selected);
-	const auto left = nameLeft + base;
-	icon.paint(p, left, nameTop, outerWidth);
-	return base + icon.width() + st::normalFont->spacew;
 }
 
 int MemberListRow::paintNameIconGetWidth(
@@ -558,24 +548,42 @@ int MemberListRow::paintNameIconGetWidth(
 		availableWidth,
 		outerWidth,
 		selected);
-	if (!_type.restricted || _type.restrictedUntil <= 0) {
+	if (!_type.restricted) {
 		return base;
+	}
+	auto added = base;
+	const auto &lockIcon = Dialogs::ThreeStateIcon(
+		st::dialogsLockIcon,
+		false,
+		selected);
+	const auto lockLeft = nameLeft
+		+ nameWidth
+		+ added
+		+ ((added > 0) ? (st::lineWidth * 2) : (st::normalFont->spacew / 2));
+	if (lockLeft + lockIcon.width() <= outerWidth) {
+		const auto lockTop = nameTop
+			+ std::max(0, (st::msgNameFont->height - lockIcon.height()) / 2);
+		lockIcon.paint(p, lockLeft, lockTop, outerWidth);
+		added = (lockLeft - nameLeft - nameWidth) + lockIcon.width();
+	}
+	if (_type.restrictedUntil <= 0) {
+		return added;
 	}
 	const auto nowSeconds = base::unixtime::now();
 	if (_type.restrictedUntil <= nowSeconds) {
-		return base;
+		return added;
 	}
 	const auto text = Ui::FormatMuteForTiny(
 		_type.restrictedUntil - nowSeconds);
-	const auto left = nameLeft + nameWidth + base + st::normalFont->spacew;
+	const auto left = nameLeft + nameWidth + added + st::normalFont->spacew;
 	const auto width = st::normalFont->width(text);
 	if (left + width > outerWidth) {
-		return base;
+		return added;
 	}
 	p.setFont(st::normalFont);
 	p.setPen(selected ? st::windowSubTextFgOver : st::windowSubTextFg);
 	p.drawText(left, nameTop + st::normalFont->ascent, text);
-	return base + width + st::normalFont->spacew;
+	return added + width + st::normalFont->spacew;
 }
 
 void MemberListRow::elementsPaint(

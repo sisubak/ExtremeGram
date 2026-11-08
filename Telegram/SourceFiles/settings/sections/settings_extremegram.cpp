@@ -10,14 +10,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common_session.h"
 
 #include "core/enhanced_settings.h"
-#include "custom/client_badge_detector.h"
 #include "lang/lang_keys.h"
 #include "settings/settings_builder.h"
 #include "settings/sections/settings_main.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/ui_utility.h"
-#include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -94,13 +92,6 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 	BuildExtremeGramToggle(
 		builder,
 		controller,
-		u"extremegram/auto-stamp-avatar"_q,
-		tr::lng_extremegram_auto_stamp_avatar(),
-		EnhancedSettings::Option::AutoStampAvatar,
-		{ u"avatar"_q, u"badge"_q, u"stamp"_q });
-	BuildExtremeGramToggle(
-		builder,
-		controller,
 		u"extremegram/mute-dialog"_q,
 		tr::lng_extremegram_mute_dialog(),
 		EnhancedSettings::Option::ExtremeMuteDialog,
@@ -133,20 +124,6 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 				: QString::fromUtf8("Скрытых групп и каналов сейчас нет."));
 		},
 		.keywords = { u"hidden"_q, u"chats"_q, u"reveal"_q },
-	});
-	builder.addButton({
-		.id = u"extremegram/stamp-avatar"_q,
-		.title = tr::lng_extremegram_stamp_avatar(),
-		.st = &st::settingsButtonNoIcon,
-		.onClick = [=] {
-			Custom::ClientBadgeFor(
-				&controller->session()
-			).stampAndReuploadSelfAvatar(
-				crl::guard(controller, [=](bool, const QString &msg) {
-					controller->showToast(msg);
-				}));
-		},
-		.keywords = { u"avatar"_q, u"badge"_q, u"stamp"_q, u"online"_q },
 	});
 }
 

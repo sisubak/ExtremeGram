@@ -19,6 +19,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 struct VoiceData;
 
+namespace Media {
+struct AudioEditResult;
+} // namespace Media
+
 namespace style {
 struct RecordBar;
 } // namespace style
@@ -31,6 +35,7 @@ namespace Ui {
 class AbstractButton;
 class SendButton;
 class RoundVideoRecorder;
+class PopupMenu;
 } // namespace Ui
 
 namespace Window {
@@ -80,6 +85,7 @@ public:
 		anim::type animated = anim::type::instant);
 
 	void startRecordingAndLock(bool round);
+	bool showImportedVoice(::Media::AudioEditResult &&voice);
 
 	void finishAnimating();
 	void hideAnimated();
@@ -126,6 +132,8 @@ private:
 	};
 
 	void init();
+	void showRecordButtonMenu();
+	void importAudioFileAsVoice(bool openInEditor);
 	void initLockGeometry();
 	void initLevelGeometry();
 
@@ -212,6 +220,8 @@ private:
 	FilterCallback _hasTTLFilter;
 
 	base::unique_qptr<QObject> _keyFilterInRecordingState;
+	base::unique_qptr<Ui::PopupMenu> _recordContextMenu;
+	bool _importingVoice = false;
 
 	Ui::BoxPointer _discardBox;
 	bool _pauseInsteadSend = false;

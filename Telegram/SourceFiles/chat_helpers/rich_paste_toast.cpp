@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/message_field.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/enhanced_settings.h"
+#include "custom/mention_pins.h"
 #include "iv/editor/iv_editor_clipboard_import.h"
 #include "iv/editor/iv_editor_session.h"
 #include "iv/iv_rich_page.h"
@@ -21,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "ui/toast/toast_widget.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/fields/input_field.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
@@ -37,7 +40,8 @@ constexpr auto kOfferTimeout = 30 * crl::time(1000);
 std::optional<RichPasteDecision> MimeDataRichPasteOffer(
 		not_null<Main::Session*> session,
 		not_null<const QMimeData*> data) {
-	if (PasteAsPlainTextRequested()
+	if (EnhancedSettings::Get(EnhancedSettings::Option::MarkdownPaste)
+		|| PasteAsPlainTextRequested()
 		|| !Iv::Editor::CanAuthorRichMessages(session)) {
 		return std::nullopt;
 	}
@@ -60,6 +64,79 @@ std::optional<RichPasteDecision> MimeDataRichPasteOffer(
 		return RichPasteDecision{ .offer = RichPasteOffer::Markdown };
 	}
 	return std::nullopt;
+}
+
+bool TryApplyInlineFormattedPaste(
+		not_null<Main::Session*> session,
+		not_null<Ui::InputField*> field,
+		not_null<const QMimeData*> data,
+		const QString &plainText) {
+	if (PasteAsPlainTextRequested()
+		|| !EnhancedSettings::Get(EnhancedSettings::Option::MarkdownPaste)) {
+		return false;
+	}
+	if (data->hasFormat(TextUtilities::TagsTextMimeType())
+		&& data->hasFormat(TextUtilities::TagsMimeType())) {
+		return false;
+	}
+	const auto limits = Iv::ResolveRichMessageLimits(session);
+	auto imported = std::optional<Iv::Editor::BlocksImportResult>();
+	if (!plainText.isEmpty() && Custom::LooksLikeMarkdown(plainText)) {
+		imported = Iv::Editor::BlocksFromMarkdown(plainText, limits, 0);
+	}
+	if ((!imported || imported->blocks.empty()) && data->hasHtml()) {
+		imported = Iv::Editor::BlocksFromMimeData(session, data, limits, 0);
+	}
+	if (!imported || imported->blocks.empty()) {
+		return false;
+	}
+	for (auto &block : imported->blocks) {
+		if (block.kind == Iv::RichPage::BlockKind::Heading
+			&& !block.text.text.text.isEmpty()) {
+			const auto len = int(block.text.text.text.size());
+			block.text.text.entities.insert(
+				block.text.text.entities.begin(),
+				EntityInText(EntityType::Bold, 0, len));
+		}
+	}
+	auto page = Iv::RichPage();
+	page.blocks = std::move(imported->blocks);
+	auto flattened = Iv::SerializeAsSimple(page, session);
+	if (!flattened) {
+		flattened = Iv::FlattenRichPageToSimpleText(page);
+	}
+	if (!flattened
+		|| flattened->text.isEmpty()
+		|| (flattened->entities.empty() && (flattened->text == plainText))) {
+		return false;
+	}
+	const auto cursor = field->textCursor();
+	const auto pos = cursor.position();
+	const auto anchor = cursor.anchor();
+	const auto docFrom = std::min(pos, anchor);
+	const auto docTill = std::max(pos, anchor);
+	const auto textFrom = int(
+		field->getTextWithTagsPart(0, docFrom).text.size());
+	const auto textTill = int(
+		field->getTextWithTagsPart(0, docTill).text.size());
+	const auto docTail = std::max(
+		0,
+		cursor.document()->characterCount() - docTill);
+	const auto was = field->getTextWithTags();
+	field->setTextWithTags(TextWithTagsReplaced(
+		was,
+		textFrom,
+		textTill,
+		{
+			flattened->text,
+			TextUtilities::ConvertEntitiesToTextTags(flattened->entities),
+		}));
+	const auto newDocLen = std::max(
+		1,
+		field->textCursor().document()->characterCount());
+	field->setCursorPosition(
+		std::clamp(newDocLen - docTail, 0, newDocLen - 1));
+	return true;
 }
 
 TextWithTags TextWithTagsReplaced(

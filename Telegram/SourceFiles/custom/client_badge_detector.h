@@ -9,11 +9,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/flat_map.h"
 #include "base/flat_set.h"
+#include "base/timer.h"
 #include "data/data_peer_id.h"
 #include "mtproto/sender.h"
 #include "ui/userpic_view.h"
 
 #include <memory>
+#include <optional>
 
 class PeerData;
 class UserData;
@@ -50,7 +52,8 @@ public:
 		int y,
 		int nameHeight,
 		not_null<PeerData*> peer,
-		const QColor &surfaceBackground);
+		const QColor &surfaceBackground,
+		std::optional<QColor> desiredTint = std::nullopt);
 
 	void reloadBadgeSourceImage();
 
@@ -62,7 +65,9 @@ public:
 	[[nodiscard]] static QImage AdaptBadgeForSurface(
 		const QImage &cleanBadge,
 		bool darkSurface,
-		int targetPixelSize);
+		int targetPixelSize,
+		std::optional<QColor> tintColor = std::nullopt,
+		const QColor &surfaceBackground = QColor());
 
 private:
 	struct PeerCacheEntry {
@@ -73,6 +78,7 @@ private:
 	};
 
 	void pollPendingPeers();
+	void scheduleAutoStampCheck(crl::time delayMs);
 	void maybeAutoStampSelfAvatar();
 	void deletePreviousSelfAvatar(
 		PhotoId newlyUploadedId,
@@ -87,13 +93,15 @@ private:
 
 	QImage _cleanLightStrokeBadge;
 	QImage _cleanDarkStrokeBadge;
-	QImage _cachedDarkSurfaceIcon;
-	QImage _cachedLightSurfaceIcon;
+	base::flat_map<uint64, QImage> _tintedIconCache;
 	int _cachedPixelSize = 0;
 	bool _stampInProgress = false;
 	bool _waitingForVideo = false;
 	bool _autoStampPending = false;
+	PhotoId _lastVerifiedSelfPhotoId = 0;
+	PhotoId _lastAttemptPhotoId = 0;
 	std::shared_ptr<Data::PhotoMedia> _videoMedia;
+	base::Timer _autoStampTimer;
 	int _autoStampAttempts = 0;
 	int _videoWaitChecks = 0;
 	Fn<void(bool, QString)> _waitingDone;

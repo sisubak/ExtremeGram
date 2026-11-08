@@ -687,32 +687,12 @@ HistoryWidget::HistoryWidget(
 			if (confirmSendingFiles(data, std::nullopt, pasted)) {
 				return true;
 			}
-			if (EnhancedSettings::Get(
-					EnhancedSettings::Option::MarkdownPaste)
-				&& Custom::LooksLikeMarkdown(pasted)) {
-				auto parsed = TextUtilities::ParseEntities(
-					pasted,
-					TextParseMarkdown);
-				if (!parsed.entities.empty()) {
-					const auto cursor = _field->textCursor();
-					const auto from = cursor.selectionStart();
-					const auto till = cursor.selectionEnd();
-					const auto was = _field->getTextWithTags();
-					const auto tail = int(was.text.size()) - till;
-					_field->setTextWithTags(ChatHelpers::TextWithTagsReplaced(
-						was,
-						from,
-						till,
-						{
-							parsed.text,
-							TextUtilities::ConvertEntitiesToTextTags(
-								parsed.entities),
-						}));
-					_field->setCursorPosition(std::max(
-						0,
-						int(_field->getTextWithTags().text.size()) - tail));
-					return true;
-				}
+			if (ChatHelpers::TryApplyInlineFormattedPaste(
+					&session(),
+					_field,
+					data,
+					pasted)) {
+				return true;
 			}
 			offerRichPaste(data);
 			return false;
@@ -6260,19 +6240,30 @@ void HistoryWidget::send(Api::SendOptions options) {
 		sendRichDraft(page, options);
 		return;
 	}
+	if (_voiceRecordBar->isListenState()) {
+		_voiceRecordBar->requestToSendWithOptions(options);
+		return;
+	}
 	if (!options.scheduled) {
+		const auto candidate = _field->getTextWithAppliedMarkdown();
+		if (Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+				_history,
+				candidate.text,
+				replyTo().messageId,
+				controller())) {
+			clearFieldText();
+			cancelFieldAreaState();
+			saveDraftWithTextNow();
+			return;
+		}
 		auto action = Api::SendAction(_history, options);
 		action.replyTo = replyTo();
 		auto message = Api::MessageToSend(std::move(action));
-		message.textWithTags = _field->getTextWithAppliedMarkdown();
+		message.textWithTags = candidate;
 		if (!session().ephemeralMessages().wouldSend(message)
 			&& showSlowmodeError()) {
 			return;
 		}
-	}
-	if (_voiceRecordBar->isListenState()) {
-		_voiceRecordBar->requestToSendWithOptions(options);
-		return;
 	}
 
 	sendTextWithTags(
@@ -7651,21 +7642,19 @@ int HistoryWidget::typingIndicatorHeight() const {
 		&& !isRecording()
 		&& !isSearching()
 		&& !_chooseTheme)
-		? _typingIndicator->height()
+		? _typingIndicator->currentHeight()
 		: 0;
 }
 
 void HistoryWidget::captureChatScreenshot() {
-	if (!_history || !_list || _list->isHidden()) {
+	if (!_history || !_list || !_list->hasSelectedItems()) {
 		return;
 	}
-	const auto origin = _list->mapTo(this, QPoint(0, 0));
-	const auto rect = QRect(origin, _list->size()).intersected(
-		QRect(QPoint(0, 0), size()));
-	if (rect.isEmpty()) {
+	const auto image = _list->renderSelectedMessagesToImage();
+	if (image.isNull()) {
 		return;
 	}
-	const auto image = grab().copy(rect);
+	clearSelected();
 	if (const auto clipboard = QGuiApplication::clipboard()) {
 		clipboard->setImage(image);
 	}
@@ -7677,11 +7666,11 @@ void HistoryWidget::captureChatScreenshot() {
 	const auto path = QDir(folder).filePath(filename);
 	if (image.save(path, "PNG")) {
 		controller()->showToast(
-			QString::fromUtf8("Фото чата скопировано и сохранено: %1")
+			QString::fromUtf8("Фото выделенных сообщений скопировано и сохранено: %1")
 				.arg(QDir::toNativeSeparators(path)));
 	} else {
 		controller()->showToast(
-			QString::fromUtf8("Не удалось сохранить фото чата."));
+			QString::fromUtf8("Не удалось сохранить фото сообщений."));
 	}
 }
 
@@ -8171,13 +8160,6 @@ void HistoryWidget::moveFieldControls() {
 		_kbScroll->setGeometryToLeft(0, bottom, width(), keyboardHeight);
 	}
 	const auto typingHeight = typingIndicatorHeight();
-	if (_typingIndicator) {
-		_typingIndicator->resizeToWidth(width());
-		_typingIndicator->moveToLeft(
-			0,
-			(typingHeight > 0) ? (bottom - typingHeight) : height());
-	}
-	bottom -= typingHeight;
 
 // (_botMenu) (_attachToggle|_replaceMedia) (_sendAs) ---- _inlineResults ------------------------------ _tabbedPanel ------ _fieldBarCancel
 // (_attachDocument|_attachPhoto) _field (_ttlInfo) (_scheduled) (_giftToUser) (_silent|_cmdStart|_kbShow) (_toggleSuggestPost) (_kbHide|_tabbedSelectorToggle) _send
@@ -8248,8 +8230,24 @@ void HistoryWidget::moveFieldControls() {
 	_fieldBarCancel->moveToRight(
 		0,
 		_field->y() - st::historySendPadding - _fieldBarCancel->height());
+	if (_typingIndicator) {
+		const auto hasReplyBar = (_editMsgId
+			|| replyTo()
+			|| readyToForward()
+			|| _previewDrawPreview
+			|| _suggestOptions);
+		const auto composeTop = _field->y()
+			- st::historySendPadding
+			- (hasReplyBar ? st::historyReplyHeight : 0);
+		_typingIndicator->setGeometryToLeft(
+			0,
+			(typingHeight > 0) ? (composeTop - typingHeight) : height(),
+			width(),
+			typingHeight);
+	}
 	if (_inlineResults) {
-		_inlineResults->moveBottom(_field->y() - st::historySendPadding);
+		_inlineResults->moveBottom(
+			_field->y() - st::historySendPadding - typingHeight);
 	}
 	if (_tabbedPanel) {
 		_tabbedPanel->moveBottomRight(buttonsBottom, width());
@@ -12274,10 +12272,11 @@ void HistoryWidget::updateField() {
 void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 	_repaintFieldScheduled = false;
 
-	auto backy = _field->y() - st::historySendPadding;
+	const auto typingH = typingIndicatorHeight();
+	auto backy = _field->y() - st::historySendPadding - typingH;
 	auto backh = fieldHeight()
 		+ 2 * st::historySendPadding
-		+ typingIndicatorHeight();
+		+ typingH;
 	auto hasForward = readyToForward();
 	auto drawMsgText = (_editMsgId || _replyTo) ? _replyEditMsg : _kbReplyTo;
 	if (_editMsgId

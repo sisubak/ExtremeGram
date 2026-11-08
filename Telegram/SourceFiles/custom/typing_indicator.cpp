@@ -7,25 +7,29 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/typing_indicator.h"
 
+#include "data/data_peer_values.h"
 #include "data/data_send_action.h"
 #include "data/data_session.h"
 #include "data/data_thread.h"
 #include "data/data_user.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "history/history.h"
 #include "history/view/history_view_send_action.h"
 #include "main/main_session.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 #include "ui/painter.h"
+#include "ui/power_saving.h"
 
 #include <algorithm>
 
 namespace Custom {
 namespace {
 
-constexpr auto kTypingIndicatorHeight = 20;
+constexpr auto kTypingIndicatorHeight = 24;
 constexpr auto kTypingIndicatorAvatar = 16;
-constexpr auto kExpirePollInterval = crl::time(500);
+constexpr auto kTypingIndicatorEmoji = 16;
+constexpr auto kExpirePollInterval = crl::time(400);
 
 } // namespace
 
@@ -33,13 +37,22 @@ TypingIndicator::TypingIndicator(QWidget *parent, Fn<void()> changed)
 : RpWidget(parent)
 , _expireTimer([=] { refresh(); })
 , _changed(std::move(changed)) {
-	setFixedHeight(style::ConvertScale(kTypingIndicatorHeight));
 	setAttribute(Qt::WA_TransparentForMouseEvents);
+	resize(0, 0);
 	hide();
 }
 
 TypingIndicator::~TypingIndicator() {
 	releaseRepliesPainter();
+}
+
+int TypingIndicator::fullHeight() const {
+	return style::ConvertScale(kTypingIndicatorHeight);
+}
+
+int TypingIndicator::currentHeight() const {
+	const auto ratio = _slideAnim.value(_targetShown ? 1.0 : 0.0);
+	return int(base::SafeRound(fullHeight() * std::clamp(ratio, 0.0, 1.0)));
 }
 
 void TypingIndicator::releaseRepliesPainter() {
@@ -68,6 +81,11 @@ void TypingIndicator::setHistory(History *history, MsgId topicRootId) {
 		? base::make_weak(&history->session())
 		: base::weak_ptr<Main::Session>();
 	_userpics.clear();
+	_statusEmojis.clear();
+	_cachedUsers.clear();
+	_slideAnim.stop();
+	_targetShown = false;
+	hide();
 
 	if (_history) {
 		if (_topicRootId) {
@@ -98,84 +116,174 @@ HistoryView::SendActionPainter *TypingIndicator::activePainter() const {
 		: _history->sendActionPainter();
 }
 
+void TypingIndicator::setShownAnimated(bool shown) {
+	if (_targetShown == shown) {
+		return;
+	}
+	_targetShown = shown;
+	if (shown && isHidden()) {
+		show();
+	}
+	const auto from = _slideAnim.value(shown ? 0.0 : 1.0);
+	const auto to = shown ? 1.0 : 0.0;
+	const auto duration = shown ? 210 : 170;
+	_slideAnim.start(
+		[this] {
+			const auto h = currentHeight();
+			if (h <= 0 && !_targetShown && !_slideAnim.animating()) {
+				_userpics.clear();
+				_statusEmojis.clear();
+				_cachedUsers.clear();
+				hide();
+			}
+			if (_changed) {
+				_changed();
+			}
+			update();
+		},
+		from,
+		to,
+		duration,
+		anim::easeOutCubic);
+	if (_changed) {
+		_changed();
+	}
+}
+
 void TypingIndicator::refresh() {
 	const auto painter = activePainter();
 	if (!painter) {
 		_expireTimer.cancel();
-		if (!isHidden()) {
-			setVisible(false);
-			if (_changed) {
-				_changed();
-			}
-		}
+		setShownAnimated(false);
 		return;
 	}
 	painter->updateNeedsAnimating(crl::now(), true);
-	const auto shown = !painter->typingUsers().empty();
+	const auto &typing = painter->typingUsers();
+	const auto shown = !typing.empty();
 	if (shown) {
+		_cachedUsers.assign(typing.begin(), typing.end());
 		if (!_expireTimer.isActive()) {
 			_expireTimer.callEach(kExpirePollInterval);
 		}
 	} else {
 		_expireTimer.cancel();
-		_userpics.clear();
 	}
-	if (shown != !isHidden()) {
-		setVisible(shown);
-		if (_changed) {
-			_changed();
-		}
-	}
-	if (shown) {
+	setShownAnimated(shown);
+	if (!isHidden()) {
 		update();
 	}
 }
 
 void TypingIndicator::paintEvent(QPaintEvent *e) {
+	if (width() <= 0 || height() <= 0 || !_sessionWeak.get()) {
+		return;
+	}
 	const auto painter = activePainter();
-	if (!painter) {
+	const auto &liveUsers = painter
+		? painter->typingUsers()
+		: base::flat_set<not_null<UserData*>>();
+	if (liveUsers.empty() && _cachedUsers.empty()) {
 		return;
 	}
+
 	auto p = Painter(this);
-	const auto users = painter->typingUsers();
-	if (users.empty()) {
-		return;
-	}
+	const auto ratio = std::clamp(
+		_slideAnim.value(_targetShown ? 1.0 : 0.0),
+		0.0,
+		1.0);
+	const auto targetH = fullHeight();
+	p.setClipRect(rect());
+	p.fillRect(rect(), st::historyComposeAreaBg);
+	p.fillRect(0, 0, width(), st::lineWidth, st::shadowFg);
+
+	p.setOpacity(ratio);
+	p.translate(0, height() - targetH);
+
+	const auto now = crl::now();
 	const auto avatarSize = style::ConvertScale(kTypingIndicatorAvatar);
+	const auto emojiSize = style::ConvertScale(kTypingIndicatorEmoji);
 	auto x = st::historySendPadding;
-	const auto top = (height() - avatarSize) / 2;
-	for (auto i = 0; i != int(users.size()) && i != 3; ++i) {
-		const auto user = users[i];
-		auto &view = _userpics[peerToUser(user->id)];
+	const auto avatarTop = (targetH - avatarSize) / 2;
+
+	auto count = 0;
+	const auto drawOneUser = [&](not_null<UserData*> user) {
+		const auto uid = peerToUser(user->id);
+		auto &view = _userpics[uid];
 		user->paintUserpicLeft(
 			p,
 			view,
 			x,
-			top,
+			avatarTop,
 			width(),
 			avatarSize);
-		x += avatarSize + st::lineWidth * 2;
-		if (user->isPremium()) {
-			const auto &icon = st::dialogsPremiumIcon.icon;
-			icon.paint(
-				p,
-				x,
-				top + avatarSize - icon.height(),
-				width(),
-				st::windowSubTextFg->c);
-			x += icon.width();
+		x += avatarSize + style::ConvertScale(3);
+
+		const auto statusId = user->emojiStatusId();
+		const auto customId = Data::EmojiStatusCustomId(statusId);
+		if (customId) {
+			auto &entry = _statusEmojis[uid];
+			if (entry.documentId != customId || !entry.emoji) {
+				entry.documentId = customId;
+				entry.emoji = user->owner().customEmojiManager().create(
+					customId,
+					[this] { update(); },
+					Data::CustomEmojiSizeTag::Normal,
+					emojiSize);
+			}
+			if (entry.emoji) {
+				const auto emojiTop = (targetH - emojiSize) / 2;
+				entry.emoji->paint(p, {
+					.textColor = st::dialogsVerifiedIconBg->c,
+					.now = now,
+					.position = QPoint(x, emojiTop),
+					.paused = On(PowerSaving::kEmojiStatus),
+				});
+				x += emojiSize + style::ConvertScale(3);
+			}
+		} else {
+			_statusEmojis.remove(uid);
+			if (user->isPremium()) {
+				const auto &icon = st::dialogsPremiumIcon.icon;
+				const auto iconTop = (targetH - icon.height()) / 2;
+				icon.paint(
+					p,
+					x,
+					iconTop,
+					width(),
+					st::dialogsVerifiedIconBg->c);
+				x += icon.width() + style::ConvertScale(3);
+			}
 		}
-		x += st::lineWidth * 2;
+		x += style::ConvertScale(2);
+	};
+
+	if (!liveUsers.empty()) {
+		for (const auto &user : liveUsers) {
+			drawOneUser(user);
+			if (++count == 3) {
+				break;
+			}
+		}
+	} else {
+		for (const auto &user : _cachedUsers) {
+			drawOneUser(user);
+			if (++count == 3) {
+				break;
+			}
+		}
 	}
-	const auto textTop = (height() - st::normalFont->height) / 2;
-	painter->paint(
-		p,
-		x,
-		textTop,
-		std::max(width() - x, 0),
-		width(),
-		st::windowSubTextFg,
-		crl::now());
+
+	if (painter && !liveUsers.empty()) {
+		const auto textTop = (targetH - st::normalFont->height) / 2;
+		painter->paint(
+			p,
+			x,
+			textTop,
+			std::max(width() - x - st::historySendPadding, 0),
+			width(),
+			st::windowSubTextFg,
+			now);
+	}
 }
 
 } // namespace Custom

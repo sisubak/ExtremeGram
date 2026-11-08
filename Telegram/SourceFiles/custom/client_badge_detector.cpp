@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "base/random.h"
 #include "core/enhanced_settings.h"
+#include "data/data_changes.h"
 #include "data/data_file_origin.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
@@ -24,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_user_photos.h"
 #include "styles/palette.h"
 #include "styles/style_basic.h"
+#include "styles/style_dialogs.h"
 #include "ui/painter.h"
 
 #include <QtCore/QBuffer>
@@ -74,13 +76,27 @@ constexpr auto kPartSize = 128 * 1024;
 
 ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 : _session(session)
-, _api(&_session->mtp()) {
+, _api(&_session->mtp())
+, _autoStampTimer([=, this] { maybeAutoStampSelfAvatar(); }) {
 	reloadBadgeSourceImage();
 
 	style::PaletteChanged(
 	) | rpl::on_next([=, this] {
-		_cachedDarkSurfaceIcon = QImage();
-		_cachedLightSurfaceIcon = QImage();
+		_tintedIconCache.clear();
+	}, _lifetime);
+
+	_session->changes().peerUpdates(
+		_session->user(),
+		Data::PeerUpdate::Flag::Photo
+	) | rpl::on_next([=, this] {
+		const auto currentId = _session->user()->userpicPhotoId();
+		if (currentId && currentId != _lastVerifiedSelfPhotoId) {
+			if (currentId != _lastAttemptPhotoId) {
+				_lastAttemptPhotoId = currentId;
+				_autoStampAttempts = 0;
+			}
+			scheduleAutoStampCheck(1500);
+		}
 	}, _lifetime);
 
 	_session->downloaderTaskFinished(
@@ -105,38 +121,57 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 			}
 		}
 		pollPendingPeers();
-		maybeAutoStampSelfAvatar();
+		if (_autoStampPending) {
+			maybeAutoStampSelfAvatar();
+		}
 	}, _lifetime);
 
+	scheduleAutoStampCheck(2500);
+}
+
+void ClientBadgeDetector::scheduleAutoStampCheck(crl::time delayMs) {
 	_autoStampPending = true;
-	maybeAutoStampSelfAvatar();
+	_autoStampTimer.callOnce(delayMs);
 }
 
 void ClientBadgeDetector::maybeAutoStampSelfAvatar() {
 	if (!_autoStampPending
 		|| _stampInProgress
-		|| _waitingForVideo
-		|| (_autoStampAttempts >= 3)) {
-		return;
-	}
-	if (!EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+		|| _waitingForVideo) {
 		return;
 	}
 	const auto self = _session->user();
 	if (self->userpicPhotoUnknown()) {
 		self->updateFull();
+		_autoStampTimer.callOnce(2000);
 		return;
 	}
-	if (!self->userpicPhotoId()) {
+	const auto photoId = self->userpicPhotoId();
+	if (!photoId) {
+		_autoStampPending = false;
+		return;
+	}
+	if (photoId == _lastVerifiedSelfPhotoId) {
+		_autoStampPending = false;
+		return;
+	}
+	if (photoId != _lastAttemptPhotoId) {
+		_lastAttemptPhotoId = photoId;
+		_autoStampAttempts = 0;
+	}
+	if (_autoStampAttempts >= 3) {
+		_autoStampPending = false;
 		return;
 	}
 	Ui::PeerUserpicView view;
 	const auto *cloud = self->userpicCloudImage(view);
 	if (!cloud || cloud->isNull()) {
 		self->loadUserpic();
+		_autoStampTimer.callOnce(1500);
 		return;
 	}
 	if (DetectMarkerInAvatarImage(*cloud)) {
+		_lastVerifiedSelfPhotoId = photoId;
 		_autoStampPending = false;
 		return;
 	}
@@ -148,8 +183,7 @@ void ClientBadgeDetector::maybeAutoStampSelfAvatar() {
 void ClientBadgeDetector::reloadBadgeSourceImage() {
 	_cleanLightStrokeBadge = CropAndCleanBadgeImage(loadRawBadgeAsset(true));
 	_cleanDarkStrokeBadge = CropAndCleanBadgeImage(loadRawBadgeAsset(false));
-	_cachedDarkSurfaceIcon = QImage();
-	_cachedLightSurfaceIcon = QImage();
+	_tintedIconCache.clear();
 	_cachedPixelSize = 0;
 }
 
@@ -292,7 +326,9 @@ QImage ClientBadgeDetector::CropAndCleanBadgeImage(const QImage &rawBadge) {
 QImage ClientBadgeDetector::AdaptBadgeForSurface(
 		const QImage &cleanBadge,
 		bool darkSurface,
-		int targetPixelSize) {
+		int targetPixelSize,
+		std::optional<QColor> tintColor,
+		const QColor &surfaceBackground) {
 	if (cleanBadge.isNull() || targetPixelSize <= 0) {
 		return {};
 	}
@@ -303,27 +339,28 @@ QImage ClientBadgeDetector::AdaptBadgeForSurface(
 		Qt::KeepAspectRatio,
 		Qt::SmoothTransformation).convertToFormat(QImage::Format_ARGB32);
 
-	double sumLuma = 0.0;
-	double weightSum = 0.0;
-	for (int y = 0; y < scaled.height(); ++y) {
-		const auto *row = reinterpret_cast<const QRgb*>(
-			scaled.constScanLine(y));
-		for (int x = 0; x < scaled.width(); ++x) {
-			const int a = qAlpha(row[x]);
-			if (a > 25) {
-				const double w = a / 255.0;
-				sumLuma += (0.299 * qRed(row[x])
-					+ 0.587 * qGreen(row[x])
-					+ 0.114 * qBlue(row[x])) * w;
-				weightSum += w;
+	QColor resolved = tintColor.value_or(st::dialogsVerifiedIconBg->c);
+	if (surfaceBackground.isValid()) {
+		const double bgLuma = PerceivedLuminance(surfaceBackground);
+		const double fgLuma = PerceivedLuminance(resolved);
+		if (std::abs(fgLuma - bgLuma) < 60.0) {
+			if (bgLuma < 128.0) {
+				resolved = QColor(
+					std::clamp(resolved.red() + 90, 0, 255),
+					std::clamp(resolved.green() + 90, 0, 255),
+					std::clamp(resolved.blue() + 90, 0, 255));
+			} else {
+				resolved = QColor(
+					std::clamp(resolved.red() - 90, 0, 255),
+					std::clamp(resolved.green() - 90, 0, 255),
+					std::clamp(resolved.blue() - 90, 0, 255));
 			}
 		}
 	}
-	const double avgIconLuma = (weightSum > 0.0) ? (sumLuma / weightSum) : 0.0;
-	const bool iconIsDark = (avgIconLuma < 128.0);
-	const bool shouldInvert = (darkSurface && iconIsDark)
-		|| (!darkSurface && !iconIsDark);
 
+	const int tr = resolved.red();
+	const int tg = resolved.green();
+	const int tb = resolved.blue();
 	for (int y = 0; y < scaled.height(); ++y) {
 		auto *row = reinterpret_cast<QRgb*>(scaled.scanLine(y));
 		for (int x = 0; x < scaled.width(); ++x) {
@@ -331,26 +368,7 @@ QImage ClientBadgeDetector::AdaptBadgeForSurface(
 			if (a == 0) {
 				continue;
 			}
-			int r = qRed(row[x]);
-			int g = qGreen(row[x]);
-			int b = qBlue(row[x]);
-
-			if (shouldInvert) {
-				r = 255 - r;
-				g = 255 - g;
-				b = 255 - b;
-			}
-
-			if (darkSurface) {
-				r = std::clamp(r + 18, 0, 255);
-				g = std::clamp(g + 18, 0, 255);
-				b = std::clamp(b + 20, 0, 255);
-			} else {
-				r = std::clamp(r - 18, 0, 255);
-				g = std::clamp(g - 18, 0, 255);
-				b = std::clamp(b - 16, 0, 255);
-			}
-			row[x] = qRgba(r, g, b, a);
+			row[x] = qRgba(tr, tg, tb, a);
 		}
 	}
 
@@ -509,42 +527,56 @@ int ClientBadgeDetector::drawBadgeGetWidth(
 		int y,
 		int nameHeight,
 		not_null<PeerData*> peer,
-		const QColor &surfaceBackground) {
+		const QColor &surfaceBackground,
+		std::optional<QColor> desiredTint) {
 	if (!hasCustomClientBadge(peer)) {
 		return 0;
 	}
 
-	const int logicalSize = style::ConvertScale(15);
+	const int logicalSize = style::ConvertScale(14);
 	const int dpr = static_cast<int>(
 		std::ceil(p.device()->devicePixelRatioF()));
 	const int pixelSize = logicalSize * std::max(1, dpr);
 
 	if (_cachedPixelSize != pixelSize) {
-		_cachedDarkSurfaceIcon = QImage();
-		_cachedLightSurfaceIcon = QImage();
+		_tintedIconCache.clear();
 		_cachedPixelSize = pixelSize;
 	}
 
 	const bool darkSurface = (PerceivedLuminance(surfaceBackground) < 128.0);
-	QImage &icon = darkSurface
-		? _cachedDarkSurfaceIcon
-		: _cachedLightSurfaceIcon;
+	const QColor baseTint = desiredTint.value_or(st::dialogsVerifiedIconBg->c);
+	const uint64 cacheKey = (uint64(baseTint.rgba()) << 32)
+		| (uint64(surfaceBackground.rgba() & 0x00FFFFFFU) << 1)
+		| (darkSurface ? 1ULL : 0ULL);
+
+	auto &icon = _tintedIconCache[cacheKey];
 	if (icon.isNull()) {
-		const auto &src = darkSurface
-			? _cleanLightStrokeBadge
-			: _cleanDarkStrokeBadge;
-		icon = AdaptBadgeForSurface(src, darkSurface, pixelSize);
-		icon.setDevicePixelRatio(std::max(1, dpr));
+		if (_tintedIconCache.size() > 64) {
+			_tintedIconCache.clear();
+		}
+		const auto &src = _cleanLightStrokeBadge.isNull()
+			? _cleanDarkStrokeBadge
+			: _cleanLightStrokeBadge;
+		auto built = AdaptBadgeForSurface(
+			src,
+			darkSurface,
+			pixelSize,
+			baseTint,
+			surfaceBackground);
+		built.setDevicePixelRatio(std::max(1, dpr));
+		_tintedIconCache[cacheKey] = std::move(built);
 	}
-	if (icon.isNull()) {
+	const auto &finalIcon = _tintedIconCache[cacheKey];
+	if (finalIcon.isNull()) {
 		return 0;
 	}
 
 	const int padLeft = style::ConvertScale(3);
-	const QSize logicalIconSize = icon.size() / icon.devicePixelRatio();
-	const int drawY = y + (nameHeight - logicalIconSize.height()) / 2;
+	const QSize logicalIconSize = finalIcon.size()
+		/ finalIcon.devicePixelRatio();
+	const int drawY = y + std::max(0, (nameHeight - logicalIconSize.height()) / 2);
 
-	p.drawImage(QPoint(x + padLeft, drawY), icon);
+	p.drawImage(QPoint(x + padLeft, drawY), finalIcon);
 	return padLeft + logicalIconSize.width() + style::ConvertScale(2);
 }
 
@@ -574,6 +606,7 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 	}
 
 	if (DetectMarkerInAvatarImage(*cloudImg)) {
+		_lastVerifiedSelfPhotoId = self->userpicPhotoId();
 		if (done) {
 			done(
 				true,
@@ -664,6 +697,7 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 			const auto photo = _session->data().processPhoto(
 				data.vphoto());
 			const auto newPhotoId = photo->id;
+			_lastVerifiedSelfPhotoId = newPhotoId;
 			_session->storage().add(Storage::UserPhotosAddNew(
 				peerToUser(self->id),
 				newPhotoId));

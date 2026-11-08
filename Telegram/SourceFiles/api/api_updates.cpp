@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_updates.h"
 
+#include <QtGui/QGuiApplication>
+
 #include "api/api_authorizations.h"
 #include "api/api_user_names.h"
 #include "api/api_chat_participants.h"
@@ -244,6 +246,14 @@ Updates::Updates(not_null<Main::Session*> session)
 , _idleFinishTimer([=] { checkIdleFinish(); }) {
 	EnhancedSettings::Changes(EnhancedSettings::Option::OnlineSpam)
 		| rpl::on_next([=] { updateOnline(); }, _lifetime);
+	if (const auto guiApp = qobject_cast<QGuiApplication*>(
+			QCoreApplication::instance())) {
+		const auto conn = QObject::connect(
+			guiApp,
+			&QGuiApplication::applicationStateChanged,
+			[=](Qt::ApplicationState) { updateOnline(); });
+		_lifetime.add([conn] { QObject::disconnect(conn); });
+	}
 	_ptsWaiter.setRequesting(true);
 
 	session->account().mtpUpdates(
@@ -1021,10 +1031,15 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		}
 	}
 	auto ms = crl::now();
+	const auto appFocused = Core::App().hasActiveWindow(&session())
+		&& (QGuiApplication::applicationState() == Qt::ApplicationActive);
 	const auto onlineSpamActive = EnhancedSettings::Get(
 		EnhancedSettings::Option::OnlineSpam)
+		&& appFocused
 		&& !Core::Quitting();
-	if (onlineSpamActive) {
+	if (!appFocused) {
+		isOnline = false;
+	} else if (onlineSpamActive) {
 		constexpr auto kInterval = crl::time(2500);
 		isOnline = (ms / kInterval) % 2 == 0;
 		updateIn = int(kInterval - (ms % kInterval));

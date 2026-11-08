@@ -1,4 +1,4 @@
-﻿/*
+/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -194,6 +194,7 @@ public:
 	[[nodiscard]] auto getSelectedEphemeral() const
 		-> std::vector<not_null<HistoryItem*>>;
 	[[nodiscard]] bool hasSelectedItems() const;
+	[[nodiscard]] QImage renderSelectedMessagesToImage();
 	[[nodiscard]] HistoryView::SelectionModeResult inSelectionMode() const;
 	[[nodiscard]] HistoryView::SelectionModeResult inSelectionMode(
 		const Element *view) const;
@@ -655,6 +656,7 @@ private:
 	QPainterPath _highlightPathCache;
 	bool _isChatWide = false;
 	bool _removeFromUserpics = false;
+	bool _capturingScreenshot = false;
 
 	base::flat_set<not_null<const HistoryItem*>> _animatedStickersPlayed;
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpics;

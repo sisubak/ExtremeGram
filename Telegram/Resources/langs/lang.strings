@@ -9616,7 +9616,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_link_preview_rule_pattern" = "URL Regex";
 "lng_link_preview_rule_domain" = "Domain";
 
-"lng_settings_online_spam" = "Online status spam";
+"lng_settings_online_spam" = "Мигание статуса «в сети» (онлайн-спам)";
 
 "lng_settings_smooth_interface_animations" = "Плавные анимации интерфейса";
 "lng_extremegram_bot_mode" = "Бот-режим (!mute, !stats)";
@@ -9628,6 +9628,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_auto_stamp_avatar" = "Автоматически обновлять аватарку с иконкой клиента";
 "lng_extremegram_badge_clicked" = "Этот пользователь использует ExtremeGram";
 "lng_extremegram_screenshot_chat" = "Сохранить чат как изображение";
+"lng_extremegram_screenshot_selected" = "Скриншот";
+"lng_extremegram_edit_audio_as_voice" = "Открыть MP3/MP4 в редакторе голосового...";
+"lng_extremegram_send_audio_as_voice" = "Отправить MP3/MP4 сразу как голосовое...";
 "lng_extremegram_mute_dialog" = "Улучшенный диалог ограничения пользователя";
 "lng_extremegram_mute_title" = "Ограничить пользователя";
 "lng_extremegram_mute_duration" = "Срок (например, 4д или 1г; пусто — навсегда)";

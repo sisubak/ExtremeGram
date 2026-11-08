@@ -13,6 +13,10 @@ namespace Main {
 class Session;
 } // namespace Main
 
+namespace Ui {
+class InputField;
+} // namespace Ui
+
 namespace ChatHelpers {
 
 enum class RichPasteOffer : uchar {
@@ -39,6 +43,12 @@ struct RichPasteToastArgs {
 [[nodiscard]] std::optional<RichPasteDecision> MimeDataRichPasteOffer(
 	not_null<Main::Session*> session,
 	not_null<const QMimeData*> data);
+
+[[nodiscard]] bool TryApplyInlineFormattedPaste(
+	not_null<Main::Session*> session,
+	not_null<Ui::InputField*> field,
+	not_null<const QMimeData*> data,
+	const QString &plainText);
 
 [[nodiscard]] TextWithTags TextWithTagsReplaced(
 	const TextWithTags &original,

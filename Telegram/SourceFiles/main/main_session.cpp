@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "main/main_session.h"
 
+#include "custom/client_badge_detector.h"
+#include "custom/eternal_tags.h"
 #include "apiwrap.h"
 #include "api/api_peer_colors.h"
 #include "api/api_updates.h"
@@ -281,6 +283,9 @@ Session::Session(
 	) | rpl::on_next([=] {
 		appConfigRefreshed();
 	}, _lifetime);
+
+	(void)Custom::ClientBadgeFor(this);
+	(void)Custom::EternalTagsFor(this);
 }
 
 void Session::appConfigRefreshed() {

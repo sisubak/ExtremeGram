@@ -2304,34 +2304,12 @@ void ComposeControls::setMimeDataHook(MimeDataHook hook) {
 					return true;
 				} else if (action == Ui::InputField::MimeAction::Insert) {
 					const auto pasted = Core::ReadMimeText(data);
-					if (EnhancedSettings::Get(
-							EnhancedSettings::Option::MarkdownPaste)
-						&& Custom::LooksLikeMarkdown(pasted)) {
-						auto parsed = TextUtilities::ParseEntities(
-							pasted,
-							TextParseMarkdown);
-						if (!parsed.entities.empty()) {
-							const auto cursor = _field->textCursor();
-							const auto from = cursor.selectionStart();
-							const auto till = cursor.selectionEnd();
-							const auto was = _field->getTextWithTags();
-							const auto tail = int(was.text.size()) - till;
-							_field->setTextWithTags(
-								ChatHelpers::TextWithTagsReplaced(
-									was,
-									from,
-									till,
-									{
-										parsed.text,
-										TextUtilities::ConvertEntitiesToTextTags(
-											parsed.entities),
-									}));
-							_field->setCursorPosition(std::max(
-								0,
-								int(_field->getTextWithTags().text.size())
-									- tail));
-							return true;
-						}
+					if (ChatHelpers::TryApplyInlineFormattedPaste(
+							&_show->session(),
+							_field,
+							data,
+							pasted)) {
+						return true;
 					}
 					offerRichPaste(data);
 				}
@@ -5279,13 +5257,12 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 	const auto typingHeight = (_typingIndicator
 		&& !_typingIndicator->isHidden()
 		&& !_voiceRecordBar->isActive())
-		? _typingIndicator->height()
+		? _typingIndicator->currentHeight()
 		: 0;
 	const auto fieldTop = size.height()
 		- _st.padding.bottom()
-		- typingHeight
 		- fieldHeight;
-	const auto buttonsTop = size.height() - typingHeight - _st.attach.height;
+	const auto buttonsTop = size.height() - _st.attach.height;
 
 	auto left = 0;
 	if (commentsShown) {
@@ -5321,16 +5298,16 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		_fieldDisabled->moveToLeft(left, fieldTop);
 	}
 
-	if (_typingIndicator) {
-		_typingIndicator->resizeToWidth(size.width());
-		_typingIndicator->moveToLeft(
-			0,
-			fieldTop + fieldHeight + _st.padding.bottom());
-	}
 	_header->resizeToWidth(size.width());
-	_header->moveToLeft(
-		0,
-		fieldTop - _st.padding.top() - _header->height());
+	const auto headerTop = fieldTop - _st.padding.top() - _header->height();
+	_header->moveToLeft(0, headerTop);
+	if (_typingIndicator) {
+		_typingIndicator->setGeometryToLeft(
+			0,
+			std::max(0, headerTop - typingHeight),
+			size.width(),
+			typingHeight);
+	}
 
 	auto right = 0;
 	if (_starsReaction) {
@@ -6101,7 +6078,7 @@ void ComposeControls::updateHeight() {
 	const auto typingHeight = (_typingIndicator
 		&& !_typingIndicator->isHidden()
 		&& !_voiceRecordBar->isActive())
-		? _typingIndicator->height()
+		? _typingIndicator->currentHeight()
 		: 0;
 	const auto height = typingHeight
 		+ (_header->isDisplayed() ? _header->height() : 0)

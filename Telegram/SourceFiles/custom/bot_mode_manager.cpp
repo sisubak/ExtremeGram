@@ -138,6 +138,9 @@ void BotStatsOverlayWidget::applySnapshot(const StatsProgressSnapshot &snap) {
 }
 
 void BotStatsOverlayWidget::paintEvent(QPaintEvent *) {
+	if (width() <= style::ConvertScale(28) || height() <= style::ConvertScale(14)) {
+		return;
+	}
 	const auto alpha = _visibilityAnim.value(_snapshot.active ? 1.0 : 0.0);
 	if (alpha <= 0.001) {
 		return;
@@ -260,7 +263,9 @@ bool BotModeManager::tryInterceptOutgoingCommand(
 	const auto isMute = (trimmed.compare(u"!mute"_q, Qt::CaseInsensitive) == 0)
 		|| trimmed.startsWith(u"!mute "_q, Qt::CaseInsensitive)
 		|| trimmed.startsWith(u"!mute@"_q, Qt::CaseInsensitive);
-	const auto isStats = (trimmed.compare(u"!stats"_q, Qt::CaseInsensitive) == 0);
+	const auto isStats = (trimmed.compare(u"!stats"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!stats "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!stats@"_q, Qt::CaseInsensitive);
 	if (!isMute && !isStats) {
 		return false;
 	}
@@ -272,8 +277,13 @@ bool BotModeManager::tryInterceptOutgoingCommand(
 		return true;
 	}
 	if (isMute) {
-		const auto rest = trimmed.mid(5).trimmed();
+		const auto spaceIdx = trimmed.indexOf(QChar(' '));
+		const auto rest = (spaceIdx >= 0) ? trimmed.mid(spaceIdx + 1).trimmed() : QString();
 		return handleMuteCommand(history, rest, replyToId, controller);
+	}
+	if (controller) {
+		controller->showToast(QString::fromUtf8(
+			"Запущен фоновый подсчёт статистики сообщений..."));
 	}
 	return handleStatsCommand(history);
 }

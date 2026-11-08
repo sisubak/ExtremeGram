@@ -12,11 +12,14 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "core/deep_links/deep_links_settings.h"
 #include "core/application.h"
 #include "core/chat_enhanced_settings.h"
+#include "data/data_chat_filters.h"
+#include "data/data_folder.h"
 #include "data/data_histories.h"
 #include "data/data_peer.h"
 #include "data/data_peer_id.h"
 #include "data/data_session.h"
 #include "history/history.h"
+#include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings.h"
@@ -1115,18 +1118,39 @@ void HideChat(not_null<PeerData*> peer) {
 	auto &session = peer->session();
 	auto ids = HiddenChatIds(session);
 	const auto id = HiddenChatId(peer);
-	if (ids.contains(id)) {
-		return;
+	if (!ids.contains(id)) {
+		ids.push_back(id);
+		session.local().writePref<QString>(
+			kHiddenChatsKey,
+			ids.join(QLatin1Char(',')));
 	}
-	ids.push_back(id);
-	session.local().writePref<QString>(
-		kHiddenChatsKey,
-		ids.join(QLatin1Char(',')));
-	if (const auto history = session.data().historyLoaded(peer)) {
-		Core::App().notifications().clearFromHistory(history);
-		history->updateChatListExistence();
-		history->updateChatListEntry();
+	const auto refreshPeer = [&](PeerData *target) {
+		if (!target) {
+			return;
+		}
+		if (const auto history = session.data().historyLoaded(target)) {
+			Core::App().notifications().clearFromHistory(history);
+			history->updateChatListSortPosition();
+			history->updateChatListExistence();
+			session.data().chatsFilters().refreshHistory(history);
+			if (const auto folder = history->folder()) {
+				folder->updateChatListSortPosition();
+				folder->updateChatListExistence();
+			}
+		}
+	};
+	refreshPeer(peer);
+	if (const auto migrated = peer->migrateFrom()) {
+		const auto migId = HiddenChatId(migrated);
+		if (!ids.contains(migId)) {
+			ids.push_back(migId);
+			session.local().writePref<QString>(
+				kHiddenChatsKey,
+				ids.join(QLatin1Char(',')));
+		}
+		refreshPeer(migrated);
 	}
+	session.data().notifyPinnedDialogsOrderUpdated();
 }
 
 void RevealHiddenChats(Main::Session &session) {
@@ -1138,12 +1162,23 @@ void RevealHiddenChats(Main::Session &session) {
 		if (!ok) {
 			continue;
 		}
-		if (const auto history = session.data().historyLoaded(
-				DeserializePeerId(serialized))) {
-			history->updateChatListExistence();
-			history->updateChatListEntry();
+		const auto history = session.data().history(
+			DeserializePeerId(serialized));
+		if (!history->chatListTimeId()) {
+			if (const auto last = history->lastMessage()) {
+				history->setChatListTimeId(last->date());
+			}
+		}
+		history->updateChatListSortPosition();
+		history->updateChatListExistence();
+		history->updateChatListEntry();
+		session.data().chatsFilters().refreshHistory(history);
+		if (const auto folder = history->folder()) {
+			folder->updateChatListSortPosition();
+			folder->updateChatListExistence();
 		}
 	}
+	session.data().notifyPinnedDialogsOrderUpdated();
 }
 
 void Start() {

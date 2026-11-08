@@ -156,6 +156,34 @@ void MentionPins::moveDown(
 	}
 }
 
+void MentionPins::reorderPinned(
+		not_null<PeerData*> peer,
+		const std::vector<UserId> &orderedSubset) {
+	const auto i = _pins.find(peer->id);
+	if (i == end(_pins) || orderedSubset.size() < 2) {
+		return;
+	}
+	auto &users = i->second;
+	auto filteredSubset = std::vector<UserId>();
+	filteredSubset.reserve(orderedSubset.size());
+	for (const auto &uid : orderedSubset) {
+		if (Find(users, uid) != users.end()
+			&& Find(filteredSubset, uid) == filteredSubset.end()) {
+			filteredSubset.push_back(uid);
+		}
+	}
+	if (filteredSubset.size() < 2) {
+		return;
+	}
+	size_t takeIdx = 0;
+	for (auto &slot : users) {
+		if (Find(filteredSubset, slot) != filteredSubset.end()) {
+			slot = filteredSubset[takeIdx++];
+		}
+	}
+	saveToDisk();
+}
+
 QString MentionPins::storageFilePath() const {
 	const auto dirPath = cWorkingDir() + u"tdata/extremegram"_q;
 	QDir().mkpath(dirPath);
@@ -232,16 +260,27 @@ MentionPins &MentionPinsFor(not_null<Main::Session*> session) {
 }
 
 bool LooksLikeMarkdown(const QString &text) {
-	return text.contains(u"**"_q)
+	if (text.contains(u"**"_q)
 		|| text.contains(u"__"_q)
 		|| text.contains(u"~~"_q)
+		|| text.contains(u"||"_q)
 		|| text.contains(u"`"_q)
 		|| text.contains(u"]("_q)
-		|| text.contains(u"\n# "_q)
+		|| text.contains(u"\n#"_q)
 		|| text.startsWith(u"# "_q)
+		|| text.startsWith(u"## "_q)
+		|| text.startsWith(u"### "_q)
 		|| text.startsWith(u"> "_q)
+		|| text.contains(u"\n> "_q)
 		|| text.contains(u"\n- "_q)
-		|| text.startsWith(u"- "_q);
+		|| text.startsWith(u"- "_q)
+		|| text.contains(u"\n* "_q)
+		|| text.startsWith(u"* "_q)) {
+		return true;
+	}
+	static const QRegularExpression kSingleItalicOrList(
+		u"(?:^|\\s)\\*[^\\s*][^\\n*]{0,200}[^\\s*]\\*(?:$|\\s|[.,!?;:])|(?:^|\\n)\\d+\\.\\s+"_q);
+	return kSingleItalicOrList.match(text).hasMatch();
 }
 
 TextWithTags ApplyMentionNames(

@@ -1,4 +1,4 @@
-﻿/*
+/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -237,13 +237,14 @@ private:
 	bool _canDelete = false;
 	bool _canForward = false;
 	bool _canSendNow = false;
+	bool _canScreenshot = false;
 	bool _searchMode = false;
 
 	Ui::Animations::Simple _selectedShown;
 	Ui::Animations::Simple _searchShown;
 
 	object_ptr<Ui::RoundButton> _clear;
-	object_ptr<Ui::RoundButton> _forward, _sendNow, _delete, _forwardNoQuote, _savedMessages;
+	object_ptr<Ui::RoundButton> _forward, _sendNow, _delete, _screenshot, _forwardNoQuote, _savedMessages;
 	object_ptr<Ui::InputField> _searchField = { nullptr };
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _chooseFromUser
 		= { nullptr };
@@ -265,7 +266,6 @@ private:
 
 	object_ptr<Ui::IconButton> _call;
 	object_ptr<Ui::IconButton> _groupCall;
-	object_ptr<Ui::IconButton> _screenshot;
 	object_ptr<Ui::IconButton> _search;
 	object_ptr<Ui::IconButton> _recentActions;
 	object_ptr<Ui::IconButton> _admins;

@@ -2622,7 +2622,8 @@ void Message::paintFromName(
 			trect.top(),
 			st::msgNameFont->height,
 			from,
-			stm->msgBg->c);
+			stm->msgBg->c,
+			nameFg);
 		customX += drawnCustomWidth;
 		drawnCustomWidth += Custom::SlowmodeFor(
 			&history()->session()

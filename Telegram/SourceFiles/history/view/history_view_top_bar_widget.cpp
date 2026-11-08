@@ -129,13 +129,13 @@ TopBarWidget::TopBarWidget(
 , _forward(this, EnhancedSettings::Get(EnhancedSettings::Option::ShowEmojiButtonAsText) ? tr::lng_selected_forward() : tr::lng_selected_forward_emoji(), st::defaultActiveButton)
 , _sendNow(this, tr::lng_selected_send_now(), st::defaultActiveButton)
 , _delete(this, EnhancedSettings::Get(EnhancedSettings::Option::ShowEmojiButtonAsText) ? tr::lng_selected_delete() : tr::lng_selected_delete_emoji(), st::defaultActiveButton)
+, _screenshot(this, tr::lng_extremegram_screenshot_selected(), st::defaultActiveButton)
 , _forwardNoQuote(this, EnhancedSettings::Get(EnhancedSettings::Option::ShowEmojiButtonAsText) ? tr::lng_selected_forward_no_quote() : tr::lng_selected_forward_no_quote_emoji(), st::defaultActiveButton)
 , _savedMessages(this, EnhancedSettings::Get(EnhancedSettings::Option::ShowEmojiButtonAsText) ? tr::lng_forward_to_saved_message_text() : tr::lng_forward_to_saved_message_emoji(), st::defaultActiveButton)
 , _back(this, st::historyTopBarBack)
 , _cancelChoose(this, st::topBarCloseChoose)
 , _call(this, st::topBarCall)
 , _groupCall(this, st::topBarGroupCall)
-, _screenshot(this, st::topBarScreenshot)
 , _search(this, st::topBarSearch)
 , _recentActions(this, st::topBarRecentActions)
 , _admins(this, st::topBarAdmins)
@@ -149,6 +149,7 @@ TopBarWidget::TopBarWidget(
 	_forward->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	_sendNow->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	_delete->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_screenshot->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 
 	Lang::Updated(
 	) | rpl::on_next([=] {
@@ -165,6 +166,8 @@ TopBarWidget::TopBarWidget(
 	_sendNow->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_delete->setClickedCallback([=] { _deleteSelection.fire({}); });
 	_delete->setWidthChangedCallback([=] { updateControlsGeometry(); });
+	_screenshot->setClickedCallback([=] { _screenshotRequests.fire({}); });
+	_screenshot->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_clear->setClickedCallback([=] { _clearSelection.fire({}); });
 	_call->setClickedCallback([=] { call({}); });
 	_call->setAcceptBoth(true, true);
@@ -290,9 +293,6 @@ TopBarWidget::TopBarWidget(
 	_groupCall->setAccessibleName(tr::lng_group_call_title(tr::now));
 	_screenshot->setAccessibleName(
 		tr::lng_extremegram_screenshot_chat(tr::now));
-	_screenshot->setClickedCallback([=] {
-		_screenshotRequests.fire({});
-	});
 	_search->setAccessibleName(tr::lng_shortcuts_search(tr::now));
 	_infoToggle->setAccessibleName(tr::lng_settings_section_info(tr::now));
 	_menuToggle->setAccessibleName(tr::lng_chat_menu(tr::now));
@@ -1159,8 +1159,6 @@ void TopBarWidget::updateSearchVisibility() {
 		|| (_activeChat.section == Section::SavedSublist
 			&& _activeChat.key.sublist());
 	_search->setVisible(searchAllowedMode && !_chooseForReportReason);
-	_screenshot->setVisible(
-		searchAllowedMode && !_chooseForReportReason && !_searchMode);
 }
 
 void TopBarWidget::updateInfoButtonVisibility() {
@@ -1197,8 +1195,9 @@ void TopBarWidget::updateControlsGeometry() {
 	auto buttonsWidth = (_forward->isHidden() ? 0 : _forward->contentWidth())
 		+ (_sendNow->isHidden() ? 0 : _sendNow->contentWidth())
 		+ (_delete->isHidden() ? 0 : _delete->contentWidth())
+		+ (_screenshot->isHidden() ? 0 : _screenshot->contentWidth())
 		+ _clear->width();
-	buttonsWidth += buttonsLeft + st::topBarActionSkip * 3;
+	buttonsWidth += buttonsLeft + st::topBarActionSkip * 4;
 
 	auto widthLeft = std::min(
 		width() - buttonsWidth,
@@ -1209,6 +1208,7 @@ void TopBarWidget::updateControlsGeometry() {
 	_savedMessages->setFullWidth(buttonFullWidth);
 	_sendNow->setFullWidth(buttonFullWidth);
 	_delete->setFullWidth(buttonFullWidth);
+	_screenshot->setFullWidth(buttonFullWidth);
 
 	selectedButtonsTop += (height() - _forward->height()) / 2;
 
@@ -1233,6 +1233,11 @@ void TopBarWidget::updateControlsGeometry() {
 	}
 
 	_delete->moveToLeft(buttonsLeft, selectedButtonsTop);
+	if (!_delete->isHidden()) {
+		buttonsLeft += _delete->width() + st::topBarActionSkip;
+	}
+
+	_screenshot->moveToLeft(buttonsLeft, selectedButtonsTop);
 	{
 		const auto large = st::topBarActionButtonLargeRadius;
 		const auto &buttonSt = st::defaultActiveButton;
@@ -1245,6 +1250,7 @@ void TopBarWidget::updateControlsGeometry() {
 			_savedMessages.data(),
 			_sendNow.data(),
 			_delete.data(),
+			_screenshot.data(),
 		};
 		auto first = (Ui::RoundButton*)(nullptr);
 		auto last = (Ui::RoundButton*)(nullptr);
@@ -1363,10 +1369,6 @@ void TopBarWidget::updateControlsGeometry() {
 		_groupCall->moveToRight(_rightTaken, otherButtonsTop);
 		_rightTaken += _call->width();
 	}
-	_screenshot->moveToRight(_rightTaken, otherButtonsTop);
-	if (!_screenshot->isHidden()) {
-		_rightTaken += _screenshot->width() + st::topBarCallSkip;
-	}
 	_search->moveToRight(_rightTaken, otherButtonsTop);
 	if (!_search->isHidden()) {
 		_rightTaken += _search->width() + st::topBarCallSkip;
@@ -1401,6 +1403,7 @@ void TopBarWidget::updateControlsVisibility() {
 	const auto visible = showSelectedState() || _selectedShown.animating();
 	_clear->setVisible(visible);
 	_delete->setVisible(_canDelete && visible);
+	_screenshot->setVisible(_canScreenshot && visible);
 	_forward->setVisible(_canForward && visible);
 	_forwardNoQuote->setVisible(_canForward && visible);
 	_savedMessages->setVisible(_canForward && visible);
@@ -1595,35 +1598,43 @@ void TopBarWidget::updateMembersShowArea() {
 
 bool TopBarWidget::showSelectedState() const {
 	return (_selectedCount > 0)
-		&& (_canDelete || _canForward || _canSendNow);
+		&& (_canDelete || _canForward || _canSendNow || _canScreenshot);
 }
 
 void TopBarWidget::showSelected(SelectedState state) {
 	auto canDelete = (state.count > 0 && state.count == state.canDeleteCount);
 	auto canForward = (state.count > 0 && state.count == state.canForwardCount);
 	auto canSendNow = (state.count > 0 && state.count == state.canSendNowCount);
-	auto count = (!canDelete && !canForward && !canSendNow) ? 0 : state.count;
+	auto canScreenshot = (state.count > 0
+		&& !state.textSelected
+		&& !_chooseForReportReason);
+	auto count = (!canDelete && !canForward && !canSendNow && !canScreenshot)
+		? 0
+		: state.count;
 	if (_selectedCount == count
 		&& _canDelete == canDelete
 		&& _canForward == canForward
-		&& _canSendNow == canSendNow) {
+		&& _canSendNow == canSendNow
+		&& _canScreenshot == canScreenshot) {
 		return;
 	}
 	if (count == 0) {
-		// Don't change the visible buttons if the selection is cancelled.
 		canDelete = _canDelete;
 		canForward = _canForward;
 		canSendNow = _canSendNow;
+		canScreenshot = _canScreenshot;
 	}
 
 	const auto wasSelectedState = showSelectedState();
 	const auto visibilityChanged = (_canDelete != canDelete)
 		|| (_canForward != canForward)
-		|| (_canSendNow != canSendNow);
+		|| (_canSendNow != canSendNow)
+		|| (_canScreenshot != canScreenshot);
 	_selectedCount = count;
 	_canDelete = canDelete;
 	_canForward = canForward;
 	_canSendNow = canSendNow;
+	_canScreenshot = canScreenshot;
 	const auto nowSelectedState = showSelectedState();
 	if (nowSelectedState) {
 		_forward->setNumbersText(_selectedCount);
@@ -1631,12 +1642,14 @@ void TopBarWidget::showSelected(SelectedState state) {
 		_savedMessages->setNumbersText(_selectedCount);
 		_sendNow->setNumbersText(_selectedCount);
 		_delete->setNumbersText(_selectedCount);
+		_screenshot->setNumbersText(_selectedCount);
 		if (!wasSelectedState) {
 			_forward->finishNumbersAnimation();
 			_forwardNoQuote->finishNumbersAnimation();
 			_savedMessages->finishNumbersAnimation();
 			_sendNow->finishNumbersAnimation();
 			_delete->finishNumbersAnimation();
+			_screenshot->finishNumbersAnimation();
 		}
 	}
 	if (visibilityChanged
