@@ -313,7 +313,7 @@ const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
 			int(name.size()),
 			u"mention://"_q + TextUtilities::MentionNameDataFromFields({
 				.selfId = session->userId().bare,
-				.userId = user->id.bare,
+				.userId = peerToUser(user->id).bare,
 				.accessHash = user->accessHash(),
 			}),
 		});
@@ -779,13 +779,22 @@ HistoryWidget::HistoryWidget(
 					TextParseMarkdown);
 				if (!parsed.entities.empty()) {
 					const auto cursor = _field->textCursor();
-					_field->insertWithTags(
-						{ cursor.selectionStart(), cursor.selectionEnd() },
+					const auto from = cursor.selectionStart();
+					const auto till = cursor.selectionEnd();
+					const auto was = _field->getTextWithTags();
+					const auto tail = int(was.text.size()) - till;
+					_field->setTextWithTags(ChatHelpers::TextWithTagsReplaced(
+						was,
+						from,
+						till,
 						{
 							parsed.text,
 							TextUtilities::ConvertEntitiesToTextTags(
 								parsed.entities),
-						});
+						}));
+					_field->setCursorPosition(std::max(
+						0,
+						int(_field->getTextWithTags().text.size()) - tail));
 					return true;
 				}
 			}

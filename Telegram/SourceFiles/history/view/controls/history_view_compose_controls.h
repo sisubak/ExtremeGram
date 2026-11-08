@@ -123,6 +123,7 @@ class StashHintManager;
 namespace HistoryView {
 
 class FieldHeader;
+class TypingIndicator;
 
 enum class ComposeControlsMode {
 	Normal,

@@ -24,7 +24,7 @@ EternalTags::EternalTags(not_null<Main::Session*> session)
 		if (i == end(_ranks)) {
 			return;
 		}
-		const auto j = i->second.find(change.user->id);
+		const auto j = i->second.find(peerToUser(change.user->id));
 		if (j == end(i->second) || j->second == change.rank) {
 			return;
 		}
@@ -45,14 +45,14 @@ bool EternalTags::has(
 	if (i == end(_ranks)) {
 		return false;
 	}
-	return i->second.find(user->id) != end(i->second);
+	return i->second.find(peerToUser(user->id)) != end(i->second);
 }
 
 void EternalTags::set(
 		not_null<PeerData*> peer,
 		not_null<UserData*> user,
 		const QString &rank) {
-	_ranks[peer->id][user->id] = rank;
+	_ranks[peer->id][peerToUser(user->id)] = rank;
 }
 
 void EternalTags::remove(
@@ -62,7 +62,7 @@ void EternalTags::remove(
 	if (i == end(_ranks)) {
 		return;
 	}
-	i->second.remove(user->id);
+	i->second.remove(peerToUser(user->id));
 	if (i->second.empty()) {
 		_ranks.remove(peer->id);
 	}

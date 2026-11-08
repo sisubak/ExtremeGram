@@ -100,7 +100,7 @@ void SendMuteMessage(
 	const auto mention = u"mention://"_q
 		+ TextUtilities::MentionNameDataFromFields({
 			.selfId = session->userId().bare,
-			.userId = user->id.bare,
+			.userId = peerToUser(user->id).bare,
 			.accessHash = user->accessHash(),
 		});
 	auto message = Api::MessageToSend(Api::SendAction(

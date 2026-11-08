@@ -44,15 +44,17 @@ bool MentionPins::has(
 		return false;
 	}
 	const auto &users = i->second;
-	return std::find(users.begin(), users.end(), user->id) != users.end();
+	const auto uid = peerToUser(user->id);
+	return std::find(users.begin(), users.end(), uid) != users.end();
 }
 
 void MentionPins::pin(
 		not_null<PeerData*> peer,
 		not_null<UserData*> user) {
 	auto &users = _pins[peer->id];
-	if (Find(users, user->id) == users.end()) {
-		users.insert(users.begin(), user->id);
+	const auto uid = peerToUser(user->id);
+	if (Find(users, uid) == users.end()) {
+		users.insert(users.begin(), uid);
 	}
 }
 
@@ -64,7 +66,7 @@ void MentionPins::unpin(
 		return;
 	}
 	auto &users = i->second;
-	const auto j = Find(users, user->id);
+	const auto j = Find(users, peerToUser(user->id));
 	if (j != users.end()) {
 		users.erase(j);
 	}
@@ -81,7 +83,7 @@ void MentionPins::moveUp(
 		return;
 	}
 	auto &users = i->second;
-	const auto j = Find(users, user->id);
+	const auto j = Find(users, peerToUser(user->id));
 	if (j != users.end() && j != users.begin()) {
 		std::iter_swap(j, j - 1);
 	}
@@ -95,7 +97,7 @@ void MentionPins::moveDown(
 		return;
 	}
 	auto &users = i->second;
-	const auto j = Find(users, user->id);
+	const auto j = Find(users, peerToUser(user->id));
 	if (j != users.end() && j + 1 != users.end()) {
 		std::iter_swap(j, j + 1);
 	}

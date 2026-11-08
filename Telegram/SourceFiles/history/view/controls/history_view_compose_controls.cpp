@@ -269,7 +269,7 @@ private:
 		const auto top = (height() - kTypingIndicatorAvatar) / 2;
 		for (auto i = 0; i != int(users.size()) && i != 3; ++i) {
 			const auto user = users[i];
-			auto &view = _userpics[user->id];
+			auto &view = _userpics[peerToUser(user->id)];
 			user->paintUserpicLeft(
 				p,
 				view,
