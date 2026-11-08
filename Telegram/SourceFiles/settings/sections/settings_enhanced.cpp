@@ -47,7 +47,6 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "core/deep_links/deep_links_settings.h"
 #include "core/enhanced_settings.h"
 #include "core/update_checker.h"
-#include "custom/client_badge_detector.h"
 #include "storage/localstorage.h"
 #include "data/data_session.h"
 #include "data/data_histories.h"
@@ -809,9 +808,6 @@ struct DecodeEnhancedSettingsResult {
 	void Enhanced::setupInterface(not_null<Ui::VerticalLayout*> content) {
 		addToggleOption(
 			content,
-			EnhancedSettings::Option::SmoothInterfaceAnimations);
-		addToggleOption(
-			content,
 			EnhancedSettings::Option::DisablePremiumAnimation);
 		addToggleOption(content, EnhancedSettings::Option::ShowGroupSenderAvatar);
 		addToggleOption(
@@ -849,32 +845,6 @@ struct DecodeEnhancedSettingsResult {
 	}
 
 	void Enhanced::setupBehavior(not_null<Ui::VerticalLayout*> content) {
-		addToggleOption(content, EnhancedSettings::Option::BotMode);
-		AddButtonWithIcon(
-			content,
-			tr::lng_extremegram_reveal_chats(),
-			st::settingsButtonNoIcon
-		)->addClickHandler([=] {
-			const auto count = EnhancedSettings::HiddenChatsCount(
-				controller()->session());
-			EnhancedSettings::RevealHiddenChats(controller()->session());
-			controller()->showToast(count > 0
-				? tr::lng_extremegram_revealed(tr::now)
-				: QString::fromUtf8("Скрытых групп и каналов сейчас нет."));
-		});
-		AddButtonWithIcon(
-			content,
-			tr::lng_extremegram_stamp_avatar(),
-			st::settingsButtonNoIcon
-		)->addClickHandler([=] {
-			Custom::ClientBadgeFor(
-				&controller()->session()
-			).stampAndReuploadSelfAvatar(
-				crl::guard(this, [=](bool, const QString &msg) {
-					controller()->showToast(msg);
-				}));
-		});
-		addToggleOption(content, EnhancedSettings::Option::OnlineSpam);
 		addToggleOption(content, EnhancedSettings::Option::ShowSimilarOnJoined);
 		addToggleOption(
 			content,

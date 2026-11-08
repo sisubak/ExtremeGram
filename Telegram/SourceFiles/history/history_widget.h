@@ -833,6 +833,7 @@ private:
 	[[nodiscard]] bool forceReplyPending() const;
 
 	void switchToSearch(QString query);
+	void captureChatScreenshot();
 
 	void validateSubsectionTabs();
 

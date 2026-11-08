@@ -2010,6 +2010,8 @@ PRIVATE
     settings/settings_credits_graphics.h
     settings/sections/settings_enhanced.cpp
     settings/sections/settings_enhanced.h
+    settings/sections/settings_extremegram.cpp
+    settings/sections/settings_extremegram.h
     settings/sections/settings_bot_use.cpp
     settings/sections/settings_bot_use.h
     settings/settings_experimental.cpp

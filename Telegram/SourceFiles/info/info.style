@@ -935,6 +935,11 @@ topBarSearch: IconButton {
 	rippleAreaSize: 40px;
 	ripple: defaultRippleAnimationBgOver;
 }
+topBarScreenshot: IconButton(topBarSearch) {
+	icon: icon {{ "menu/save_image", menuIconFg }};
+	iconOver: icon {{ "menu/save_image", menuIconFgOver }};
+	iconPosition: point(8px, 15px);
+}
 topBarCloseChoose: IconButton(topBarSearch) {
 	width: 56px;
 	icon: icon {{ "info/info_close", boxTitleCloseFg }};

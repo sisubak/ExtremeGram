@@ -1503,6 +1503,9 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	}
 
 	Painter p(this);
+	if (_appearAnim.animating()) {
+		p.setOpacity(_appearAnim.value(1.0));
+	}
 	auto clip = e->rect();
 
 	auto context = preparePaintContext(clip);
@@ -5403,6 +5406,19 @@ void HistoryInner::updateSize() {
 	if (_thanosController) {
 		_thanosController->pinScroll();
 	}
+}
+
+void HistoryInner::animateAppear() {
+	if (!EnhancedSettings::Get(
+			EnhancedSettings::Option::SmoothInterfaceAnimations)) {
+		return;
+	}
+	_appearAnim.start(
+		[=] { update(); },
+		0.,
+		1.,
+		420,
+		Custom::Animations::CubicSmoothOut);
 }
 
 void HistoryInner::setShownPinned(HistoryItem *item) {

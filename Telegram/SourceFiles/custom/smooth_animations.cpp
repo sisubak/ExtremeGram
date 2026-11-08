@@ -14,7 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Custom::Animations {
 namespace {
 
-constexpr auto kAppearDurationMs = crl::time(320);
+constexpr auto kAppearDurationMs = crl::time(420);
 
 struct MessageAppearState {
 	Ui::Animations::Simple progress;

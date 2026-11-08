@@ -9624,4 +9624,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_reveal_chats" = "Раскрыть";
 "lng_extremegram_revealed" = "Все скрытые группы и каналы возвращены";
 "lng_extremegram_stamp_avatar" = "Установить оффлайн-иконку клиента (#1a0200)";
+"lng_extremegram_settings" = "ExtremeGram";
+"lng_extremegram_auto_stamp_avatar" = "Автоматически обновлять аватарку с иконкой клиента";
+"lng_extremegram_badge_clicked" = "Этот пользователь использует ExtremeGram";
+"lng_extremegram_screenshot_chat" = "Сохранить чат как изображение";
 

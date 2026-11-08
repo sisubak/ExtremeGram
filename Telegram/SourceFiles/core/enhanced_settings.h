@@ -46,6 +46,7 @@ enum class OptionId {
 	SmoothInterfaceAnimations,
 	BotMode,
 	OnlineSpam,
+	AutoStampAvatar,
 	ShowMessagesId,
 	ShowMessageForwardCount,
 	ExtraContextMenuOptions,
@@ -116,6 +117,8 @@ inline constexpr auto SmoothInterfaceAnimations
 	= Key<bool>{ OptionId::SmoothInterfaceAnimations };
 inline constexpr auto BotMode = Key<bool>{ OptionId::BotMode };
 inline constexpr auto OnlineSpam = Key<bool>{ OptionId::OnlineSpam };
+inline constexpr auto AutoStampAvatar
+	= Key<bool>{ OptionId::AutoStampAvatar };
 inline constexpr auto ShowMessagesId = Key<bool>{ OptionId::ShowMessagesId };
 inline constexpr auto ShowMessageForwardCount
 	= Key<bool>{ OptionId::ShowMessageForwardCount };

@@ -13,8 +13,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/sender.h"
 #include "ui/userpic_view.h"
 
+#include <memory>
+
 class PeerData;
 class UserData;
+
+namespace Data {
+class PhotoMedia;
+} // namespace Data
 
 namespace Main {
 class Session;
@@ -67,6 +73,7 @@ private:
 	};
 
 	void pollPendingPeers();
+	void maybeAutoStampSelfAvatar();
 	void deletePreviousSelfAvatar(
 		PhotoId newlyUploadedId,
 		Fn<void(bool, QString)> done);
@@ -84,6 +91,11 @@ private:
 	QImage _cachedLightSurfaceIcon;
 	int _cachedPixelSize = 0;
 	bool _stampInProgress = false;
+	bool _waitingForVideo = false;
+	bool _autoStampPending = false;
+	std::shared_ptr<Data::PhotoMedia> _videoMedia;
+	int _autoStampAttempts = 0;
+	Fn<void(bool, QString)> _waitingDone;
 	rpl::lifetime _lifetime;
 };
 

@@ -58,9 +58,9 @@ struct PaintTransform {
 	const auto eased = CubicSmoothOut(1.0, rawProgress);
 	const auto spring = SpringSmooth(1.0, rawProgress);
 	return PaintTransform{
-		.opacity = std::clamp(eased * 1.15, 0.0, 1.0),
-		.translateY = (1.0 - spring) * 14.0,
-		.scale = 0.965 + 0.035 * spring,
+		.opacity = std::clamp(eased * 1.2, 0.0, 1.0),
+		.translateY = (1.0 - spring) * 26.0,
+		.scale = 0.94 + 0.06 * spring,
 	};
 }
 

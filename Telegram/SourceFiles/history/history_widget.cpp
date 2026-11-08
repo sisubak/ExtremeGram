@@ -235,6 +235,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_iv.h"
 #include "styles/style_layers.h"
 
+#include <QtCore/QDateTime>
+#include <QtCore/QDir>
 #include <QtCore/QMimeData>
 #include <QtGui/QWindow>
 #include <QtWidgets/QApplication>
@@ -1188,6 +1190,10 @@ HistoryWidget::HistoryWidget(
 		if (_history) {
 			controller->searchInChat(_history);
 		}
+	}, _topBar->lifetime());
+	_topBar->screenshotRequest(
+	) | rpl::on_next([=] {
+		captureChatScreenshot();
 	}, _topBar->lifetime());
 
 	session().api().sendActions(
@@ -7590,6 +7596,33 @@ bool HistoryWidget::searchInChatEmbedded(
 	return true;
 }
 
+void HistoryWidget::captureChatScreenshot() {
+	if (!_history || !_list || _list->isHidden()) {
+		return;
+	}
+	const auto origin = _list->mapTo(this, QPoint(0, 0));
+	const auto rect = QRect(origin, _list->size()).intersected(
+		QRect(QPoint(0, 0), size()));
+	if (rect.isEmpty()) {
+		return;
+	}
+	const auto image = grab().copy(rect);
+	const auto folder = File::DefaultDownloadPath(&session());
+	QDir().mkpath(folder);
+	const auto path = folder
+		+ u"ExtremeGram_"_q
+		+ QDateTime::currentDateTime().toString(u"yyyyMMdd_hhmmss"_q)
+		+ u".png"_q;
+	if (image.save(path, "PNG")) {
+		controller()->showToast(
+			QString::fromUtf8("Фото чата сохранено: %1")
+				.arg(QDir::toNativeSeparators(path)));
+	} else {
+		controller()->showToast(
+			QString::fromUtf8("Не удалось сохранить фото чата."));
+	}
+}
+
 void HistoryWidget::switchToSearch(QString query) {
 	const auto search = crl::guard(_list, [=] {
 		if (!_peer) {
@@ -9270,6 +9303,7 @@ void HistoryWidget::updateHistoryGeometry(
 			hold->lifetime.destroy();
 		}
 		_list->show();
+		_list->animateAppear();
 	}
 	synteticScrollToY(toY);
 	if (initial && _showAtMsgId) {

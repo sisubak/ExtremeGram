@@ -135,6 +135,7 @@ TopBarWidget::TopBarWidget(
 , _cancelChoose(this, st::topBarCloseChoose)
 , _call(this, st::topBarCall)
 , _groupCall(this, st::topBarGroupCall)
+, _screenshot(this, st::topBarScreenshot)
 , _search(this, st::topBarSearch)
 , _recentActions(this, st::topBarRecentActions)
 , _admins(this, st::topBarAdmins)
@@ -287,6 +288,11 @@ TopBarWidget::TopBarWidget(
 	setCursor(style::cur_pointer);
 	_call->setAccessibleName(tr::lng_profile_action_short_call(tr::now));
 	_groupCall->setAccessibleName(tr::lng_group_call_title(tr::now));
+	_screenshot->setAccessibleName(
+		tr::lng_extremegram_screenshot_chat(tr::now));
+	_screenshot->setClickedCallback([=] {
+		_screenshotRequests.fire({});
+	});
 	_search->setAccessibleName(tr::lng_shortcuts_search(tr::now));
 	_infoToggle->setAccessibleName(tr::lng_settings_section_info(tr::now));
 	_menuToggle->setAccessibleName(tr::lng_chat_menu(tr::now));
@@ -1153,6 +1159,8 @@ void TopBarWidget::updateSearchVisibility() {
 		|| (_activeChat.section == Section::SavedSublist
 			&& _activeChat.key.sublist());
 	_search->setVisible(searchAllowedMode && !_chooseForReportReason);
+	_screenshot->setVisible(
+		searchAllowedMode && !_chooseForReportReason && !_searchMode);
 }
 
 void TopBarWidget::updateInfoButtonVisibility() {
@@ -1354,6 +1362,10 @@ void TopBarWidget::updateControlsGeometry() {
 		_call->moveToRight(_rightTaken, otherButtonsTop);
 		_groupCall->moveToRight(_rightTaken, otherButtonsTop);
 		_rightTaken += _call->width();
+	}
+	_screenshot->moveToRight(_rightTaken, otherButtonsTop);
+	if (!_screenshot->isHidden()) {
+		_rightTaken += _screenshot->width() + st::topBarCallSkip;
 	}
 	_search->moveToRight(_rightTaken, otherButtonsTop);
 	if (!_search->isHidden()) {

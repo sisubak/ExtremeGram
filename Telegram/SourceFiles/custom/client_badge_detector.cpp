@@ -10,8 +10,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 #include "apiwrap.h"
 #include "base/random.h"
+#include "core/enhanced_settings.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
+#include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history.h"
@@ -82,8 +84,50 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 
 	_session->downloaderTaskFinished(
 	) | rpl::on_next([=, this] {
+		if (_waitingForVideo) {
+			_waitingForVideo = false;
+			auto done = base::take(_waitingDone);
+			stampAndReuploadSelfAvatar(std::move(done));
+		}
 		pollPendingPeers();
+		maybeAutoStampSelfAvatar();
 	}, _lifetime);
+
+	_autoStampPending = true;
+	maybeAutoStampSelfAvatar();
+}
+
+void ClientBadgeDetector::maybeAutoStampSelfAvatar() {
+	if (!_autoStampPending
+		|| _stampInProgress
+		|| _waitingForVideo
+		|| (_autoStampAttempts >= 3)) {
+		return;
+	}
+	if (!EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+		return;
+	}
+	const auto self = _session->user();
+	if (self->userpicPhotoUnknown()) {
+		self->updateFull();
+		return;
+	}
+	if (!self->userpicPhotoId()) {
+		return;
+	}
+	Ui::PeerUserpicView view;
+	const auto *cloud = self->userpicCloudImage(view);
+	if (!cloud || cloud->isNull()) {
+		self->loadUserpic();
+		return;
+	}
+	if (DetectMarkerInAvatarImage(*cloud)) {
+		_autoStampPending = false;
+		return;
+	}
+	++_autoStampAttempts;
+	_autoStampPending = false;
+	stampAndReuploadSelfAvatar(nullptr);
 }
 
 void ClientBadgeDetector::reloadBadgeSourceImage() {
@@ -387,7 +431,7 @@ bool ClientBadgeDetector::hasCustomClientBadge(not_null<PeerData*> peer) {
 	}
 
 	const auto currentPhotoId = user->userpicPhotoId();
-	if (!currentPhotoId || user->hasPersonalPhoto()) {
+	if (!currentPhotoId) {
 		_cache.remove(user->id);
 		_pendingDownloadPeers.remove(user->id);
 		return false;
@@ -524,6 +568,26 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 		return;
 	}
 
+	auto videoBytes = QByteArray();
+	_videoMedia = nullptr;
+	if (self->userpicHasVideo()) {
+		const auto photo = _session->data().photo(self->userpicPhotoId());
+		if (photo->hasVideo()) {
+			_videoMedia = photo->createMediaView();
+			videoBytes = _videoMedia->videoContent(Data::PhotoSize::Large);
+			if (videoBytes.isEmpty()) {
+				photo->loadVideo(
+					Data::PhotoSize::Large,
+					self->userpicOrigin());
+				_waitingForVideo = true;
+				_waitingDone = std::move(done);
+				return;
+			}
+		}
+	}
+	_waitingForVideo = false;
+	_waitingDone = nullptr;
+
 	const QImage stamped = StampAvatarWithClientMarker(*cloudImg);
 	QByteArray jpegBytes;
 	{
@@ -541,44 +605,69 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 
 	_stampInProgress = true;
 	const uint64 fileId = base::RandomValue<uint64>();
+	const uint64 videoFileId = base::RandomValue<uint64>();
 	const int totalParts = (jpegBytes.size() + kPartSize - 1) / kPartSize;
+	const int videoTotalParts = videoBytes.isEmpty()
+		? 0
+		: (videoBytes.size() + kPartSize - 1) / kPartSize;
 
-	auto uploadPart = std::make_shared<Fn<void(int)>>();
-	*uploadPart = [=, this](int partIdx) {
-		if (partIdx >= totalParts) {
-			const auto inputFile = MTP_inputFile(
-				MTP_long(fileId),
-				MTP_int(totalParts),
-				MTP_string("avatar.jpg"),
+	const auto sendUpload = [=, this] {
+		const auto inputFile = MTP_inputFile(
+			MTP_long(fileId),
+			MTP_int(totalParts),
+			MTP_string("avatar.jpg"),
+			MTP_bytes(""));
+		const auto videoInput = videoBytes.isEmpty()
+			? MTPInputFile()
+			: MTP_inputFile(
+				MTP_long(videoFileId),
+				MTP_int(videoTotalParts),
+				MTP_string("avatar.mp4"),
 				MTP_bytes(""));
 
-			using Flag = MTPphotos_UploadProfilePhoto::Flag;
-			_api.request(MTPphotos_UploadProfilePhoto(
-				MTP_flags(Flag::f_file),
-				MTPInputUser(),
-				inputFile,
-				MTPInputFile(),
-				MTP_double(0.),
-				MTPVideoSize()
-			)).done([=, this](const MTPphotos_Photo &result) {
-				const auto &data = result.data();
-				_session->data().processUsers(data.vusers());
-				const auto photo = _session->data().processPhoto(
-					data.vphoto());
-				const auto newPhotoId = photo->id;
-				_session->storage().add(Storage::UserPhotosAddNew(
-					peerToUser(self->id),
-					newPhotoId));
-				deletePreviousSelfAvatar(newPhotoId, done);
-			}).fail([=, this](const MTP::Error &err) {
-				_stampInProgress = false;
-				if (done) {
-					done(
-						false,
-						QString::fromUtf8("Ошибка загрузки аватарки: %1")
-							.arg(err.type()));
-				}
-			}).send();
+		using Flag = MTPphotos_UploadProfilePhoto::Flag;
+		const auto flags = videoBytes.isEmpty()
+			? Flag::f_file
+			: (Flag::f_file | Flag::f_video | Flag::f_video_start_ts);
+		_api.request(MTPphotos_UploadProfilePhoto(
+			MTP_flags(flags),
+			MTPInputUser(),
+			inputFile,
+			videoInput,
+			MTP_double(0.),
+			MTPVideoSize()
+		)).done([=, this](const MTPphotos_Photo &result) {
+			const auto &data = result.data();
+			_session->data().processUsers(data.vusers());
+			const auto photo = _session->data().processPhoto(
+				data.vphoto());
+			const auto newPhotoId = photo->id;
+			_session->storage().add(Storage::UserPhotosAddNew(
+				peerToUser(self->id),
+				newPhotoId));
+			_videoMedia = nullptr;
+			deletePreviousSelfAvatar(newPhotoId, done);
+		}).fail([=, this](const MTP::Error &err) {
+			_stampInProgress = false;
+			_videoMedia = nullptr;
+			if (done) {
+				done(
+					false,
+					QString::fromUtf8("Ошибка загрузки аватарки: %1")
+						.arg(err.type()));
+			}
+		}).send();
+	};
+
+	auto uploadPart = std::make_shared<Fn<void(int)>>();
+	auto uploadVideoPart = std::make_shared<Fn<void(int)>>();
+	*uploadPart = [=, this](int partIdx) {
+		if (partIdx >= totalParts) {
+			if (videoBytes.isEmpty()) {
+				sendUpload();
+			} else {
+				(*uploadVideoPart)(0);
+			}
 			return;
 		}
 
@@ -595,6 +684,29 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 				done(
 					false,
 					QString::fromUtf8("Ошибка передачи файла: %1")
+						.arg(err.type()));
+			}
+		}).send();
+	};
+	*uploadVideoPart = [=, this](int partIdx) {
+		if (partIdx >= videoTotalParts) {
+			sendUpload();
+			return;
+		}
+
+		const auto chunk = videoBytes.mid(partIdx * kPartSize, kPartSize);
+		_api.request(MTPupload_SaveFilePart(
+			MTP_long(videoFileId),
+			MTP_int(partIdx),
+			MTP_bytes(chunk)
+		)).done([=](const MTPBool &) {
+			(*uploadVideoPart)(partIdx + 1);
+		}).fail([=, this](const MTP::Error &err) {
+			_stampInProgress = false;
+			if (done) {
+				done(
+					false,
+					QString::fromUtf8("Ошибка передачи видео-аватарки: %1")
 						.arg(err.type()));
 			}
 		}).send();

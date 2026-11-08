@@ -256,19 +256,26 @@ bool BotModeManager::tryInterceptOutgoingCommand(
 		const QString &text,
 		FullMsgId replyToId,
 		Window::SessionController *controller) {
-	if (!EnhancedSettings::Get(EnhancedSettings::Option::BotMode)) {
+	const auto trimmed = text.trimmed();
+	const auto isMute = (trimmed.compare(u"!mute"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!mute "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!mute@"_q, Qt::CaseInsensitive);
+	const auto isStats = (trimmed.compare(u"!stats"_q, Qt::CaseInsensitive) == 0);
+	if (!isMute && !isStats) {
 		return false;
 	}
-	const auto trimmed = text.trimmed();
-	if (trimmed.compare(u"!mute"_q, Qt::CaseInsensitive) == 0
-		|| trimmed.startsWith(u"!mute "_q, Qt::CaseInsensitive)) {
+	if (!EnhancedSettings::Get(EnhancedSettings::Option::BotMode)) {
+		if (controller) {
+			controller->showToast(QString::fromUtf8(
+				"Бот-режим выключен. Включите его в настройках ExtremeGram."));
+		}
+		return true;
+	}
+	if (isMute) {
 		const auto rest = trimmed.mid(5).trimmed();
 		return handleMuteCommand(history, rest, replyToId, controller);
 	}
-	if (trimmed.compare(u"!stats"_q, Qt::CaseInsensitive) == 0) {
-		return handleStatsCommand(history);
-	}
-	return false;
+	return handleStatsCommand(history);
 }
 
 std::optional<int> BotModeManager::ParseDurationSeconds(const QString &token) {
@@ -335,40 +342,41 @@ bool BotModeManager::handleMuteCommand(
 	const auto parts = argsText.split(
 		QRegularExpression(u"\\s+"_q),
 		Qt::SkipEmptyParts);
-	if (parts.isEmpty()) {
+	if (parts.isEmpty() && !targetPeer) {
 		if (controller) {
 			controller->showToast(QString::fromUtf8(
-				"Формат: ответьте на сообщение !mute 4d [причина]"));
+				"Ответьте на сообщение участника: !mute [время] [причина]"));
 		}
 		return true;
 	}
 
 	int argIndex = 0;
-	if (!targetPeer && parts[0].startsWith('@')) {
+	if (!targetPeer && !parts.isEmpty() && parts[0].startsWith('@')) {
 		const auto uname = parts[0].mid(1);
 		targetPeer = _session->data().peerByUsername(uname);
 		argIndex = 1;
 	}
 
-	if (!targetPeer || argIndex >= parts.size()) {
+	if (!targetPeer) {
 		if (controller) {
 			controller->showToast(QString::fromUtf8(
-				"Ответьте на сообщение участника: !mute 4d [причина]"));
+				"Ответьте на сообщение участника: !mute [время] [причина]"));
 		}
 		return true;
 	}
 
-	const auto durationSec = ParseDurationSeconds(parts[argIndex]);
-	if (!durationSec) {
-		if (controller) {
-			controller->showToast(QString::fromUtf8(
-				"Неверное время мута. Пример: !mute 30m, !mute 4d"));
-		}
-		return true;
+	auto durationSec = std::optional<int>();
+	if (argIndex < parts.size()) {
+		durationSec = ParseDurationSeconds(parts[argIndex]);
+	}
+	if (durationSec) {
+		++argIndex;
+	} else {
+		durationSec = 4 * 86400;
 	}
 
-	const auto reason = (parts.size() > argIndex + 1)
-		? parts.mid(argIndex + 1).join(' ')
+	const auto reason = (parts.size() > argIndex)
+		? parts.mid(argIndex).join(' ')
 		: QString();
 
 	const auto untilDate = base::unixtime::now() + *durationSec;

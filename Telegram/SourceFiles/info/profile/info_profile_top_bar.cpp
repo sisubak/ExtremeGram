@@ -105,6 +105,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "ui/toast/toast.h"
 #include "boxes/sticker_set_box.h"
+#include "styles/style_basic.h"
 #include "styles/style_chat.h"
 #include "styles/style_info.h"
 #include "styles/style_info_profile_top_bar.h"
@@ -113,6 +114,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
+#include <QtGui/QMouseEvent>
 
 namespace Info::Profile {
 namespace {
@@ -569,7 +571,17 @@ TopBar::TopBar(
 		_extremeBadge->resize(
 			style::ConvertScale(20),
 			std::max(_title->height(), style::ConvertScale(20)));
-		_extremeBadge->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_extremeBadge->setCursor(style::cur_pointer);
+		_extremeBadge->events(
+		) | rpl::filter([](not_null<QEvent*> e) {
+			return e->type() == QEvent::MouseButtonRelease;
+		}) | rpl::on_next([=](not_null<QEvent*> e) {
+			const auto mouse = static_cast<QMouseEvent*>(e.get());
+			if (mouse->button() == Qt::LeftButton) {
+				controller->showToast(
+					tr::lng_extremegram_badge_clicked(tr::now));
+			}
+		}, _extremeBadge->lifetime());
 		const auto refreshExtremeBadge = [=] {
 			const auto shown = Custom::ClientBadgeFor(
 				&_peer->session()).hasCustomClientBadge(_peer);

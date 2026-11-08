@@ -133,6 +133,9 @@ public:
 		return _chooseFromUserRequests.events();
 	}
 	[[nodiscard]] rpl::producer<> searchRequest() const;
+	[[nodiscard]] rpl::producer<> screenshotRequest() const {
+		return _screenshotRequests.events();
+	}
 
 	void setGeometryWithNarrowRatio(
 		QRect geometry,
@@ -252,6 +255,7 @@ private:
 	rpl::event_stream<> _searchSubmitted;
 	rpl::event_stream<> _jumpToDateRequests;
 	rpl::event_stream<> _chooseFromUserRequests;
+	rpl::event_stream<> _screenshotRequests;
 	rpl::event_stream<bool> _searchModeChanges;
 
 	object_ptr<Ui::IconButton> _back;
@@ -261,6 +265,7 @@ private:
 
 	object_ptr<Ui::IconButton> _call;
 	object_ptr<Ui::IconButton> _groupCall;
+	object_ptr<Ui::IconButton> _screenshot;
 	object_ptr<Ui::IconButton> _search;
 	object_ptr<Ui::IconButton> _recentActions;
 	object_ptr<Ui::IconButton> _admins;

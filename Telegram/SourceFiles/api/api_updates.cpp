@@ -1023,7 +1023,7 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	auto ms = crl::now();
 	if (EnhancedSettings::Get(EnhancedSettings::Option::OnlineSpam)
 		&& !Core::Quitting()) {
-		constexpr auto kInterval = crl::time(5000);
+		constexpr auto kInterval = crl::time(100);
 		isOnline = (ms / kInterval) % 2 == 0;
 		updateIn = int(kInterval - (ms % kInterval));
 	}

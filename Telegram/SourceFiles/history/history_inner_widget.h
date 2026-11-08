@@ -177,6 +177,7 @@ public:
 	void recountHistoryGeometry(bool initial = false);
 	void updateSize();
 	void setShownPinned(HistoryItem *item);
+	void animateAppear();
 
 	void repaintItem(const HistoryItem *item);
 	void repaintItem(const Element *view);
@@ -696,6 +697,7 @@ private:
 
 	mutable bool _lastInSelectionMode = false;
 	mutable Ui::Animations::Simple _inSelectionModeAnimation;
+	Ui::Animations::Simple _appearAnim;
 
 	// scroll by touch support (at least Windows Surface tablets)
 	bool _touchScroll = false;
