@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/typing_indicator.h"
 
+#include "base/call_delayed.h"
 #include "data/data_peer_values.h"
 #include "data/data_send_action.h"
 #include "data/data_session.h"
@@ -99,7 +100,17 @@ void TypingIndicator::setHistory(History *history, MsgId topicRootId) {
 		) | rpl::filter([=](const Data::SendActionManager::AnimationUpdate &u) {
 			return (u.thread->owningHistory() == _history);
 		}) | rpl::on_next([=] {
-			refresh();
+			if (_refreshScheduled) {
+				return;
+			}
+			_refreshScheduled = true;
+			const auto weak = base::make_weak(this);
+			crl::on_main([weak] {
+				if (const auto indicator = weak.get()) {
+					indicator->_refreshScheduled = false;
+					indicator->refresh();
+				}
+			});
 		}, _historyLifetime);
 	}
 	refresh();
@@ -153,13 +164,17 @@ void TypingIndicator::setShownAnimated(bool shown) {
 }
 
 void TypingIndicator::refresh() {
+	if (_refreshing) {
+		return;
+	}
+	_refreshing = true;
+	auto guard = gsl::finally([&] { _refreshing = false; });
 	const auto painter = activePainter();
 	if (!painter) {
 		_expireTimer.cancel();
 		setShownAnimated(false);
 		return;
 	}
-	painter->updateNeedsAnimating(crl::now(), true);
 	const auto &typing = painter->typingUsers();
 	const auto shown = !typing.empty();
 	if (shown) {

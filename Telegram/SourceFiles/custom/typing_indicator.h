@@ -68,6 +68,8 @@ private:
 	base::flat_map<UserId, StatusEmojiEntry> _statusEmojis;
 	std::vector<not_null<UserData*>> _cachedUsers;
 	Ui::Animations::Simple _slideAnim;
+	bool _refreshing = false;
+	bool _refreshScheduled = false;
 	bool _targetShown = false;
 	base::Timer _expireTimer;
 	Fn<void()> _changed;
