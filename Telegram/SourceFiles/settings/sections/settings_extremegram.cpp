@@ -64,7 +64,7 @@ void BuildOnlineSpamInterval(
 	const auto formatMs = [](int value) {
 		return tr::lng_extremegram_online_spam_interval_ms(
 			tr::now,
-			lt_count,
+			lt_amount,
 			QString::number(value),
 			Ui::Text::RichLangValue);
 	};
@@ -141,7 +141,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 	builder.addDividerText(
 		tr::lng_extremegram_online_spam_about(
 			tr::now,
-			lt_count,
+			lt_amount,
 			QString::number(2500)));
 
 	builder.addSkip();
