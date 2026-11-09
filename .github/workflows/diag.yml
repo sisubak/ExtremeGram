@@ -1,0 +1,14 @@
+name: Actions Diagnostic
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Ping
+        run: |
+          echo "GitHub Actions is working"
+          date -u
+          df -h / | tail -1
