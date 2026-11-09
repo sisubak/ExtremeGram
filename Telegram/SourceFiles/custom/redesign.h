@@ -8,6 +8,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/basic_types.h"
+#include "rpl/rpl.h"
+
+class QColor;
 
 namespace Window {
 class SessionController;
@@ -16,5 +19,16 @@ class SessionController;
 namespace Custom {
 
 void ApplyRedesignDesign(not_null<Window::SessionController*> controller);
+
+[[nodiscard]] rpl::producer<> TokensChanged();
+
+struct DesignTokens {
+	int radiusId = 10;
+	float64 cardAlpha = 0.94;
+	int accentWashAlpha = 0;
+	QColor accent = QColor();
+};
+
+[[nodiscard]] DesignTokens DesignTokensForCurrentMode();
 
 } // namespace Custom

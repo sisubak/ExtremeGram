@@ -46,6 +46,41 @@ constexpr auto kSwitchDurationMs = 320;
 	}
 }
 
+[[nodiscard]] rpl::event_stream<> &TokensStream() {
+	static auto result = rpl::event_stream<>();
+	return result;
+}
+
+} // namespace
+
+DesignTokens DesignTokensForCurrentMode() {
+	const auto mode = EnhancedSettings::Get(
+		EnhancedSettings::Option::RedesignMode);
+	auto tokens = DesignTokens{ .radiusId = 0 };
+	switch (mode) {
+	case 1:
+		tokens.radiusId = 14;
+		tokens.cardAlpha = 0.88;
+		if (const auto accent = ModeAccent(mode)) {
+			tokens.accent = *accent;
+			tokens.accentWashAlpha = 18;
+		}
+		return tokens;
+	case 2:
+		tokens.radiusId = 7;
+		tokens.cardAlpha = 0.98;
+		if (const auto accent = ModeAccent(mode)) {
+			tokens.accent = *accent;
+			tokens.accentWashAlpha = 30;
+		}
+		return tokens;
+	default:
+		return tokens;
+	}
+}
+
+namespace {
+
 void AnimateWindowSwitch(
 		not_null<::MainWindow*> target,
 		Fn<void()> apply) {
@@ -130,6 +165,11 @@ void ApplyRedesignDesign(not_null<Window::SessionController*> controller) {
 		}
 		break;
 	}
+	TokensStream().fire({});
+}
+
+rpl::producer<> TokensChanged() {
+	return TokensStream().events();
 }
 
 } // namespace Custom

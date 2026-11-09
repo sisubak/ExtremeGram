@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/bot_mode_manager.h"
+#include "custom/redesign.h"
 #include "custom/smooth_animations.h"
 
 #include "api/api_updates.h"
@@ -63,6 +64,7 @@ BotStatsOverlayWidget::BotStatsOverlayWidget(
 , _session(session) {
 	setFixedHeight(style::ConvertScale(54));
 	setAttribute(Qt::WA_TransparentForMouseEvents);
+	TokensChanged() | rpl::on_next([=] { update(); }, lifetime());
 	hide();
 }
 
@@ -157,10 +159,20 @@ void BotStatsOverlayWidget::paintEvent(QPaintEvent *) {
 		marginY,
 		-marginX,
 		-marginY);
-	const auto radius = style::ConvertScaleExact(10.0);
+	const auto tokens = DesignTokensForCurrentMode();
+	const auto radius = style::ConvertScaleExact(tokens.radiusId * 1.0);
 
 	auto cardBg = st::windowBgOver->c;
-	cardBg.setAlphaF(0.94);
+	cardBg.setAlphaF(tokens.cardAlpha);
+	if (tokens.accentWashAlpha > 0 && tokens.accent.isValid()) {
+		const auto wash = tokens.accentWashAlpha / 100.0;
+		const auto mix = [wash](float64 base, float64 target) {
+			return base + (target - base) * wash;
+		};
+		cardBg.setRedF(mix(cardBg.redF(), tokens.accent.redF()));
+		cardBg.setGreenF(mix(cardBg.greenF(), tokens.accent.greenF()));
+		cardBg.setBlueF(mix(cardBg.blueF(), tokens.accent.blueF()));
+	}
 	p.setPen(QPen(st::shadowFg->c, style::ConvertScaleExact(1.0)));
 	p.setBrush(cardBg);
 	p.drawRoundedRect(cardRect, radius, radius);

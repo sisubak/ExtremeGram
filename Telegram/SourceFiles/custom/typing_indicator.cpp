@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/typing_indicator.h"
+#include "custom/redesign.h"
 
 #include "base/call_delayed.h"
 #include "data/data_peer_values.h"
@@ -41,6 +42,7 @@ TypingIndicator::TypingIndicator(QWidget *parent, Fn<void()> changed)
 , _expireTimer([=] { refresh(); })
 , _changed(std::move(changed)) {
 	setAttribute(Qt::WA_TransparentForMouseEvents);
+	TokensChanged() | rpl::on_next([=] { update(); }, lifetime());
 	resize(0, 0);
 	hide();
 }
@@ -211,6 +213,18 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 	const auto targetH = fullHeight();
 	p.setClipRect(rect());
 	p.fillRect(rect(), st::historyComposeAreaBg);
+
+	const auto tokens = DesignTokensForCurrentMode();
+	if (tokens.accentWashAlpha > 0 && tokens.accent.isValid()) {
+		auto wash = tokens.accent;
+		wash.setAlphaF(tokens.accentWashAlpha / 640.0);
+		p.fillRect(
+			0,
+			st::lineWidth,
+			width(),
+			height() - st::lineWidth,
+			wash);
+	}
 	p.fillRect(0, 0, width(), st::lineWidth, st::shadowFg);
 
 	p.setOpacity(ratio);
