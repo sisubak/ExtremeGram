@@ -266,7 +266,13 @@ bool BotModeManager::interceptCommand(
 	const auto isStats = (trimmed.compare(u"!stats"_q, Qt::CaseInsensitive) == 0)
 		|| trimmed.startsWith(u"!stats "_q, Qt::CaseInsensitive)
 		|| trimmed.startsWith(u"!stats@"_q, Qt::CaseInsensitive);
-	if (!isMute && !isStats) {
+	const auto isStop = (trimmed.compare(u"!stop"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!stop "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!stop@"_q, Qt::CaseInsensitive);
+	const auto isHelp = (trimmed.compare(u"!help"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!help "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!help@"_q, Qt::CaseInsensitive);
+	if (!isMute && !isStats && !isStop && !isHelp) {
 		return false;
 	}
 	if (!EnhancedSettings::Get(EnhancedSettings::Option::BotMode)) {
@@ -280,6 +286,29 @@ bool BotModeManager::interceptCommand(
 		const auto spaceIdx = trimmed.indexOf(QChar(' '));
 		const auto rest = (spaceIdx >= 0) ? trimmed.mid(spaceIdx + 1).trimmed() : QString();
 		return handleMuteCommand(history, rest, replyToId, controller);
+	}
+	if (isStop) {
+		if (stopScan(history)) {
+			if (controller) {
+				controller->showToast(QString::fromUtf8(
+					"Подсчёт статистики остановлен. Команда !stats запустит заново."));
+			}
+		} else if (controller) {
+			controller->showToast(QString::fromUtf8(
+				"В этом чате нет активного подсчёта статистики."));
+		}
+		return true;
+	}
+	if (controller && isHelp) {
+		controller->showToast(QString::fromUtf8(
+			"Бот-режим ExtremeGram: команды\n"
+			"!mute [время] [причина] — ограничить ответом (30с–366д: 90m, 2h, 1d)\n"
+			"!stats — подсчёт сообщений чата\n"
+			"!stop — остановить подсчёт\n"
+			"!help — этот список"));
+	}
+	if (isHelp) {
+		return true;
 	}
 	if (controller) {
 		controller->showToast(QString::fromUtf8(
@@ -457,6 +486,34 @@ bool BotModeManager::handleStatsCommand(not_null<History*> history) {
 		*jobPtr,
 		QString::fromUtf8("Запуск фонового подсчёта сообщений..."));
 	requestBatch(peer->id);
+	return true;
+}
+
+bool BotModeManager::stopScan(not_null<History*> history) {
+	const auto peerId = history->peer->id;
+	const auto it = _jobs.find(peerId);
+	if (it == _jobs.end() || !it->second) {
+		return false;
+	}
+	auto &job = *it->second;
+	if (job.currentRequestId) {
+		_api.request(job.currentRequestId).cancel();
+		job.currentRequestId = 0;
+	}
+	if (const auto timerIt = _jobTimers.find(peerId);
+			timerIt != _jobTimers.end() && timerIt->second) {
+		timerIt->second->cancel();
+	}
+	_retryCallbacks.erase(peerId);
+	job.active = false;
+	job.liveTracking = false;
+	job.sendingLeaderboard = false;
+	job.waitingRateLimit = false;
+	job.waitSecondsLeft = 0;
+	job.pendingOutgoingChunks.clear();
+	job.countedMsgIds.clear();
+	_dirtyLivePeers.erase(peerId);
+	saveStats(job);
 	return true;
 }
 

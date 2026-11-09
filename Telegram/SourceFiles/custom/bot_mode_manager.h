@@ -113,6 +113,7 @@ private:
 		FullMsgId replyToId,
 		Window::SessionController *controller);
 	bool handleStatsCommand(not_null<History*> history);
+	bool stopScan(not_null<History*> history);
 
 	void requestBatch(PeerId peerId);
 	void scheduleRetry(PeerId peerId, int seconds, Fn<void()> retryFn);
