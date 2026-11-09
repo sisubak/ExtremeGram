@@ -157,6 +157,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 			}));
 		},
 		.keywords = { u"redesign"_q, u"design"_q, u"theme"_q, u"colors"_q },
+	});
 
 	builder.addButton({
 		.id = u"extremegram/reveal-hidden-chats"_q,
