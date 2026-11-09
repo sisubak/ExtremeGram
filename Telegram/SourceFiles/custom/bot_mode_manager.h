@@ -73,7 +73,7 @@ public:
 	explicit BotModeManager(not_null<Main::Session*> session);
 	~BotModeManager();
 
-	bool tryInterceptOutgoingCommand(
+	bool interceptCommand(
 		not_null<History*> history,
 		const QString &text,
 		FullMsgId replyToId,
@@ -114,20 +114,20 @@ private:
 		Window::SessionController *controller);
 	bool handleStatsCommand(not_null<History*> history);
 
-	void requestNextHistoryBatch(PeerId peerId);
-	void scheduleRateLimitRetry(PeerId peerId, int seconds, Fn<void()> retryFn);
-	void finishScanAndSendLeaderboard(PeerId peerId);
-	void sendNextPendingChunk(PeerId peerId);
-	void sendTextWithRateLimitRetry(
+	void requestBatch(PeerId peerId);
+	void scheduleRetry(PeerId peerId, int seconds, Fn<void()> retryFn);
+	void finishScan(PeerId peerId);
+	void sendChunk(PeerId peerId);
+	void sendWithRetry(
 		not_null<PeerData*> peer,
 		const QString &text,
 		FullMsgId replyTo,
 		Fn<void()> onDone = nullptr);
 
-	void onLiveItemAdded(not_null<HistoryItem*> item);
-	void ensureSavedStatsLoaded(not_null<PeerData*> peer);
-	void saveStatsToDisk(const ScanJob &job) const;
-	void broadcastProgress(const ScanJob &job, const QString &status);
+	void onItemAdded(not_null<HistoryItem*> item);
+	void loadStats(not_null<PeerData*> peer);
+	void saveStats(const ScanJob &job) const;
+	void reportProgress(const ScanJob &job, const QString &status);
 
 	[[nodiscard]] static std::optional<int> ParseDurationSeconds(
 		const QString &token);

@@ -222,7 +222,7 @@ BotModeManager::BotModeManager(not_null<Main::Session*> session)
 		if (job && job->waitingRateLimit && job->waitSecondsLeft > 0) {
 			--job->waitSecondsLeft;
 			anyWaiting = true;
-			broadcastProgress(*job, job->sendingLeaderboard
+			reportProgress(*job, job->sendingLeaderboard
 				? QString::fromUtf8("Ожидание лимита перед отправкой...")
 				: QString::fromUtf8("Ожидание лимита Telegram API..."));
 		}
@@ -235,13 +235,13 @@ BotModeManager::BotModeManager(not_null<Main::Session*> session)
 	for (const auto peerId : base::take(_dirtyLivePeers)) {
 		const auto it = _jobs.find(peerId);
 		if (it != _jobs.end() && it->second) {
-			saveStatsToDisk(*it->second);
+			saveStats(*it->second);
 		}
 	}
 }) {
 	_session->data().newItemAdded(
 	) | rpl::on_next([=](not_null<HistoryItem*> item) {
-		onLiveItemAdded(item);
+		onItemAdded(item);
 	}, _lifetime);
 }
 
@@ -249,12 +249,12 @@ BotModeManager::~BotModeManager() {
 	for (const auto peerId : _dirtyLivePeers) {
 		const auto it = _jobs.find(peerId);
 		if (it != _jobs.end() && it->second) {
-			saveStatsToDisk(*it->second);
+			saveStats(*it->second);
 		}
 	}
 }
 
-bool BotModeManager::tryInterceptOutgoingCommand(
+bool BotModeManager::interceptCommand(
 		not_null<History*> history,
 		const QString &text,
 		FullMsgId replyToId,
@@ -419,11 +419,11 @@ bool BotModeManager::handleMuteCommand(
 		if (!reason.isEmpty()) {
 			report += QString::fromUtf8("\nПричина: %1").arg(reason);
 		}
-		sendTextWithRateLimitRetry(peer, report, replyToId);
+		sendWithRetry(peer, report, replyToId);
 	}).fail([=, peer = history->peer](const MTP::Error &error) {
 		const auto waitSec = ExtractWaitSeconds(error.type());
 		if (waitSec > 0) {
-			scheduleRateLimitRetry(peer->id, waitSec, [=] {
+			scheduleRetry(peer->id, waitSec, [=] {
 				handleMuteCommand(history, argsText, replyToId, nullptr);
 			});
 			return;
@@ -453,14 +453,14 @@ bool BotModeManager::handleStatsCommand(not_null<History*> history) {
 		.liveTracking = false,
 	});
 
-	broadcastProgress(
+	reportProgress(
 		*jobPtr,
 		QString::fromUtf8("Запуск фонового подсчёта сообщений..."));
-	requestNextHistoryBatch(peer->id);
+	requestBatch(peer->id);
 	return true;
 }
 
-void BotModeManager::requestNextHistoryBatch(PeerId peerId) {
+void BotModeManager::requestBatch(PeerId peerId) {
 	const auto it = _jobs.find(peerId);
 	if (it == _jobs.end() || !it->second || !it->second->active) {
 		return;
@@ -508,7 +508,7 @@ void BotModeManager::requestNextHistoryBatch(PeerId peerId) {
 		st.estimatedTotal = std::max(st.estimatedTotal, totalCount);
 
 		if (!messagesList || messagesList->isEmpty()) {
-			finishScanAndSendLeaderboard(peerId);
+			finishScan(peerId);
 			return;
 		}
 
@@ -558,8 +558,8 @@ void BotModeManager::requestNextHistoryBatch(PeerId peerId) {
 		}
 
 		st.offsetId = minId;
-		saveStatsToDisk(st);
-		broadcastProgress(
+		saveStats(st);
+		reportProgress(
 			st,
 			QString::fromUtf8("Подсчёт: %1 / %2 (участников: %3)")
 				.arg(st.scannedMessages)
@@ -567,26 +567,26 @@ void BotModeManager::requestNextHistoryBatch(PeerId peerId) {
 				.arg(st.counts.size()));
 
 		if (messagesList->size() < kBatchSize || minId.bare <= 1) {
-			finishScanAndSendLeaderboard(peerId);
+			finishScan(peerId);
 			return;
 		}
 
 		auto &timer = _jobTimers[peerId];
 		if (!timer) {
 			timer = std::make_unique<base::Timer>([=] {
-				requestNextHistoryBatch(peerId);
+				requestBatch(peerId);
 			});
 		}
 		timer->callOnce(kBatchDelayMs);
 	}).fail([=](const MTP::Error &error) {
 		const auto waitSec = ExtractWaitSeconds(error.type());
-		scheduleRateLimitRetry(peerId, (waitSec > 0) ? waitSec : 3, [=] {
-			requestNextHistoryBatch(peerId);
+		scheduleRetry(peerId, (waitSec > 0) ? waitSec : 3, [=] {
+			requestBatch(peerId);
 		});
 	}).send();
 }
 
-void BotModeManager::scheduleRateLimitRetry(
+void BotModeManager::scheduleRetry(
 		PeerId peerId,
 		int seconds,
 		Fn<void()> retryFn) {
@@ -594,7 +594,7 @@ void BotModeManager::scheduleRateLimitRetry(
 	if (it != _jobs.end() && it->second) {
 		it->second->waitingRateLimit = true;
 		it->second->waitSecondsLeft = seconds + 1;
-		broadcastProgress(
+		reportProgress(
 			*it->second,
 			QString::fromUtf8("Ожидание лимита API: %1 с...").arg(seconds + 1));
 	}
@@ -618,7 +618,7 @@ void BotModeManager::scheduleRateLimitRetry(
 	timer->callOnce((seconds + 1) * crl::time(1000));
 }
 
-void BotModeManager::finishScanAndSendLeaderboard(PeerId peerId) {
+void BotModeManager::finishScan(PeerId peerId) {
 	const auto it = _jobs.find(peerId);
 	if (it == _jobs.end() || !it->second) {
 		return;
@@ -626,7 +626,7 @@ void BotModeManager::finishScanAndSendLeaderboard(PeerId peerId) {
 	auto &job = *it->second;
 	job.liveTracking = true;
 	job.sendingLeaderboard = true;
-	saveStatsToDisk(job);
+	saveStats(job);
 
 	std::vector<UserStatEntry> sorted;
 	sorted.reserve(job.counts.size());
@@ -670,11 +670,11 @@ void BotModeManager::finishScanAndSendLeaderboard(PeerId peerId) {
 		job.pendingOutgoingChunks.push_back(currentChunk);
 	}
 
-	broadcastProgress(job, QString::fromUtf8("Отправка лидерборда в чат..."));
-	sendNextPendingChunk(peerId);
+	reportProgress(job, QString::fromUtf8("Отправка лидерборда в чат..."));
+	sendChunk(peerId);
 }
 
-void BotModeManager::sendNextPendingChunk(PeerId peerId) {
+void BotModeManager::sendChunk(PeerId peerId) {
 	const auto it = _jobs.find(peerId);
 	if (it == _jobs.end() || !it->second) {
 		return;
@@ -684,15 +684,15 @@ void BotModeManager::sendNextPendingChunk(PeerId peerId) {
 		job.active = false;
 		job.sendingLeaderboard = false;
 		job.waitingRateLimit = false;
-		saveStatsToDisk(job);
-		broadcastProgress(
+		saveStats(job);
+		reportProgress(
 			job,
 			QString::fromUtf8("Подсчёт завершён. Фоновый учёт активен."));
 		return;
 	}
 
 	const auto nextText = job.pendingOutgoingChunks.front();
-	sendTextWithRateLimitRetry(job.peer, nextText, FullMsgId(), [=] {
+	sendWithRetry(job.peer, nextText, FullMsgId(), [=] {
 		const auto innerIt = _jobs.find(peerId);
 		if (innerIt == _jobs.end() || !innerIt->second) {
 			return;
@@ -702,16 +702,16 @@ void BotModeManager::sendNextPendingChunk(PeerId peerId) {
 			st.pendingOutgoingChunks.erase(st.pendingOutgoingChunks.begin());
 		}
 		if (st.pendingOutgoingChunks.empty()) {
-			sendNextPendingChunk(peerId);
+			sendChunk(peerId);
 		} else {
-			scheduleRateLimitRetry(peerId, 1, [=] {
-				sendNextPendingChunk(peerId);
+			scheduleRetry(peerId, 1, [=] {
+				sendChunk(peerId);
 			});
 		}
 	});
 }
 
-void BotModeManager::sendTextWithRateLimitRetry(
+void BotModeManager::sendWithRetry(
 		not_null<PeerData*> peer,
 		const QString &text,
 		FullMsgId replyTo,
@@ -760,8 +760,8 @@ void BotModeManager::sendTextWithRateLimitRetry(
 	}).fail([=](const MTP::Error &error) {
 		const auto waitSec = ExtractWaitSeconds(error.type());
 		if (waitSec > 0) {
-			scheduleRateLimitRetry(peer->id, waitSec, [=] {
-				sendTextWithRateLimitRetry(peer, text, replyTo, onDone);
+			scheduleRetry(peer->id, waitSec, [=] {
+				sendWithRetry(peer, text, replyTo, onDone);
 			});
 		} else if (onDone) {
 			onDone();
@@ -769,7 +769,7 @@ void BotModeManager::sendTextWithRateLimitRetry(
 	}).send();
 }
 
-void BotModeManager::ensureSavedStatsLoaded(not_null<PeerData*> peer) {
+void BotModeManager::loadStats(not_null<PeerData*> peer) {
 	if (_jobs.contains(peer->id)) {
 		return;
 	}
@@ -807,12 +807,12 @@ void BotModeManager::ensureSavedStatsLoaded(not_null<PeerData*> peer) {
 	_jobs[peer->id] = std::move(job);
 }
 
-void BotModeManager::onLiveItemAdded(not_null<HistoryItem*> item) {
+void BotModeManager::onItemAdded(not_null<HistoryItem*> item) {
 	if (!item->isRegular() || !IsServerMsgId(item->id)) {
 		return;
 	}
 	const auto peer = item->history()->peer;
-	ensureSavedStatsLoaded(peer);
+	loadStats(peer);
 	const auto peerId = peer->id;
 	const auto it = _jobs.find(peerId);
 	if (it == _jobs.end() || !it->second || !it->second->liveTracking) {
@@ -844,7 +844,7 @@ QString BotModeManager::statsDirPath() const {
 	return dirPath;
 }
 
-void BotModeManager::saveStatsToDisk(const ScanJob &job) const {
+void BotModeManager::saveStats(const ScanJob &job) const {
 	QJsonObject root;
 	root[u"peer_id"_q] = QString::number(job.peer->id.value);
 	root[u"peer_name"_q] = job.peer->name();
@@ -871,7 +871,7 @@ void BotModeManager::saveStatsToDisk(const ScanJob &job) const {
 	}
 }
 
-void BotModeManager::broadcastProgress(
+void BotModeManager::reportProgress(
 		const ScanJob &job,
 		const QString &status) {
 	_progressStream.fire(StatsProgressSnapshot{

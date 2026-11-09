@@ -77,7 +77,7 @@ constexpr auto kPartSize = 128 * 1024;
 ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 : _session(session)
 , _api(&_session->mtp())
-, _autoStampTimer([=, this] { maybeAutoStampSelfAvatar(); }) {
+, _autoStampTimer([=, this] { tryStamp(); }) {
 	reloadBadgeSourceImage();
 
 	style::PaletteChanged(
@@ -95,7 +95,7 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 				_lastAttemptPhotoId = currentId;
 				_autoStampAttempts = 0;
 			}
-			scheduleAutoStampCheck(1500);
+			scheduleStamp(1500);
 		}
 	}, _lifetime);
 
@@ -109,7 +109,7 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 				_videoWaitChecks = 0;
 				auto done = base::take(_waitingDone);
 				if (ready) {
-					stampAndReuploadSelfAvatar(std::move(done));
+					stampSelfAvatar(std::move(done));
 				} else {
 					_videoMedia = nullptr;
 					if (done) {
@@ -122,19 +122,19 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 		}
 		pollPendingPeers();
 		if (_autoStampPending) {
-			maybeAutoStampSelfAvatar();
+			tryStamp();
 		}
 	}, _lifetime);
 
-	scheduleAutoStampCheck(2500);
+	scheduleStamp(2500);
 }
 
-void ClientBadgeDetector::scheduleAutoStampCheck(crl::time delayMs) {
+void ClientBadgeDetector::scheduleStamp(crl::time delayMs) {
 	_autoStampPending = true;
 	_autoStampTimer.callOnce(delayMs);
 }
 
-void ClientBadgeDetector::maybeAutoStampSelfAvatar() {
+void ClientBadgeDetector::tryStamp() {
 	if (!_autoStampPending
 		|| _stampInProgress
 		|| _waitingForVideo) {
@@ -177,7 +177,7 @@ void ClientBadgeDetector::maybeAutoStampSelfAvatar() {
 	}
 	++_autoStampAttempts;
 	_autoStampPending = false;
-	stampAndReuploadSelfAvatar(nullptr);
+	stampSelfAvatar(nullptr);
 }
 
 void ClientBadgeDetector::reloadBadgeSourceImage() {
@@ -580,7 +580,7 @@ int ClientBadgeDetector::drawBadgeGetWidth(
 	return padLeft + logicalIconSize.width() + style::ConvertScale(2);
 }
 
-void ClientBadgeDetector::stampAndReuploadSelfAvatar(
+void ClientBadgeDetector::stampSelfAvatar(
 		Fn<void(bool ok, QString message)> done) {
 	if (_stampInProgress) {
 		if (done) {
@@ -702,7 +702,7 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 				peerToUser(self->id),
 				newPhotoId));
 			_videoMedia = nullptr;
-			deletePreviousSelfAvatar(newPhotoId, done);
+			deletePrevAvatar(newPhotoId, done);
 		}).fail([=, this](const MTP::Error &err) {
 			_stampInProgress = false;
 			_videoMedia = nullptr;
@@ -771,7 +771,7 @@ void ClientBadgeDetector::stampAndReuploadSelfAvatar(
 	(*uploadPart)(0);
 }
 
-void ClientBadgeDetector::deletePreviousSelfAvatar(
+void ClientBadgeDetector::deletePrevAvatar(
 		PhotoId newlyUploadedId,
 		Fn<void(bool, QString)> done) {
 	const auto self = _session->user();

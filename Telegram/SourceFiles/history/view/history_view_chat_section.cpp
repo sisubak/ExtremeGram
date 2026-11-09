@@ -2526,7 +2526,7 @@ void ChatWidget::send(Api::SendOptions options) {
 	}
 	if (!options.scheduled) {
 		const auto candidate = _composeControls->getTextWithAppliedMarkdown();
-		if (Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+		if (Custom::BotModeFor(&session()).interceptCommand(
 				_history,
 				candidate.text,
 				replyTo().messageId,
@@ -2737,7 +2737,7 @@ void ChatWidget::sendTextWithTags(
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
 	if (!options.scheduled
-		&& Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+		&& Custom::BotModeFor(&session()).interceptCommand(
 			_history,
 			textWithTags.text,
 			message.action.replyTo.messageId,

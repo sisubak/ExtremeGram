@@ -6246,7 +6246,7 @@ void HistoryWidget::send(Api::SendOptions options) {
 	}
 	if (!options.scheduled) {
 		const auto candidate = _field->getTextWithAppliedMarkdown();
-		if (Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+		if (Custom::BotModeFor(&session()).interceptCommand(
 				_history,
 				candidate.text,
 				replyTo().messageId,
@@ -6414,7 +6414,7 @@ void HistoryWidget::sendTextWithTags(
 	message.textWithTags = textWithTags;
 	if (!options.scheduled
 		&& _history
-		&& Custom::BotModeFor(&session()).tryInterceptOutgoingCommand(
+		&& Custom::BotModeFor(&session()).interceptCommand(
 			_history,
 			textWithTags.text,
 			message.action.replyTo.messageId,

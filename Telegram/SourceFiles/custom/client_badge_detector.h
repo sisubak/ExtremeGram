@@ -43,7 +43,7 @@ public:
 	[[nodiscard]] int badgeWidth(not_null<PeerData*> peer);
 	[[nodiscard]] rpl::producer<PeerId> badgeDetectedChanges() const;
 
-	void stampAndReuploadSelfAvatar(
+	void stampSelfAvatar(
 		Fn<void(bool ok, QString message)> done = nullptr);
 
 	int drawBadgeGetWidth(
@@ -78,9 +78,9 @@ private:
 	};
 
 	void pollPendingPeers();
-	void scheduleAutoStampCheck(crl::time delayMs);
-	void maybeAutoStampSelfAvatar();
-	void deletePreviousSelfAvatar(
+	void scheduleStamp(crl::time delayMs);
+	void tryStamp();
+	void deletePrevAvatar(
 		PhotoId newlyUploadedId,
 		Fn<void(bool, QString)> done);
 	[[nodiscard]] QImage loadRawBadgeAsset(bool preferLightStroke) const;
