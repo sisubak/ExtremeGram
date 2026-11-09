@@ -114,6 +114,11 @@ private:
 		Window::SessionController *controller);
 	bool handleStatsCommand(not_null<History*> history);
 	bool stopScan(not_null<History*> history);
+	bool handleWhoisCommand(
+		not_null<History*> history,
+		const QString &argsText,
+		FullMsgId replyToId,
+		Window::SessionController *controller);
 
 	void requestBatch(PeerId peerId);
 	void scheduleRetry(PeerId peerId, int seconds, Fn<void()> retryFn);

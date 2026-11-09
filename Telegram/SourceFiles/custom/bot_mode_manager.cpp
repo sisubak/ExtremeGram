@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "window/window_session_controller.h"
 
+#include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
@@ -35,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QRegularExpression>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace Custom {
@@ -43,6 +45,64 @@ namespace {
 constexpr auto kBatchSize = 100;
 constexpr auto kBatchDelayMs = crl::time(380);
 constexpr auto kMaxMessageChars = 3700;
+
+struct IdBirthMark {
+	int64_t id = 0;
+	int64_t epoch = 0;
+};
+
+// Approximate Telegram account creation milestones, measured against
+// well-known published ID ranges. Interpolated linearly per segment.
+constexpr std::array<IdBirthMark, 18> kIdBirthMarks{{
+	{ 0, 1376438400 },
+	{ 1'000'000, 1438387200 },
+	{ 5'000'000, 1476489600 },
+	{ 10'700'000, 1483228800 },
+	{ 30'000'000, 1512086400 },
+	{ 70'000'000, 1533081600 },
+	{ 100'000'000, 1551398400 },
+	{ 200'000'000, 1596240000 },
+	{ 300'000'000, 1627776000 },
+	{ 400'000'000, 1648771200 },
+	{ 500'000'000, 1672531200 },
+	{ 600'000'000, 1688169600 },
+	{ 700'000'000, 1704067200 },
+	{ 800'000'000, 1714521600 },
+	{ 900'000'000, 1725148800 },
+	{ 1000'000'000, 1735689600 },
+	{ 1100'000'000, 1748736000 },
+	{ 1200'000'000, 1759276800 },
+}};
+
+[[nodiscard]] std::optional<int64_t> ApproximateRegistrationEpoch(
+		int64_t userId) {
+	if (userId <= kIdBirthMarks.front().id) {
+		return kIdBirthMarks.front().epoch;
+	}
+	for (auto i = std::size_t(1); i < kIdBirthMarks.size(); ++i) {
+		const auto &right = kIdBirthMarks[i];
+		if (userId > right.id) {
+			continue;
+		}
+		const auto &left = kIdBirthMarks[i - 1];
+		const auto span = double(right.id - left.id);
+		const auto progress = double(userId - left.id) / std::max(span, 1.0);
+		return left.epoch
+			+ int64_t((right.epoch - left.epoch) * progress);
+	}
+	return kIdBirthMarks.back().epoch;
+}
+
+[[nodiscard]] QString FormatDayString(int64_t epoch) {
+	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
+		.toString(u"dd.MM.yyyy"_q);
+}
+
+[[nodiscard]] QString FormatDateTimeString(int64_t epoch) {
+	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
+		.toString(u"dd.MM.yyyy HH:mm"_q)
+		+ QString::fromUtf8(" UTC");
+}
 
 [[nodiscard]] QString FormatDurationHuman(int seconds) {
 	if (seconds % 86400 == 0) {
@@ -284,7 +344,10 @@ bool BotModeManager::interceptCommand(
 	const auto isHelp = (trimmed.compare(u"!help"_q, Qt::CaseInsensitive) == 0)
 		|| trimmed.startsWith(u"!help "_q, Qt::CaseInsensitive)
 		|| trimmed.startsWith(u"!help@"_q, Qt::CaseInsensitive);
-	if (!isMute && !isStats && !isStop && !isHelp) {
+	const auto isWhois = (trimmed.compare(u"!whois"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!whois "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!whois@"_q, Qt::CaseInsensitive);
+	if (!isMute && !isStats && !isStop && !isHelp && !isWhois) {
 		return false;
 	}
 	if (!EnhancedSettings::Get(EnhancedSettings::Option::BotMode)) {
@@ -311,10 +374,18 @@ bool BotModeManager::interceptCommand(
 		}
 		return true;
 	}
+	if (isWhois) {
+		const auto spaceIdx = trimmed.indexOf(QChar(' '));
+		const auto rest = (spaceIdx >= 0)
+			? trimmed.mid(spaceIdx + 1).trimmed()
+			: QString();
+		return handleWhoisCommand(history, rest, replyToId, controller);
+	}
 	if (controller && isHelp) {
 		controller->showToast(QString::fromUtf8(
 			"Бот-режим ExtremeGram: команды\n"
 			"!mute [время] [причина] — ограничить ответом (30с–366д: 90m, 2h, 1d)\n"
+			"!whois — данные автора ответа: ID, дата регистрации, вход в группу\n"
 			"!stats — подсчёт сообщений чата\n"
 			"!stop — остановить подсчёт\n"
 			"!help — этот список"));
@@ -475,6 +546,101 @@ bool BotModeManager::handleMuteCommand(
 		}
 	}).send();
 
+	return true;
+}
+
+bool BotModeManager::handleWhoisCommand(
+		not_null<History*> history,
+		const QString &argsText,
+		FullMsgId replyToId,
+		Window::SessionController *controller) {
+	PeerData *targetPeer = nullptr;
+	if (replyToId) {
+		if (const auto replyItem = _session->data().message(replyToId)) {
+			targetPeer = replyItem->from().get();
+		}
+	}
+	const auto trimmedArgs = argsText.trimmed();
+	if (!targetPeer && !trimmedArgs.isEmpty()) {
+		const auto uname = trimmedArgs.startsWith('@')
+			? trimmedArgs.mid(1).split(QChar(' '), Qt::SkipEmptyParts).value(0)
+			: QString();
+		targetPeer = uname.isEmpty()
+			? nullptr
+			: _session->data().peerByUsername(uname);
+	}
+	if (!targetPeer) {
+		if (controller) {
+			controller->showToast(QString::fromUtf8(
+				"Ответьте на сообщение участника или укажите @username: !whois"));
+		}
+		return true;
+	}
+	const auto user = targetPeer->asUser();
+	const auto peer = history->peer;
+	if (!user) {
+		sendWithRetry(
+			peer,
+			QString::fromUtf8("!whois возвращает данные только по людям."),
+			replyToId,
+			nullptr);
+		return true;
+	}
+
+	const auto userId = peerToUser(user->id).bare;
+	auto base = QString::fromUtf8(
+		"%1: данных об этом боте в чате нет.")
+		.arg(user->name());
+	if (!user->isBot()) {
+		const auto registered = ApproximateRegistrationEpoch(userId);
+		const auto registeredLine = registered
+			? FormatDayString(*registered)
+				+ QString::fromUtf8(" (приблизительно)")
+			: QString::fromUtf8("недоступна");
+		base = QString::fromUtf8(
+			"%1\nID: %2\nРегистрация аккаунта: %3")
+			.arg(user->name())
+			.arg(userId)
+			.arg(registeredLine);
+	}
+
+	const auto channel = peer->asChannel();
+	if (channel && channel->isMegagroup()) {
+		_api.request(MTPchannels_GetParticipant(
+			channel->inputChannel(),
+			user->input()
+		)).done([=, lower = history->peer](
+				const MTPchannels_ChannelParticipant &result) {
+			const auto &data = result.data();
+			channel->owner().processUsers(data.vusers());
+			auto joinedLine = QString::fromUtf8(
+				"Дата входа в группу: недоступна");
+			data.vparticipant().match([&](
+					const MTPDchannelParticipant &d) {
+				joinedLine = FormatDateTimeString(d.vdate().v);
+			}, [&](const MTPDchannelParticipantAdmin &d) {
+				joinedLine = FormatDateTimeString(d.vdate().v);
+			}, [&](const MTPDchannelParticipantBanned &d) {
+				joinedLine = FormatDateTimeString(d.vdate().v);
+			}, [&](const MTPDchannelParticipantCreator &d) {
+				joinedLine = FormatDateTimeString(d.vdate().v);
+			}, [&](const MTPDchannelParticipantSelf &d) {
+				joinedLine = FormatDateTimeString(d.vdate().v);
+			}, [](const auto &) {});
+			const auto report = QString::fromUtf8(
+				"%1\nВход в группу: %2")
+					.arg(
+						base,
+						joinedLine);
+			sendWithRetry(lower, report, FullMsgId(), nullptr);
+		}).fail([=, lower = history->peer](const MTP::Error &) {
+			const auto report = base + QString::fromUtf8(
+				"\nВход в группу: участник не найден");
+			sendWithRetry(lower, report, FullMsgId(), nullptr);
+		}).send();
+	} else {
+		sendWithRetry(peer, base, replyToId, nullptr);
+	}
 	return true;
 }
 
