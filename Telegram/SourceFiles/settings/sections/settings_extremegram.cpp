@@ -16,9 +16,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/layers/generic_box.h"
+#include "ui/text/text_utilities.h"
 #include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/widgets/continuous_sliders.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -55,6 +57,63 @@ void BuildExtremeGramToggle(
 	}, button->lifetime());
 }
 
+void BuildOnlineSpamInterval(
+		SectionBuilder &builder,
+		Window::SessionController *controller) {
+	const auto key = EnhancedSettings::Option::OnlineSpamInterval;
+	const auto formatMs = [](int value) {
+		return tr::lng_extremegram_online_spam_interval_ms(
+			tr::now,
+			lt_count,
+			QString::number(value),
+			Ui::Text::RichLangValue);
+	};
+	const auto label = [formatMs](int value) {
+		constexpr auto kDefaultMs = 2500;
+		return (value > 0) ? formatMs(value) : formatMs(kDefaultMs);
+	};
+	const auto valueLabel = builder.container()->lifetime(
+	).make_state<rpl::event_stream<QString>>();
+	const auto button = builder.addButton({
+		.id = u"extremegram/online-spam-interval"_q,
+		.title = tr::lng_extremegram_online_spam_interval(),
+		.label = valueLabel->events_starting_with(
+			label(EnhancedSettings::Get(key))),
+		.st = &st::settingsButtonNoIcon,
+		.keywords = { u"online"_q, u"ms"_q, u"interval"_q },
+	});
+	if (!button || !controller) {
+		return;
+	}
+	const auto slider = builder.container()->add(
+		object_ptr<Ui::MediaSliderWheelless>(
+			builder.container(),
+			st::settingsScale),
+		st::settingsBigScalePadding);
+	slider->resize(slider->width(), st::settingsScale.seekSize.height());
+	slider->setAccessibleName(EnhancedSettings::OptionTitle(key.id));
+
+	constexpr auto kMsStep = 100;
+	constexpr auto kMaximumMs = 60000;
+	const auto sections = kMaximumMs / kMsStep;
+	slider->setPseudoDiscrete(
+		sections + 1,
+		[](int index) { return index; },
+		EnhancedSettings::Get(key) / kMsStep,
+		[=](int index) { valueLabel->fire(label(index * kMsStep)); },
+		[=](int index) {
+			EnhancedSettings::ApplyOption(
+				not_null<Window::SessionController*>(controller),
+				key,
+				index * kMsStep);
+		});
+	EnhancedSettings::Changes(key) | rpl::on_next([=] {
+		const auto value = EnhancedSettings::Get(key);
+		slider->setValue(value / float64(kMaximumMs));
+		valueLabel->fire(label(value));
+	}, builder.container()->lifetime());
+}
+
 void BuildExtremeGramSection(SectionBuilder &builder) {
 	const auto controller = builder.controller();
 
@@ -78,6 +137,12 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_settings_online_spam(),
 		EnhancedSettings::Option::OnlineSpam,
 		{ u"online"_q, u"status"_q });
+	BuildOnlineSpamInterval(builder, controller);
+	builder.addDividerText(
+		tr::lng_extremegram_online_spam_about(
+			tr::now,
+			lt_count,
+			QString::number(2500)));
 
 	builder.addSkip();
 	builder.addSubsectionTitle({

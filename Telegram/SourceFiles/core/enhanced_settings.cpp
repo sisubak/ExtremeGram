@@ -357,6 +357,14 @@ const DescriptorList &DescriptorData() {
 			result.effects = OptionEffect::ApplyRedesignMode;
 			return result;
 		}(),
+		[&] {
+			auto result = Integer(OptionId::OnlineSpamInterval,
+				"extremegram_online_spam_interval",
+				&tr::lng_extremegram_online_spam_interval,
+				"enhanced/online-spam-interval",
+				{ .minimum = 0, .maximum = 60000, .allowZero = true });
+			return result;
+		}(),
 	};
 	return result;
 }

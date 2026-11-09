@@ -106,6 +106,7 @@ enum class OptionId {
 	MarkdownPaste,
 	MentionAsName,
 	RedesignMode,
+	OnlineSpamInterval,
 	Count,
 };
 
@@ -211,6 +212,8 @@ inline constexpr auto ExtremeMuteDialog
 inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
 	inline constexpr auto MentionAsName = Key<bool>{ OptionId::MentionAsName };
 	inline constexpr auto RedesignMode = Key<int>{ OptionId::RedesignMode };
+	inline constexpr auto OnlineSpamInterval
+		= Key<int>{ OptionId::OnlineSpamInterval };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel

@@ -244,8 +244,12 @@ Updates::Updates(not_null<Main::Session*> session)
 , _byMinChannelTimer([=] { getDifference(); })
 , _failDifferenceTimer([=] { getDifferenceAfterFail(); })
 , _idleFinishTimer([=] { checkIdleFinish(); }) {
-	EnhancedSettings::Changes(EnhancedSettings::Option::OnlineSpam)
-		| rpl::on_next([=] { updateOnline(); }, _lifetime);
+	EnhancedSettings::Changes(
+		EnhancedSettings::Option::OnlineSpam
+	) | rpl::on_next([=] { updateOnline(); }, _lifetime);
+	EnhancedSettings::Changes(
+		EnhancedSettings::Option::OnlineSpamInterval
+	) | rpl::on_next([=] { updateOnline(); }, _lifetime);
 	if (const auto guiApp = qobject_cast<QGuiApplication*>(
 			QCoreApplication::instance())) {
 		const auto conn = QObject::connect(
@@ -1040,9 +1044,14 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	if (!appFocused) {
 		isOnline = false;
 	} else if (onlineSpamActive) {
-		constexpr auto kInterval = crl::time(2500);
-		isOnline = (ms / kInterval) % 2 == 0;
-		updateIn = int(kInterval - (ms % kInterval));
+		constexpr auto kDefaultInterval = crl::time(2500);
+		const auto configured = EnhancedSettings::Get(
+			EnhancedSettings::Option::OnlineSpamInterval);
+		const auto spamInterval = (configured > 0)
+			? crl::time(configured)
+			: kDefaultInterval;
+		isOnline = (ms / spamInterval) % 2 == 0;
+		updateIn = int(spamInterval - (ms % spamInterval));
 	}
 	if (isOnline != _lastWasOnline
 		|| (isOnline && _lastSetOnline + config.onlineUpdatePeriod <= ms)
