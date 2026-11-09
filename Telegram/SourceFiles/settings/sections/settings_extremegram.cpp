@@ -18,7 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
-#include "ui/widgets/radio_button.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 

@@ -10,12 +10,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/enhanced_settings.h"
+#include "custom/smooth_animations.h"
+#include "mainwindow.h"
 #include "storage/localstorage.h"
 #include "styles/palette.h"
 #include "ui/effects/animations.h"
 #include "ui/painter.h"
 #include "ui/rp_widget.h"
-#include "window/main_window.h"
 #include "window/themes/window_theme.h"
 #include "window/themes/window_themes_embedded.h"
 #include "window/window_session_controller.h"
@@ -46,7 +47,7 @@ constexpr auto kSwitchDurationMs = 320;
 }
 
 void AnimateWindowSwitch(
-		not_null<Ui::RpWidget*> target,
+		not_null<::MainWindow*> target,
 		Fn<void()> apply) {
 	const auto from = target->grab().toImage();
 	apply();
@@ -55,7 +56,7 @@ void AnimateWindowSwitch(
 		target->update();
 		return;
 	}
-	const auto overlay = Ui::CreateChild<Ui::RpWidget>(target.get());
+	const auto overlay = Ui::CreateChild<Ui::RpWidget>(target);
 	overlay->setGeometry(target->rect());
 	overlay->setAttribute(Qt::WA_TransparentForMouseEvents);
 	overlay->show();
@@ -74,7 +75,6 @@ void AnimateWindowSwitch(
 			overlay->deleteLater();
 		}
 	}, 0.0, 1.0, kSwitchDurationMs, Animations::CubicSmoothOut);
-
 	overlay->paintRequest(
 	) | rpl::on_next([=] {
 		auto p = QPainter(overlay);
