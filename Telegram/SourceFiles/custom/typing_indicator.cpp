@@ -17,9 +17,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_send_action.h"
 #include "main/main_session.h"
 #include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
+#include "ui/text/text_custom_emoji.h"
 
 #include <algorithm>
 
@@ -179,9 +181,9 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 		return;
 	}
 	const auto painter = activePainter();
-	const auto &liveUsers = painter
+	const auto liveUsers = painter
 		? painter->typingUsers()
-		: base::flat_set<not_null<UserData*>>();
+		: std::vector<not_null<UserData*>>();
 	if (liveUsers.empty() && _cachedUsers.empty()) {
 		return;
 	}
@@ -219,7 +221,7 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 		x += avatarSize + style::ConvertScale(3);
 
 		const auto statusId = user->emojiStatusId();
-		const auto customId = Data::EmojiStatusCustomId(statusId);
+		const auto customId = statusId.documentId;
 		if (customId) {
 			auto &entry = _statusEmojis[uid];
 			if (entry.documentId != customId || !entry.emoji) {

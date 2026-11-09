@@ -394,6 +394,7 @@ public:
 	void copySelectedText(bool withImageText = false);
 	[[nodiscard]] MessageIdsList getSelectedIds() const;
 	[[nodiscard]] SelectedItems getSelectedItems() const;
+	[[nodiscard]] bool hasSelectedItems() const;
 	[[nodiscard]] QImage renderSelectedMessagesToImage();
 	[[nodiscard]] TextSelection getSelectedTextRange(
 		not_null<HistoryItem*> item) const;
@@ -849,7 +850,6 @@ private:
 	void removeItemSelection(
 		const SelectedMap::const_iterator &i);
 	bool hasSelectedText() const;
-	bool hasSelectedItems() const;
 	[[nodiscard]] HistorySelectedTextParts getSelectedTextParts() const;
 	SelectionModeResult inSelectionMode() const;
 	bool overSelectedItems() const;

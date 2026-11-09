@@ -12,6 +12,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "core/deep_links/deep_links_settings.h"
 #include "core/application.h"
 #include "core/chat_enhanced_settings.h"
+#include "data/data_chat.h"
 #include "data/data_chat_filters.h"
 #include "data/data_folder.h"
 #include "data/data_histories.h"
