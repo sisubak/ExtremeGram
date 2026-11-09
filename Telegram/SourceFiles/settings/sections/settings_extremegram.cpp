@@ -157,6 +157,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_bot_mode(),
 		EnhancedSettings::Option::BotMode,
 		{ u"bot"_q, u"mute"_q, u"stats"_q });
+	builder.addDividerText(tr::lng_extremegram_bot_mode_about());
 	BuildExtremeGramToggle(
 		builder,
 		controller,
@@ -164,6 +165,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_mute_dialog(),
 		EnhancedSettings::Option::ExtremeMuteDialog,
 		{ u"mute"_q, u"restrict"_q, u"reason"_q, u"duration"_q });
+	builder.addDividerText(tr::lng_extremegram_mute_dialog_about());
 	BuildExtremeGramToggle(
 		builder,
 		controller,
@@ -171,6 +173,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_markdown_paste(),
 		EnhancedSettings::Option::MarkdownPaste,
 		{ u"markdown"_q, u"paste"_q, u"formatting"_q });
+	builder.addDividerText(tr::lng_extremegram_markdown_paste_about());
 	BuildExtremeGramToggle(
 		builder,
 		controller,
@@ -178,6 +181,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_mention_as_name(),
 		EnhancedSettings::Option::MentionAsName,
 		{ u"mention"_q, u"username"_q, u"name"_q });
+	builder.addDividerText(tr::lng_extremegram_mention_as_name_about());
 
 	builder.addButton({
 		.id = u"extremegram/redesign"_q,
@@ -223,6 +227,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		},
 		.keywords = { u"redesign"_q, u"design"_q, u"theme"_q, u"colors"_q },
 	});
+	builder.addDividerText(tr::lng_extremegram_redesign_about());
 
 	builder.addButton({
 		.id = u"extremegram/reveal-hidden-chats"_q,
