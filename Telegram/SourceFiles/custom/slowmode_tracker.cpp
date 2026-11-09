@@ -134,7 +134,7 @@ int SlowmodeTracker::drawIconGetWidth(
 		return 0;
 	}
 
-	const auto padLeft = style::ConvertScale(4);
+	const auto padLeft = style::ConvertScale(2);
 	const auto size = style::ConvertScale(14);
 	const auto top = y + (nameHeight - size) / 2;
 	const auto rect = QRectF(x + padLeft, top, size, size);
@@ -142,36 +142,50 @@ int SlowmodeTracker::drawIconGetWidth(
 	PainterHighQualityEnabler hq(p);
 	p.save();
 
-	auto bgPen = QPen(badgeColor);
-	auto faded = badgeColor;
-	faded.setAlphaF(faded.alphaF() * 0.28);
-	bgPen.setColor(faded);
-	bgPen.setWidthF(style::ConvertScaleExact(1.5));
-	p.setPen(bgPen);
+	auto bg = badgeColor;
+	bg.setAlphaF(bg.alphaF() * 0.16);
+	p.setPen(Qt::NoPen);
+	p.setBrush(bg);
+	p.drawEllipse(rect);
+
+	auto rim = badgeColor;
+	rim.setAlphaF(rim.alphaF() * 0.35);
+	auto rimPen = QPen(rim);
+	rimPen.setWidthF(style::ConvertScaleExact(1.0));
+	p.setPen(rimPen);
 	p.setBrush(Qt::NoBrush);
-	const auto dialRect = rect.adjusted(1.5, 2.5, -1.5, -0.5);
-	p.drawEllipse(dialRect);
+	p.drawEllipse(rect.adjusted(0.6, 0.6, -0.6, -0.6));
 
-	auto activePen = QPen(badgeColor);
-	activePen.setWidthF(style::ConvertScaleExact(1.6));
-	activePen.setCapStyle(Qt::RoundCap);
-	p.setPen(activePen);
-	const auto cx = dialRect.center().x();
+	const auto cx = rect.center().x();
+	const auto cy = rect.center().y();
+	const auto radius = rect.width() * 0.28;
+
+	auto handPen = QPen(badgeColor);
+	handPen.setWidthF(style::ConvertScaleExact(1.3));
+	handPen.setCapStyle(Qt::RoundCap);
+	p.setPen(handPen);
+	const auto angle = (0.5 - 2.0 * (1.0 - ratio)) * M_PI;
 	p.drawLine(
-		QPointF(cx - style::ConvertScaleExact(2.0), rect.top() + 0.8),
-		QPointF(cx + style::ConvertScaleExact(2.0), rect.top() + 0.8));
-
-	const auto startAngle16 = 90 * 16;
-	const auto spanAngle16 = -static_cast<int>(std::round(ratio * 360.0 * 16.0));
-	p.drawArc(dialRect, startAngle16, spanAngle16);
-
-	const auto angleRad = (0.5 - 2.0 * (1.0 - ratio)) * M_PI;
-	const auto radius = dialRect.width() * 0.32;
-	p.drawLine(
-		dialRect.center(),
+		QPointF(cx, cy),
 		QPointF(
-			dialRect.center().x() + std::cos(angleRad) * radius,
-			dialRect.center().y() - std::sin(angleRad) * radius));
+			cx + std::cos(angle) * radius,
+			cy - std::sin(angle) * radius));
+
+	auto arcColor = badgeColor;
+	arcColor.setAlphaF(arcColor.alphaF() * 0.55);
+	auto arcPen = QPen(arcColor);
+	arcPen.setWidthF(style::ConvertScaleExact(1.0));
+	arcPen.setCapStyle(Qt::RoundCap);
+	p.setPen(arcPen);
+	const auto startAngle16 = 90 * 16;
+	const auto spanAngle16 = -static_cast<int>(
+		std::round(ratio * 360.0 * 16.0));
+	p.drawArc(rect.adjusted(2.2, 2.2, -2.2, -2.2), startAngle16, spanAngle16);
+
+	p.setBrush(badgeColor);
+	p.setPen(Qt::NoPen);
+	const auto dot = style::ConvertScaleExact(1.0);
+	p.drawEllipse(QPointF(cx, cy), dot, dot);
 
 	p.restore();
 	return padLeft + size + style::ConvertScale(2);
