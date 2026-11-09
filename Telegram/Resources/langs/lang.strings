@@ -9638,6 +9638,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_mute_invalid_duration" = "Неверный срок. Используйте, например, 4д или 1г.";
 "lng_extremegram_mute_done" = "Пользователь ограничен";
 "lng_extremegram_mute_failed" = "Не удалось ограничить пользователя";
+"lng_extremegram_mute_admin" = "Нельзя ограничивать админов канала";
+"lng_extremegram_mute_dialog_link" = "Ограничить через улучшенный диалог...";
 "lng_extremegram_markdown_paste" = "Автоматически применять Markdown при вставке текста";
 "lng_extremegram_mention_as_name" = "Заменять @username на имя пользователя при отправке";
 "lng_extremegram_eternal_tag" = "Вечный тэг (возвращать при изменении)";

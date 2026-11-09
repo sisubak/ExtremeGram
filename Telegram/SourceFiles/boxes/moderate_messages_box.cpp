@@ -18,8 +18,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 #include "boxes/peers/community_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
+#include "boxes/peers/extremegram_mute_box.h"
 #include "boxes/peers/peer_ban_box.h"
 #include "core/application.h"
+#include "core/enhanced_settings.h"
 #include "core/ui_integration.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -1328,6 +1330,50 @@ void CreateModerateMessagesBox(
 			Controller::Data{ .participants = participants });
 		Ui::AddExpandablePeerList(ban, controller, inner);
 		handleSubmition(ban);
+
+		if (EnhancedSettings::Get(
+				EnhancedSettings::Option::ExtremeMuteDialog)
+			&& isSingle
+			&& (peer->asChannel() != nullptr)
+			&& peer->isMegagroup()
+			&& !peer->isMonoforum()) {
+			const auto channel = peer->asChannel();
+			const auto user = participants.front()->asUser();
+			const auto link = box->addRow(
+				object_ptr<Ui::FlatLabel>(
+					box,
+					tr::lng_extremegram_mute_dialog_link(tr::now),
+					st::moderateBoxDividerLabel),
+				st::boxRowPadding + buttonPadding);
+			link->setClickHandlerFilter([=](
+					const ClickHandlerPtr &,
+					Qt::MouseButton button) {
+				if (button != Qt::LeftButton) {
+					return false;
+				}
+				channel->session().api().request(MTPchannels_GetParticipant(
+					channel->inputChannel(),
+					user->input()
+				)).done([=](
+						const MTPchannels_ChannelParticipant &result) {
+					channel->owner().processUsers(result.data().vusers());
+					const auto participant = Api::ChatParticipant(
+						result.data().vparticipant(),
+						channel);
+					if (participant.isCreatorOrAdmin()) {
+						box->uiShow()->showToast(
+							tr::lng_extremegram_mute_admin(tr::now));
+						return;
+					}
+					ShowExtremeGramMuteBox(
+						box->uiShow().get(),
+						channel,
+						user,
+						participant.restrictions());
+				}).send();
+				return true;
+			});
+		}
 
 		auto ownedUntilWrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			inner,

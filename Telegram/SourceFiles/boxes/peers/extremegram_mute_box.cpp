@@ -146,7 +146,18 @@ void ShowExtremeGramMuteBox(
 		not_null<ChannelData*> channel,
 		not_null<UserData*> user,
 		ChatRestrictionsInfo oldRights) {
-	const auto show = controller->uiShow();
+	ShowExtremeGramMuteBox(
+		controller->uiShow(),
+		channel,
+		user,
+		oldRights);
+}
+
+void ShowExtremeGramMuteBox(
+		not_null<ChatHelpers::Show*> show,
+		not_null<ChannelData*> channel,
+		not_null<UserData*> user,
+		ChatRestrictionsInfo oldRights) {
 	show->showBox(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(tr::lng_extremegram_mute_title());
 		box->setWidth(st::boxWideWidth);

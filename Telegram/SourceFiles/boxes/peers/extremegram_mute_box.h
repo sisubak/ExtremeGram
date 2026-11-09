@@ -13,12 +13,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 class ChannelData;
 class UserData;
 
+namespace ChatHelpers {
+class Show;
+} // namespace ChatHelpers
+
 namespace Window {
 class SessionController;
 } // namespace Window
 
 void ShowExtremeGramMuteBox(
 	not_null<Window::SessionController*> controller,
+	not_null<ChannelData*> channel,
+	not_null<UserData*> user,
+	ChatRestrictionsInfo oldRights);
+
+void ShowExtremeGramMuteBox(
+	not_null<ChatHelpers::Show*> show,
 	not_null<ChannelData*> channel,
 	not_null<UserData*> user,
 	ChatRestrictionsInfo oldRights);
