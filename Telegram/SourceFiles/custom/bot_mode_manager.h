@@ -155,4 +155,9 @@ private:
 
 [[nodiscard]] BotModeManager &BotModeFor(not_null<Main::Session*> session);
 
+[[nodiscard]] std::optional<int64> ApproximateRegistrationEpoch(
+	int64 userId);
+[[nodiscard]] QString FormatRegistrationDay(int64 epoch);
+[[nodiscard]] QString FormatJoinDateTime(int64 epoch);
+
 } // namespace Custom

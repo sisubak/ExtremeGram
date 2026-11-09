@@ -74,36 +74,6 @@ constexpr std::array<IdBirthMark, 18> kIdBirthMarks{{
 	{ 1200'000'000, 1759276800 },
 }};
 
-[[nodiscard]] std::optional<int64_t> ApproximateRegistrationEpoch(
-		int64_t userId) {
-	if (userId <= kIdBirthMarks.front().id) {
-		return kIdBirthMarks.front().epoch;
-	}
-	for (auto i = std::size_t(1); i < kIdBirthMarks.size(); ++i) {
-		const auto &right = kIdBirthMarks[i];
-		if (userId > right.id) {
-			continue;
-		}
-		const auto &left = kIdBirthMarks[i - 1];
-		const auto span = double(right.id - left.id);
-		const auto progress = double(userId - left.id) / std::max(span, 1.0);
-		return left.epoch
-			+ int64_t((right.epoch - left.epoch) * progress);
-	}
-	return kIdBirthMarks.back().epoch;
-}
-
-[[nodiscard]] QString FormatDayString(int64_t epoch) {
-	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
-		.toString(u"dd.MM.yyyy"_q);
-}
-
-[[nodiscard]] QString FormatDateTimeString(int64_t epoch) {
-	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
-		.toString(u"dd.MM.yyyy HH:mm"_q)
-		+ QString::fromUtf8(" UTC");
-}
-
 [[nodiscard]] QString FormatDurationHuman(int seconds) {
 	if (seconds % 86400 == 0) {
 		return QString::number(seconds / 86400) + u"д"_q;
@@ -116,6 +86,35 @@ constexpr std::array<IdBirthMark, 18> kIdBirthMarks{{
 }
 
 } // namespace
+
+std::optional<int64> ApproximateRegistrationEpoch(int64 userId) {
+	if (userId <= kIdBirthMarks.front().id) {
+		return kIdBirthMarks.front().epoch;
+	}
+	for (auto i = std::size_t(1); i < kIdBirthMarks.size(); ++i) {
+		const auto &right = kIdBirthMarks[i];
+		if (userId > right.id) {
+			continue;
+		}
+		const auto &left = kIdBirthMarks[i - 1];
+		const auto span = double(right.id - left.id);
+		const auto progress = double(userId - left.id) / std::max(span, 1.0);
+		return left.epoch
+			+ int64((right.epoch - left.epoch) * progress);
+	}
+	return kIdBirthMarks.back().epoch;
+}
+
+QString FormatRegistrationDay(int64 epoch) {
+	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
+		.toString(u"dd.MM.yyyy"_q);
+}
+
+QString FormatJoinDateTime(int64 epoch) {
+	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
+		.toString(u"dd.MM.yyyy HH:mm"_q)
+		+ QString::fromUtf8(" UTC");
+}
 
 BotStatsOverlayWidget::BotStatsOverlayWidget(
 	QWidget *parent,
@@ -594,7 +593,7 @@ bool BotModeManager::handleWhoisCommand(
 	if (!user->isBot()) {
 		const auto registered = ApproximateRegistrationEpoch(userId);
 		const auto registeredLine = registered
-			? FormatDayString(*registered)
+			? FormatRegistrationDay(*registered)
 				+ QString::fromUtf8(" (приблизительно)")
 			: QString::fromUtf8("недоступна");
 		base = QString::fromUtf8(
@@ -617,21 +616,19 @@ bool BotModeManager::handleWhoisCommand(
 				"Дата входа в группу: недоступна");
 			data.vparticipant().match([&](
 					const MTPDchannelParticipant &d) {
-				joinedLine = FormatDateTimeString(d.vdate().v);
+				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [&](const MTPDchannelParticipantAdmin &d) {
-				joinedLine = FormatDateTimeString(d.vdate().v);
+				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [&](const MTPDchannelParticipantBanned &d) {
-				joinedLine = FormatDateTimeString(d.vdate().v);
+				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [&](const MTPDchannelParticipantCreator &d) {
-				joinedLine = FormatDateTimeString(d.vdate().v);
+				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [&](const MTPDchannelParticipantSelf &d) {
-				joinedLine = FormatDateTimeString(d.vdate().v);
+				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [](const auto &) {});
 			const auto report = QString::fromUtf8(
 				"%1\nВход в группу: %2")
-					.arg(
-						base,
-						joinedLine);
+				.arg(base, joinedLine);
 			sendWithRetry(lower, report, FullMsgId(), nullptr);
 		}).fail([=, lower = history->peer](const MTP::Error &) {
 			const auto report = base + QString::fromUtf8(

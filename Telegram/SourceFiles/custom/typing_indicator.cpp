@@ -247,16 +247,13 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 			avatarTop,
 			width(),
 			avatarSize);
-		x += avatarSize + style::ConvertScale(3);
-
-		const auto statusId = user->emojiStatusId();
-		const auto customId = statusId.documentId;
-		if (customId) {
+		x += avatarSize + style::ConvertScale(3);		const auto statusId = user->emojiStatusId();
+		if (statusId) {
 			auto &entry = _statusEmojis[uid];
-			if (entry.documentId != customId || !entry.emoji) {
-				entry.documentId = customId;
+			if (!(entry.statusId == statusId) || !entry.emoji) {
+				entry.statusId = statusId;
 				entry.emoji = user->owner().customEmojiManager().create(
-					customId,
+					Data::EmojiStatusCustomId(statusId),
 					[this] { update(); },
 					Data::CustomEmojiSizeTag::Normal,
 					emojiSize);

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "base/weak_ptr.h"
 #include "data/data_peer_id.h"
+#include "data/data_types.h"
 #include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
 #include "ui/userpic_view.h"
@@ -49,7 +50,7 @@ protected:
 
 private:
 	struct StatusEmojiEntry {
-		DocumentId documentId = 0;
+		EmojiStatusId statusId;
 		std::unique_ptr<Ui::Text::CustomEmoji> emoji;
 	};
 
