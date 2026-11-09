@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_report.h"
 #include "api/api_ringtones.h"
 #include "api/api_sending.h"
+#include "api/api_chat_participants.h"
 #include "api/api_transcribes.h"
 #include "api/api_who_reacted.h"
 #include "api/api_stickers_creator.h"
@@ -46,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/editor/iv_editor_session.h"
 #include "iv/iv_rich_message_html_export.h"
 #include "ui/effects/ripple_animation.h"
+#include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_action.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
@@ -79,6 +81,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/moderate_messages_box.h"
+#include "custom/bot_mode_manager.h"
+#include "custom/client_badge_detector.h"
 #include "boxes/report_messages_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/sticker_set_box.h"
@@ -1560,6 +1564,97 @@ void AddSaveRichHtmlAction(
 		list);
 }
 
+void ShowExtremeBadgeBox(
+		not_null<Window::SessionController*> controller,
+		not_null<UserData*> user,
+		QString joinedText) {
+	const auto userId = peerToUser(user->id).bare;
+	const auto registered = Custom::ApproximateRegistrationEpoch(userId);
+	const auto registeredText = registered
+		? Custom::FormatRegistrationDay(*registered)
+			+ QString::fromUtf8(" (приблизительно)")
+		: QString::fromUtf8("недоступно");
+	controller->show(Box([=](
+			not_null<Ui::GenericBox*> box) {
+		box->setTitle(QString::fromUtf8("ExtremeGram"));
+		auto addLine = [&](QString text) {
+			box->addRow(
+				object_ptr<Ui::FlatLabel>(
+					box,
+					rpl::single(std::move(text)),
+					st::defaultFlatLabel),
+				st::boxPadding);
+		};
+		addLine(user->name());
+		addLine(QString::fromUtf8("ID: %1").arg(userId));
+		addLine(QString::fromUtf8(
+			"Регистрация аккаунта: %1").arg(registeredText));
+		addLine(QString::fromUtf8("Вход в группу: %1").arg(joinedText));
+		addLine(QString::fromUtf8(
+			"Аккаунт использует клиент ExtremeGram."));
+		box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+	}));
+}
+
+void AddExtremeBadgeAction(
+		not_null<Ui::PopupMenu*> menu,
+		const ContextMenuRequest &request,
+		not_null<ListWidget*> list) {
+	const auto item = request.item;
+	if (!item || !request.selectedItems.empty()) {
+		return;
+	}
+	const auto user = item->from()->asUser();
+	if (!user) {
+		return;
+	}
+	if (!Custom::ClientBadgeFor(
+			&item->history()->session()
+		).hasCustomClientBadge(item->from())) {
+		return;
+	}
+	const auto controller = list->controller();
+	const auto channel = item->history()->peer->asChannel();
+	const auto fallback = [=] {
+		ShowExtremeBadgeBox(
+			controller,
+			user,
+			QString::fromUtf8("недоступно"));
+	};
+	if (!channel || !channel->isMegagroup()) {
+		fallback();
+		return;
+	}
+	menu->addAction(
+		QString::fromUtf8("Сведения о клиенте ExtremeGram"),
+		[=] {
+			channel->session().api().request(MTPchannels_GetParticipant(
+				channel->inputChannel(),
+				user->input()
+			)).done([=](const MTPchannels_ChannelParticipant &result) {
+				const auto &data = result.data();
+				channel->owner().processUsers(data.vusers());
+				auto joined = QString::fromUtf8("недоступно");
+				data.vparticipant().match([&](
+						const MTPDchannelParticipant &d) {
+					joined = Custom::FormatJoinDateTime(d.vdate().v);
+				}, [&](const MTPDchannelParticipantAdmin &d) {
+					joined = Custom::FormatJoinDateTime(d.vdate().v);
+				}, [&](const MTPDchannelParticipantBanned &d) {
+					joined = Custom::FormatJoinDateTime(d.vdate().v);
+				}, [&](const MTPDchannelParticipantCreator &d) {
+					joined = Custom::FormatJoinDateTime(d.vdate().v);
+				}, [&](const MTPDchannelParticipantSelf &d) {
+					joined = Custom::FormatJoinDateTime(d.vdate().v);
+				}, [](const auto &) {});
+				ShowExtremeBadgeBox(controller, user, joined);
+			}).fail([=] {
+				fallback();
+			}).send();
+		},
+		&st::menuIconInfo);
+}
+
 void AddReportAction(
 		not_null<Ui::PopupMenu*> menu,
 		const ContextMenuRequest &request,
@@ -1768,6 +1863,7 @@ void AddMessageActions(
 	AddDownloadFilesAction(menu, request, list);
 	AddSaveRichHtmlAction(menu, request, list);
 	AddReportAction(menu, request, list);
+	AddExtremeBadgeAction(menu, request, list);
 	AddBlockSenderAction(menu, request, list);
 	if (request.item && request.selectedItems.empty()) {
 		AddEphemeralMessageActions(
