@@ -65,8 +65,7 @@ void BuildOnlineSpamInterval(
 		return tr::lng_extremegram_online_spam_interval_ms(
 			tr::now,
 			lt_amount,
-			QString::number(value),
-			Ui::Text::RichLangValue);
+			QString::number(value));
 	};
 	const auto label = [formatMs](int value) {
 		constexpr auto kDefaultMs = 2500;
@@ -77,9 +76,9 @@ void BuildOnlineSpamInterval(
 	const auto button = builder.addButton({
 		.id = u"extremegram/online-spam-interval"_q,
 		.title = tr::lng_extremegram_online_spam_interval(),
+		.st = &st::settingsButtonNoIcon,
 		.label = valueLabel->events_starting_with(
 			label(EnhancedSettings::Get(key))),
-		.st = &st::settingsButtonNoIcon,
 		.keywords = { u"online"_q, u"ms"_q, u"interval"_q },
 	});
 	if (!button || !controller) {
@@ -139,10 +138,10 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		{ u"online"_q, u"status"_q });
 	BuildOnlineSpamInterval(builder, controller);
 	builder.addDividerText(
-		tr::lng_extremegram_online_spam_about(
+		rpl::single(tr::lng_extremegram_online_spam_about(
 			tr::now,
 			lt_amount,
-			QString::number(2500)));
+			QString::number(2500))));
 
 	builder.addSkip();
 	builder.addSubsectionTitle({

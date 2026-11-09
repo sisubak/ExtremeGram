@@ -147,14 +147,14 @@ void ShowExtremeGramMuteBox(
 		not_null<UserData*> user,
 		ChatRestrictionsInfo oldRights) {
 	ShowExtremeGramMuteBox(
-		controller->uiShow(),
+		controller->uiShow().get(),
 		channel,
 		user,
 		oldRights);
 }
 
 void ShowExtremeGramMuteBox(
-		not_null<ChatHelpers::Show*> show,
+		not_null<Ui::Show*> show,
 		not_null<ChannelData*> channel,
 		not_null<UserData*> user,
 		ChatRestrictionsInfo oldRights) {

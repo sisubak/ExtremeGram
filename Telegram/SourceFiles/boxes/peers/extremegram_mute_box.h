@@ -13,9 +13,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 class ChannelData;
 class UserData;
 
-namespace ChatHelpers {
+namespace Ui {
 class Show;
-} // namespace ChatHelpers
+} // namespace Ui
 
 namespace Window {
 class SessionController;
@@ -28,7 +28,7 @@ void ShowExtremeGramMuteBox(
 	ChatRestrictionsInfo oldRights);
 
 void ShowExtremeGramMuteBox(
-	not_null<ChatHelpers::Show*> show,
+	not_null<Ui::Show*> show,
 	not_null<ChannelData*> channel,
 	not_null<UserData*> user,
 	ChatRestrictionsInfo oldRights);
