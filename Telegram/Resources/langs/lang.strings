@@ -9641,4 +9641,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_markdown_paste" = "Автоматически применять Markdown при вставке текста";
 "lng_extremegram_mention_as_name" = "Заменять @username на имя пользователя при отправке";
 "lng_extremegram_eternal_tag" = "Вечный тэг (возвращать при изменении)";
+"lng_extremegram_redesign" = "Редизайн";
+"lng_extremegram_redesign_classic" = "Классический";
+"lng_extremegram_redesign_modern" = "Современный";
+"lng_extremegram_redesign_ultra" = "Ultra";
 

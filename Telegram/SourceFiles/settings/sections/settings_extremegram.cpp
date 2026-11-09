@@ -15,8 +15,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_main.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
+#include "ui/layers/generic_box.h"
 #include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/radio_button.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -111,6 +113,50 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_mention_as_name(),
 		EnhancedSettings::Option::MentionAsName,
 		{ u"mention"_q, u"username"_q, u"name"_q });
+
+	builder.addButton({
+		.id = u"extremegram/redesign"_q,
+		.title = tr::lng_extremegram_redesign(),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			controller->uiShow()->show(Box([=](not_null<Ui::GenericBox*> box) {
+				box->setTitle(tr::lng_extremegram_redesign());
+				const auto group = std::make_shared<Ui::RadioenumGroup<int>>(
+					EnhancedSettings::Get(EnhancedSettings::Option::RedesignMode));
+				const auto addMode = [&](int value, tr::phrase<> label) {
+					box->verticalLayout()->add(
+						object_ptr<Ui::Radioenum<int>>(
+							box->verticalLayout(),
+							group,
+							value,
+							label(tr::now),
+							st::settingsSendType),
+						st::settingsSendTypePadding);
+				};
+				addMode(
+					0,
+					tr::lng_extremegram_redesign_classic);
+				addMode(
+					1,
+					tr::lng_extremegram_redesign_modern);
+				addMode(
+					2,
+					tr::lng_extremegram_redesign_ultra);
+				group->setChangedCallback([=, raw = group.get()](int value) {
+					EnhancedSettings::ApplyOption(
+						not_null<Window::SessionController*>(controller),
+						EnhancedSettings::Option::RedesignMode,
+						value);
+					raw->setValue(value);
+					box->closeBox();
+				});
+				box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+			}));
+		},
+		.keywords = { u"redesign"_q, u"design"_q, u"theme"_q, u"colors"_q },
 
 	builder.addButton({
 		.id = u"extremegram/reveal-hidden-chats"_q,

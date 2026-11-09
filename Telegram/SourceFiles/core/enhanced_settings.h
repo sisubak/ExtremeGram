@@ -105,6 +105,7 @@ enum class OptionId {
 	ExtremeMuteDialog,
 	MarkdownPaste,
 	MentionAsName,
+	RedesignMode,
 	Count,
 };
 
@@ -208,7 +209,8 @@ inline constexpr auto ShowPeerInfo = Key<bool>{ OptionId::ShowPeerInfo };
 inline constexpr auto ExtremeMuteDialog
 	= Key<bool>{ OptionId::ExtremeMuteDialog };
 inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
-inline constexpr auto MentionAsName = Key<bool>{ OptionId::MentionAsName };
+	inline constexpr auto MentionAsName = Key<bool>{ OptionId::MentionAsName };
+	inline constexpr auto RedesignMode = Key<int>{ OptionId::RedesignMode };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel
@@ -257,6 +259,7 @@ enum class OptionEffect : uint32 {
 	ReloadFiltersMenu = (1U << 7),
 	ShowHdVideoHint = (1U << 8),
 	ShowBitrateHint = (1U << 9),
+	ApplyRedesignMode = (1U << 10),
 };
 inline constexpr bool is_flag_type(OptionEffect) { return true; }
 using OptionEffects = base::flags<OptionEffect>;

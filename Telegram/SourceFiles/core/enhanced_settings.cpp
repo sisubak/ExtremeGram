@@ -12,6 +12,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "core/deep_links/deep_links_settings.h"
 #include "core/application.h"
 #include "core/chat_enhanced_settings.h"
+#include "custom/redesign.h"
 #include "data/data_chat.h"
 #include "data/data_chat_filters.h"
 #include "data/data_folder.h"
@@ -346,6 +347,16 @@ const DescriptorList &DescriptorData() {
 			{},
 			false,
 			true),
+		[] {
+			auto result = Integer(
+				OptionId::RedesignMode,
+				"extremegram_redesign_mode",
+				&tr::lng_extremegram_redesign,
+				"enhanced/extremegram-redesign-mode",
+				{ .minimum = 0, .maximum = 2, .allowZero = true });
+			result.effects = OptionEffect::ApplyRedesignMode;
+			return result;
+		}(),
 	};
 	return result;
 }
@@ -1053,6 +1064,9 @@ bool ApplyOption(
 	}
 	if (effects & OptionEffect::ShowBitrateHint) {
 		Ui::Toast::Show(tr::lng_bitrate_controller_hint(tr::now));
+	}
+	if (effects & OptionEffect::ApplyRedesignMode) {
+		Custom::ApplyRedesignDesign(controller);
 	}
 	if (descriptor.restartRequired
 		&& restartNotification == RestartNotification::Show) {
