@@ -611,6 +611,8 @@ PRIVATE
     custom/eternal_tags.h
     custom/mention_pins.cpp
     custom/mention_pins.h
+    custom/redesign.cpp
+    custom/redesign.h
     custom/slowmode_tracker.cpp
     custom/slowmode_tracker.h
     custom/smooth_animations.cpp
