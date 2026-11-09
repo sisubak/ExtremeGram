@@ -27,8 +27,6 @@ struct DesignTokens {
 	float64 cardAlpha = 0.94;
 	int accentWashAlpha = 0;
 	QColor accent = QColor();
-};
-
-[[nodiscard]] DesignTokens DesignTokensForCurrentMode();
+};[[nodiscard]] DesignTokens DesignTokensForCurrentMode();
 
 } // namespace Custom

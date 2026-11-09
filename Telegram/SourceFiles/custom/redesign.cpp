@@ -56,7 +56,10 @@ constexpr auto kSwitchDurationMs = 320;
 DesignTokens DesignTokensForCurrentMode() {
 	const auto mode = EnhancedSettings::Get(
 		EnhancedSettings::Option::RedesignMode);
-	auto tokens = DesignTokens{ .radiusId = 0 };
+	auto tokens = DesignTokens{};
+	if (mode == 0) {
+		return tokens;
+	}
 	switch (mode) {
 	case 1:
 		tokens.radiusId = 14;
