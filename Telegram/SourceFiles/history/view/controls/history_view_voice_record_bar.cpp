@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "base/random.h"
 #include "base/unixtime.h"
+#include "custom/smooth_animations.h"
 #include "ui/boxes/confirm_box.h"
 #include "calls/calls_instance.h"
 #include "chat_helpers/compose/compose_show.h"
@@ -1088,13 +1089,19 @@ void ListenWrap::initPlayButton() {
 	_playPauseButton->show();
 	_playPauseButton->setAccessibleName(tr::lng_record_lock_play(tr::now));
 
+	const auto pop = _lifetime.make_state<rpl::variable<float64>>(0.0);
+	const auto popAnim = _lifetime.make_state<Ui::Animations::Simple>();
+
 	_playPauseButton->paintRequest(
 	) | rpl::on_next([=](const QRect &clip) {
 		auto p = QPainter(_playPauseButton);
 		const auto size = _playPauseButton->size();
 
+		const auto popValue = pop->current();
+		const auto bump = 0.16 * popValue * (1.0 - popValue) * 4.0;
 		const auto progress = _showProgress.current()
-			* st::historyRecordCenterControlIconScale;
+			* st::historyRecordCenterControlIconScale
+			* (1.0 + bump);
 		p.translate(size.width() / 2, size.height() / 2);
 		p.scale(progress, progress);
 		p.translate(-play.width() / 2, -play.height() / 2);
@@ -1102,6 +1109,11 @@ void ListenWrap::initPlayButton() {
 	}, _playPauseButton->lifetime());
 
 	_playPauseButton->setClickedCallback([=] {
+		*pop = 0.0;
+		popAnim->start([=] {
+			*pop = popAnim->value(1.0);
+			_playPauseButton->update();
+		}, 0.0, 1.0, 240, Custom::Animations::CubicSmoothOut);
 		playPause();
 	});
 
