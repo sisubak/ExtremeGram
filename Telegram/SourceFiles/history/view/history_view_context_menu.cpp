@@ -1642,8 +1642,8 @@ void AddExtremeBadgeAction(
 					joined = Custom::FormatJoinDateTime(d.vdate().v);
 				}, [&](const MTPDchannelParticipantBanned &d) {
 					joined = Custom::FormatJoinDateTime(d.vdate().v);
-				}, [&](const MTPDchannelParticipantCreator &d) {
-					joined = Custom::FormatJoinDateTime(d.vdate().v);
+				}, [&](const MTPDchannelParticipantCreator &) {
+					joined = Custom::FormatJoinDateTime(-1);
 				}, [&](const MTPDchannelParticipantSelf &d) {
 					joined = Custom::FormatJoinDateTime(d.vdate().v);
 				}, [](const auto &) {});

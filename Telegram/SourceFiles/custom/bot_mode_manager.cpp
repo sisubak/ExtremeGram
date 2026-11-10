@@ -111,6 +111,9 @@ QString FormatRegistrationDay(int64 epoch) {
 }
 
 QString FormatJoinDateTime(int64 epoch) {
+	if (epoch <= 0) {
+		return QString::fromUtf8("неизвестно");
+	}
 	return QDateTime::fromSecsSinceEpoch(epoch, Qt::UTC)
 		.toString(u"dd.MM.yyyy HH:mm"_q)
 		+ QString::fromUtf8(" UTC");
@@ -621,8 +624,8 @@ bool BotModeManager::handleWhoisCommand(
 				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [&](const MTPDchannelParticipantBanned &d) {
 				joinedLine = FormatJoinDateTime(d.vdate().v);
-			}, [&](const MTPDchannelParticipantCreator &d) {
-				joinedLine = FormatJoinDateTime(d.vdate().v);
+			}, [&](const MTPDchannelParticipantCreator &) {
+				joinedLine = FormatJoinDateTime(-1);
 			}, [&](const MTPDchannelParticipantSelf &d) {
 				joinedLine = FormatJoinDateTime(d.vdate().v);
 			}, [](const auto &) {});
