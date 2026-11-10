@@ -1582,7 +1582,7 @@ void ShowExtremeBadgeBox(
 		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
-				Ui::Text::Bold(user->name()),
+				rpl::single(Ui::Text::Bold(user->name())),
 				st::defaultFlatLabel),
 			st::boxRowPadding);
 		const auto username = user->username();

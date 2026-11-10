@@ -1342,8 +1342,8 @@ void CreateModerateMessagesBox(
 			const auto link = box->addRow(
 				object_ptr<Ui::FlatLabel>(
 					box,
-					Ui::Text::Link(
-						tr::lng_extremegram_mute_dialog_link(tr::now)),
+					rpl::single(Ui::Text::Link(
+						tr::lng_extremegram_mute_dialog_link(tr::now))),
 					st::moderateBoxDividerLabel),
 				st::boxRowPadding + buttonPadding);
 			link->setClickHandlerFilter([=](

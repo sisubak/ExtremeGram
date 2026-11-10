@@ -74,6 +74,10 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
 - Новые custom-файлы регистрировать в Telegram/CMakeLists.txt (~606–619).
 - `addAction(text, lambda, &st::menuIconInfo)` — валидный порядок аргументов.
 - box->addButton(rpl::single(QString), fn) — для произвольного текста.
+- Ui::FlatLabel НЕ имеет ctor с TextWithEntities — только
+  rpl::producer<TextWithEntities>: оборачивать rpl::single(Ui::Text::Bold/Link(...)).
+- Если в lang-строке убрал {amount} — убрать и lt_amount из вызова phrase,
+  иначе "no match for call to (const tr::phrase<>)". 
 
 ## Текущее состояние (на момент последнего обновления)
 - Последний зелёный релиз: build-42741996523 (коммит d9ad843) — у пользователя.

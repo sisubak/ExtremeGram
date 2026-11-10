@@ -137,10 +137,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		{ u"online"_q, u"status"_q });
 	BuildOnlineSpamInterval(builder, controller);
 	builder.addDividerText(
-		rpl::single(tr::lng_extremegram_online_spam_about(
-			tr::now,
-			lt_amount,
-			QString::number(2500))));
+		rpl::single(tr::lng_extremegram_online_spam_about(tr::now)));
 
 	builder.addSkip();
 	builder.addSubsectionTitle({
