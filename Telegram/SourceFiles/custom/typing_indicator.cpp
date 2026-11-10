@@ -238,11 +238,6 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 	const auto avatarTop = (targetH - avatarSize) / 2;
 
 	auto count = 0;
-	struct PendingBadge {
-		Ui::Text::CustomEmoji *emoji = nullptr;
-		const style::icon *premium = nullptr;
-	};
-	std::vector<PendingBadge> badges;
 	const auto drawOneUser = [&](not_null<UserData*> user) {
 		const auto uid = peerToUser(user->id);
 		auto &view = _userpics[uid];
@@ -253,9 +248,7 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 			avatarTop,
 			width(),
 			avatarSize);
-		x += avatarSize + style::ConvertScale(3);
-
-		const auto statusId = user->emojiStatusId();
+		x += avatarSize + style::ConvertScale(3);		const auto statusId = user->emojiStatusId();
 		if (statusId) {
 			auto &entry = _statusEmojis[uid];
 			if (!(entry.statusId == statusId) || !entry.emoji) {
@@ -267,14 +260,27 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 					emojiSize);
 			}
 			if (entry.emoji) {
-				badges.push_back({ .emoji = entry.emoji.get() });
+				const auto emojiTop = (targetH - emojiSize) / 2;
+				entry.emoji->paint(p, {
+					.textColor = st::dialogsVerifiedIconBg->c,
+					.now = now,
+					.position = QPoint(x, emojiTop),
+					.paused = On(PowerSaving::kEmojiStatus),
+				});
+				x += emojiSize + style::ConvertScale(3);
 			}
 		} else {
 			_statusEmojis.remove(uid);
 			if (user->isPremium()) {
-				badges.push_back({
-					.premium = &st::dialogsPremiumIcon.icon,
-				});
+				const auto &icon = st::dialogsPremiumIcon.icon;
+				const auto iconTop = (targetH - icon.height()) / 2;
+				icon.paint(
+					p,
+					x,
+					iconTop,
+					width(),
+					st::dialogsVerifiedIconBg->c);
+				x += icon.width() + style::ConvertScale(3);
 			}
 		}
 		x += style::ConvertScale(2);
@@ -296,45 +302,16 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 		}
 	}
 
-	const auto badgeSpacing = style::ConvertScale(3);
-	auto badgesWidth = 0;
-	for (const auto &badge : badges) {
-		badgesWidth += badgeSpacing
-			+ (badge.emoji ? emojiSize : badge.premium->width());
-	}
 	if (painter && !liveUsers.empty()) {
 		const auto textTop = (targetH - st::normalFont->height) / 2;
-		const auto textRight = width() - badgesWidth;
 		painter->paint(
 			p,
 			x,
 			textTop,
-			std::max(textRight - x - st::historySendPadding, 0),
+			std::max(width() - x - st::historySendPadding, 0),
 			width(),
 			st::windowSubTextFg,
 			now);
-	}
-	auto badgeX = width() - badgesWidth;
-	for (const auto &badge : badges) {
-		if (badge.emoji) {
-			badge.emoji->paint(p, {
-				.textColor = st::dialogsVerifiedIconBg->c,
-				.now = now,
-				.position = QPoint(
-					badgeX + badgeSpacing,
-					(targetH - emojiSize) / 2),
-				.paused = On(PowerSaving::kEmojiStatus),
-			});
-			badgeX += badgeSpacing + emojiSize;
-		} else {
-			badge.premium->paint(
-				p,
-				badgeX + badgeSpacing,
-				(targetH - badge.premium->height()) / 2,
-				width(),
-				st::dialogsVerifiedIconBg->c);
-			badgeX += badgeSpacing + badge.premium->width();
-		}
 	}
 }
 
