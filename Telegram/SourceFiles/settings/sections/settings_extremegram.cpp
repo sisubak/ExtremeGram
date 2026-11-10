@@ -68,8 +68,7 @@ void BuildOnlineSpamInterval(
 			QString::number(value));
 	};
 	const auto label = [formatMs](int value) {
-		constexpr auto kDefaultMs = 2500;
-		return (value > 0) ? formatMs(value) : formatMs(kDefaultMs);
+		return formatMs(value);
 	};
 	const auto valueLabel = builder.container()->lifetime(
 	).make_state<rpl::event_stream<QString>>();
@@ -93,7 +92,7 @@ void BuildOnlineSpamInterval(
 	slider->setAccessibleName(EnhancedSettings::OptionTitle(key.id));
 
 	constexpr auto kMsStep = 100;
-	constexpr auto kMaximumMs = 60000;
+	constexpr auto kMaximumMs = 600000;
 	const auto sections = kMaximumMs / kMsStep;
 	slider->setPseudoDiscrete(
 		sections + 1,

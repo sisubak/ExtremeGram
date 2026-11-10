@@ -1044,14 +1044,15 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	if (!appFocused) {
 		isOnline = false;
 	} else if (onlineSpamActive) {
-		constexpr auto kDefaultInterval = crl::time(2500);
 		const auto configured = EnhancedSettings::Get(
 			EnhancedSettings::Option::OnlineSpamInterval);
-		const auto spamInterval = (configured > 0)
-			? crl::time(configured)
-			: kDefaultInterval;
-		isOnline = (ms / spamInterval) % 2 == 0;
-		updateIn = int(spamInterval - (ms % spamInterval));
+		if (configured <= 0) {
+			isOnline = true;
+		} else {
+			const auto spamInterval = crl::time(configured);
+			isOnline = (ms / spamInterval) % 2 == 0;
+			updateIn = int(spamInterval - (ms % spamInterval));
+		}
 	}
 	if (isOnline != _lastWasOnline
 		|| (isOnline && _lastSetOnline + config.onlineUpdatePeriod <= ms)

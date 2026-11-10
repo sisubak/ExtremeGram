@@ -248,7 +248,8 @@ void TypingIndicator::paintEvent(QPaintEvent *e) {
 			avatarTop,
 			width(),
 			avatarSize);
-		x += avatarSize + style::ConvertScale(3);		const auto statusId = user->emojiStatusId();
+		x += avatarSize + style::ConvertScale(3);
+		const auto statusId = user->emojiStatusId();
 		if (statusId) {
 			auto &entry = _statusEmojis[uid];
 			if (!(entry.statusId == statusId) || !entry.emoji) {
