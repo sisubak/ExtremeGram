@@ -53,7 +53,7 @@ struct IdBirthMark {
 
 // Approximate Telegram account creation milestones, measured against
 // well-known published ID ranges. Interpolated linearly per segment.
-constexpr std::array<IdBirthMark, 18> kIdBirthMarks{{
+constexpr std::array<IdBirthMark, 19> kIdBirthMarks{{
 	{ 0, 1376438400 },
 	{ 1'000'000, 1438387200 },
 	{ 5'000'000, 1476489600 },
@@ -72,6 +72,7 @@ constexpr std::array<IdBirthMark, 18> kIdBirthMarks{{
 	{ 1000'000'000, 1735689600 },
 	{ 1100'000'000, 1748736000 },
 	{ 1200'000'000, 1759276800 },
+	{ 1766'313'192, 1768435200 },
 }};
 
 [[nodiscard]] QString FormatDurationHuman(int seconds) {
@@ -102,7 +103,13 @@ std::optional<int64> ApproximateRegistrationEpoch(int64 userId) {
 		return left.epoch
 			+ int64((right.epoch - left.epoch) * progress);
 	}
-	return kIdBirthMarks.back().epoch;
+	const auto &last = kIdBirthMarks.back();
+	const auto &prev = kIdBirthMarks[kIdBirthMarks.size() - 2];
+	const auto idsPerSecond = double(last.id - prev.id)
+		/ double(std::max<int64>(last.epoch - prev.epoch, 1));
+	const auto extraSeconds = int64(
+		double(userId - last.id) / std::max(idsPerSecond, 1.0));
+	return last.epoch + extraSeconds;
 }
 
 QString FormatRegistrationDay(int64 epoch) {

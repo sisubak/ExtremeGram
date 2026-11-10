@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/options.h"
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
+#include "custom/client_badge_detector.h"
 #include "data/data_channel.h"
 #include "data/data_drafts.h"
 #include "data/data_folder.h"
@@ -952,6 +953,15 @@ void PaintRow(
 			paintPeerBadge(rowName.maxWidth());
 			badgeWidth = widthBefore - rectForName.width();
 		}
+		auto clientBadgeWidth = 0;
+		if (!context.search) {
+			auto &detector = Custom::ClientBadgeFor(
+				&from->owner().session());
+			if (detector.hasCustomClientBadge(from)) {
+				clientBadgeWidth = detector.badgeWidth(from);
+				rectForName.setWidth(rectForName.width() - clientBadgeWidth);
+			}
+		}
 		p.setPen(context.active
 			? st::dialogsNameFgActive
 			: context.selected
@@ -962,6 +972,29 @@ void PaintRow(
 			.availableWidth = rectForName.width(),
 			.elisionLines = 1,
 		});
+		if (clientBadgeWidth) {
+			const auto nameW = std::min(
+				rowName.maxWidth(),
+				rectForName.width());
+			Custom::ClientBadgeFor(
+				&from->owner().session()
+			).drawBadgeGetWidth(
+				p,
+				rectForName.left() + nameW + badgeWidth,
+				rectForName.top(),
+				st::semiboldFont->height,
+				from,
+				context.active
+					? st::dialogsBgActive->c
+					: context.selected
+					? st::dialogsBgOver->c
+					: st::dialogsBg->c,
+				(context.active
+					? st::dialogsNameFgActive
+					: context.selected
+					? st::dialogsNameFgOver
+					: st::dialogsNameFg)->c);
+		}
 		if (drawMuteIcon) {
 			const auto &muteIcon = ThreeStateIcon(
 				st::dialogsMuteIcon,
@@ -973,6 +1006,7 @@ void PaintRow(
 			const auto muteLeft = rectForName.left()
 				+ nameW
 				+ badgeWidth
+				+ clientBadgeWidth
 				+ st::dialogsMuteIconSkip;
 			const auto muteTop = rectForName.top()
 				+ (st::semiboldFont->height - muteIcon.height()) / 2;

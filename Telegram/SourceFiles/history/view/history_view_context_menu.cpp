@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/pill_tabs.h"
 #include "menu/menu_item_download_files.h"
 #include "menu/menu_item_rate_transcribe.h"
@@ -130,6 +131,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 
@@ -1573,25 +1575,56 @@ void ShowExtremeBadgeBox(
 	const auto registeredText = registered
 		? Custom::FormatRegistrationDay(*registered)
 			+ QString::fromUtf8(" (приблизительно)")
-		: QString::fromUtf8("недоступно");
-	controller->show(Box([=](
-			not_null<Ui::GenericBox*> box) {
+		: QString::fromUtf8("недоступна");
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(QString::fromUtf8("ExtremeGram"));
-		auto addLine = [&](QString text) {
+		box->setWidth(st::boxWideWidth);
+		box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				Ui::Text::Bold(user->name()),
+				st::defaultFlatLabel),
+			st::boxRowPadding);
+		const auto username = user->username();
+		if (!username.isEmpty()) {
 			box->addRow(
 				object_ptr<Ui::FlatLabel>(
 					box,
-					rpl::single(std::move(text)),
+					u"@"_q + username,
 					st::defaultFlatLabel),
-				st::boxPadding);
-		};
-		addLine(user->name());
-		addLine(QString::fromUtf8("ID: %1").arg(userId));
-		addLine(QString::fromUtf8(
-			"Регистрация аккаунта: %1").arg(registeredText));
-		addLine(QString::fromUtf8("Вход в группу: %1").arg(joinedText));
-		addLine(QString::fromUtf8(
-			"Аккаунт использует клиент ExtremeGram."));
+				st::boxRowPadding);
+		}
+		box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				QString::fromUtf8("ID: %1").arg(userId),
+				st::defaultFlatLabel),
+			st::boxRowPadding);
+		box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				QString::fromUtf8("Регистрация: %1").arg(registeredText),
+				st::defaultFlatLabel),
+			st::boxRowPadding);
+		box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				QString::fromUtf8("Вход в группу: %1").arg(joinedText),
+				st::defaultFlatLabel),
+			st::boxRowPadding);
+		Ui::AddDividerText(
+			box->verticalLayout(),
+			rpl::single(QString::fromUtf8(
+				"Аккаунт использует клиент ExtremeGram.")));
+		box->addButton(
+			rpl::single(QString::fromUtf8("Копировать ID")),
+			[=] {
+				QGuiApplication::clipboard()->setText(
+					QString::number(userId));
+				controller->showToast(
+					QString::fromUtf8("ID скопирован"));
+				box->closeBox();
+			});
 		box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 	}));
 }

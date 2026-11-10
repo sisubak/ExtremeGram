@@ -8,9 +8,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_members_controllers.h"
 
 #include "boxes/peers/edit_participants_box.h"
+#include "custom/client_badge_detector.h"
 #include "info/profile/info_profile_values.h"
 #include "dialogs/dialogs_three_state_icon.h"
 #include "data/data_chat.h"
+#include "data/data_session.h"
 #include "data/data_user.h"
 #include "base/unixtime.h"
 #include "ui/text/format_values.h"
@@ -549,10 +551,21 @@ int MemberListRow::paintNameIconGetWidth(
 		availableWidth,
 		outerWidth,
 		selected);
-	if (!_type.restricted) {
-		return base;
-	}
 	auto added = base;
+	auto &detector = Custom::ClientBadgeFor(&peer()->owner().session());
+	if (detector.hasCustomClientBadge(peer())) {
+		added += detector.drawBadgeGetWidth(
+			p,
+			nameLeft + nameWidth + added,
+			nameTop,
+			st::msgNameFont->height,
+			peer(),
+			st::boxBg->c,
+			(selected ? st::windowSubTextFgOver : st::windowSubTextFg)->c);
+	}
+	if (!_type.restricted) {
+		return added;
+	}
 	const auto &lockIcon = Dialogs::ThreeStateIcon(
 		st::dialogsLockIcon,
 		false,
