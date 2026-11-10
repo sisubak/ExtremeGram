@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_custom_emoji.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace Custom {
 namespace {
