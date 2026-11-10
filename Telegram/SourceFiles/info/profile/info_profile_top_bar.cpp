@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/enhanced_settings.h"
 #include "core/shortcuts.h"
 #include "custom/client_badge_detector.h"
+#include "custom/redesign.h"
 #include "data/components/recent_shared_media_gifts.h"
 #include "data/data_birthday.h"
 #include "data/data_changes.h"
@@ -2966,6 +2967,17 @@ void TopBar::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 	const auto geometry = userpicGeometry();
 	const auto clipBounds = e->region().boundingRect();
+	const auto tokens = Custom::DesignTokensForCurrentMode();
+	if (tokens.cardProfile) {
+		const auto inset = style::ConvertScaleExact(10.);
+		const auto radius = style::ConvertScaleExact(tokens.radiusId * 1.);
+		auto path = QPainterPath();
+		path.addRoundedRect(
+			QRectF(rect()).adjusted(inset, 0, -inset, 0),
+			radius,
+			radius);
+		p.setClipPath(path);
+	}
 
 	if (_hasGradientBg && _cachedGradient.isNull()) {
 		const auto collectible = effectiveCollectible();
@@ -2990,7 +3002,9 @@ void TopBar::paintEvent(QPaintEvent *e) {
 				offset);
 		}
 	}
-	if (!_hasGradientBg) {
+	if (tokens.minimalProfile) {
+		p.fillRect(rect(), st::windowBg);
+	} else if (!_hasGradientBg) {
 		paintEdges(p, clipBounds);
 	} else {
 		const auto x = (width()
@@ -3009,13 +3023,13 @@ void TopBar::paintEvent(QPaintEvent *e) {
 			}
 			auto hq = PainterHighQualityEnabler(p);
 			p.setPen(Qt::NoPen);
-			p.setClipPath(_cachedClipPath);
+			p.setClipPath(_cachedClipPath, Qt::IntersectClip);
 			p.drawImage(x, y, _cachedGradient);
 		} else {
 			p.drawImage(x, y, _cachedGradient);
 		}
 	}
-	if (_patternEmoji && _patternEmoji->ready()) {
+	if (!tokens.minimalProfile && _patternEmoji && _patternEmoji->ready()) {
 		paintAnimatedPattern(p, clipBounds, geometry);
 	}
 

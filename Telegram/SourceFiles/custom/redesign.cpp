@@ -64,6 +64,8 @@ DesignTokens DesignTokensForCurrentMode() {
 	case 1:
 		tokens.radiusId = 14;
 		tokens.cardAlpha = 0.88;
+		tokens.chatListCards = true;
+		tokens.cardProfile = true;
 		if (const auto accent = ModeAccent(mode)) {
 			tokens.accent = *accent;
 			tokens.accentWashAlpha = 18;
@@ -72,6 +74,8 @@ DesignTokens DesignTokensForCurrentMode() {
 	case 2:
 		tokens.radiusId = 7;
 		tokens.cardAlpha = 0.98;
+		tokens.denseChatList = true;
+		tokens.minimalProfile = true;
 		if (const auto accent = ModeAccent(mode)) {
 			tokens.accent = *accent;
 			tokens.accentWashAlpha = 30;

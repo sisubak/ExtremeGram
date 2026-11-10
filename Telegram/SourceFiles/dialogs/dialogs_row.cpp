@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
+#include "custom/redesign.h"
 #include "dialogs/dialogs_entry.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "dialogs/ui/dialogs_layout.h"
@@ -430,12 +431,16 @@ const style::DialogRow &Row::ComputeSt(
 
 void Row::recountHeight(float64 narrowRatio, FilterId filterId) {
 	const auto &st = ComputeSt(_id.entry(), filterId);
-	_height = ((&st == &st::defaultDialogRow) || !_id.history())
+	auto height = ((&st == &st::defaultDialogRow) || !_id.history())
 		? st::defaultDialogRow.height
 		: anim::interpolate(
 			st.height,
 			st::defaultDialogRow.height,
 			narrowRatio);
+	if (Custom::DesignTokensForCurrentMode().denseChatList) {
+		height = style::ConvertScale(56);
+	}
+	_height = height;
 }
 
 uint64 Row::sortKey(FilterId filterId) const {

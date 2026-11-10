@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
 #include "custom/client_badge_detector.h"
+#include "custom/redesign.h"
 #include "data/data_channel.h"
 #include "data/data_drafts.h"
 #include "data/data_folder.h"
@@ -486,6 +487,32 @@ void PaintRow(
 		p.translate(swipeMirrored ? swipeTranslation : -swipeTranslation, 0);
 	}
 	p.fillRect(geometry, bg);
+	const auto tokens = Custom::DesignTokensForCurrentMode();
+	if (tokens.chatListCards
+		&& tokens.accent.isValid()
+		&& !swipeTranslation) {
+		const auto inset = style::ConvertScaleExact(5.);
+		const auto vInset = style::ConvertScaleExact(2.);
+		const auto radius = style::ConvertScaleExact(tokens.radiusId * 1.);
+		const auto card = QRectF(geometry).adjusted(
+			inset,
+			vInset,
+			-inset,
+			-vInset);
+		auto wash = tokens.accent;
+		wash.setAlpha(tokens.accentWashAlpha);
+		auto border = tokens.accent;
+		border.setAlpha((context.active || context.selected) ? 110 : 60);
+		{
+			auto hq = PainterHighQualityEnabler(p);
+			p.setPen(Qt::NoPen);
+			p.setBrush(wash);
+			p.drawRoundedRect(card, radius, radius);
+			p.setPen(QPen(border, 1.));
+			p.setBrush(Qt::NoBrush);
+			p.drawRoundedRect(card, radius, radius);
+		}
+	}
 	if (!(flags & Flag::TopicJumpRipple)) {
 		auto ripple = context.active
 			? st::dialogsRippleBgActive

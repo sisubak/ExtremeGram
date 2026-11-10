@@ -27,6 +27,12 @@ struct DesignTokens {
 	float64 cardAlpha = 0.94;
 	int accentWashAlpha = 0;
 	QColor accent = QColor();
-};[[nodiscard]] DesignTokens DesignTokensForCurrentMode();
+	bool chatListCards = false;
+	bool denseChatList = false;
+	bool cardProfile = false;
+	bool minimalProfile = false;
+};
+
+[[nodiscard]] DesignTokens DesignTokensForCurrentMode();
 
 } // namespace Custom

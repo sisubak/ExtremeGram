@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/file_utilities.h"
+#include "custom/redesign.h"
 #include "core/shortcuts.h"
 #include "core/ui_integration.h"
 #include "ui/widgets/buttons.h"
@@ -358,6 +359,15 @@ InnerWidget::InnerWidget(
 	) | rpl::on_next([=](Window::Notifications::ChangeType change) {
 		if (change == Window::Notifications::ChangeType::CountMessages) {
 			// Folder rows change their unread badge with this setting.
+			update();
+		}
+	}, lifetime());
+
+	Custom::TokensChanged(
+	) | rpl::on_next([=] {
+		if (_shownList->updateHeights(_narrowRatio)) {
+			refresh();
+		} else {
 			update();
 		}
 	}, lifetime());
