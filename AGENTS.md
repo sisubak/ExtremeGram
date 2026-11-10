@@ -2,6 +2,12 @@
 
 This guide defines repository-wide instructions for coding agents working with the Telegram Desktop codebase.
 
+## Fork context
+
+Before working on this fork read `AGENT_TODO.md` in the repository root: it
+holds the ExtremeGram feature map, build/CI workflow, hard-won compile rules,
+current state and the live TODO/bug list.
+
 ## AI Tasks
 
 In this repository "task" is a specific term. It always means one work record in
