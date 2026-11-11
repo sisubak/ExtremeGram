@@ -94,6 +94,12 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
   можно использовать как «резерв+флаг» без hasCustomClientBadge.
 - В PaintRow список чатов бейдж-резерв клиента должен идти ДО paintPeerBadge,
   иначе verified-бейдж рисуется в освобождённый слот клиентского.
+- object_ptr<T> НЕ имеет дефолтного конструктора — член класса объявлять
+  `object_ptr<T> _x = { nullptr };`, иначе ошибка в конце init-list ctor.
+- not_null<T*> не конвертируется неявно в T* — использовать `.get()`
+  (например, SessionController::widget() → MainWindow* → QWidget*).
+- Ui::Animations::Simple в запиненном lib_ui (c3f7343) прыгает в конец при
+  anim::Disabled() — см. пункт 18 (Power Saving).
 
 ## Текущее состояние (на момент последнего обновления)
 - Последний зелёный релиз: build-43041765462 (коммит d075da5) — скачан,
