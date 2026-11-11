@@ -607,6 +607,8 @@ PRIVATE
     custom/bot_mode_manager.h
     custom/client_badge_detector.cpp
     custom/client_badge_detector.h
+    custom/client_badge_popup.cpp
+    custom/client_badge_popup.h
     custom/eternal_tags.cpp
     custom/eternal_tags.h
     custom/mention_pins.cpp

@@ -1343,10 +1343,16 @@ void HistoryItem::finishEdition(int oldKeyboardTop) {
 	if (const auto group = _history->owner().groups().find(this)) {
 		for (const auto &item : group->items) {
 			_history->owner().requestItemViewRefresh(item);
+			if (const auto view = item->mainView()) {
+				view->animateEdit();
+			}
 			item->invalidateChatListEntry();
 		}
 	} else {
 		_history->owner().requestItemViewRefresh(this);
+		if (const auto view = mainView()) {
+			view->animateEdit();
+		}
 		invalidateChatListEntry();
 	}
 

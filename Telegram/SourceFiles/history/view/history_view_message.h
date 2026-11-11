@@ -295,6 +295,7 @@ public:
 	[[nodiscard]] bool isSignedAuthorElided() const override;
 
 	void itemDataChanged() override;
+	void animateEdit() override;
 
 	void applyGroupAdminChanges(
 		const base::flat_set<UserId> &changes) override;
@@ -568,6 +569,7 @@ private:
 
 	BottomInfo _bottomInfo;
 	mutable QPoint _lastMediaPosition;
+	Ui::Animations::Simple _editAnimation;
 
 };
 

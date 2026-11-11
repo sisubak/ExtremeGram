@@ -41,6 +41,11 @@ public:
 
 	[[nodiscard]] bool hasCustomClientBadge(not_null<PeerData*> peer);
 	[[nodiscard]] int badgeWidth(not_null<PeerData*> peer);
+	[[nodiscard]] QImage badgePreview(
+		const QColor &surfaceBackground,
+		int logicalSize,
+		int scale,
+		std::optional<QColor> tint = std::nullopt);
 	[[nodiscard]] rpl::producer<PeerId> badgeDetectedChanges() const;
 
 	void stampSelfAvatar(

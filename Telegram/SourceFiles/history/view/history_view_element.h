@@ -697,6 +697,9 @@ public:
 	void itemTextUpdated();
 	void blockquoteExpandChanged();
 
+	virtual void animateEdit() {
+	}
+
 	virtual void unloadHeavyPart();
 	void checkHeavyPart();
 

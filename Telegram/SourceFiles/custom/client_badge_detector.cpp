@@ -517,6 +517,28 @@ int ClientBadgeDetector::badgeWidth(not_null<PeerData*> peer) {
 	return hasCustomClientBadge(peer) ? style::ConvertScale(20) : 0;
 }
 
+QImage ClientBadgeDetector::badgePreview(
+		const QColor &surfaceBackground,
+		int logicalSize,
+		int scale,
+		std::optional<QColor> tint) {
+	const auto &src = _cleanLightStrokeBadge.isNull()
+		? _cleanDarkStrokeBadge
+		: _cleanLightStrokeBadge;
+	if (src.isNull() || logicalSize <= 0) {
+		return {};
+	}
+	const auto dpr = std::max(1, scale);
+	auto result = AdaptBadgeForSurface(
+		src,
+		PerceivedLuminance(surfaceBackground) < 128.0,
+		logicalSize * dpr,
+		tint,
+		surfaceBackground);
+	result.setDevicePixelRatio(dpr);
+	return result;
+}
+
 rpl::producer<PeerId> ClientBadgeDetector::badgeDetectedChanges() const {
 	return _detectionChanges.events();
 }

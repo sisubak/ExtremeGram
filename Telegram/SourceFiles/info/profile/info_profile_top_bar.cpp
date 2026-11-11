@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/enhanced_settings.h"
 #include "core/shortcuts.h"
 #include "custom/client_badge_detector.h"
+#include "custom/client_badge_popup.h"
 #include "custom/redesign.h"
 #include "data/components/recent_shared_media_gifts.h"
 #include "data/data_birthday.h"
@@ -579,8 +580,7 @@ TopBar::TopBar(
 		}) | rpl::on_next([=](not_null<QEvent*> e) {
 			const auto mouse = static_cast<QMouseEvent*>(e.get());
 			if (mouse->button() == Qt::LeftButton) {
-				controller->showToast(
-					tr::lng_extremegram_badge_clicked(tr::now));
+				Custom::ShowClientBadgePopup(_extremeBadge.get(), _peer);
 			}
 		}, _extremeBadge->lifetime());
 		const auto refreshExtremeBadge = [=] {

@@ -532,6 +532,71 @@ struct BadgePillGeometry {
 	};
 }
 
+[[nodiscard]] QPainterPath BubbleWashPath(
+		const QRect &rect,
+		const Ui::BubbleRounding &rounding) {
+	const auto radius = [](Ui::BubbleCornerRounding corner) {
+		return (corner == Ui::BubbleCornerRounding::Large)
+			? float64(st::bubbleRadiusLarge)
+			: (corner == Ui::BubbleCornerRounding::Small)
+			? float64(st::bubbleRadiusSmall)
+			: 0.;
+	};
+	const auto topLeft = radius(rounding.topLeft);
+	const auto topRight = radius(rounding.topRight);
+	const auto bottomRight = radius(rounding.bottomRight);
+	const auto bottomLeft = radius(rounding.bottomLeft);
+
+	auto path = QPainterPath();
+	path.moveTo(rect.left() + topLeft, rect.top());
+	path.lineTo(rect.right() - topRight, rect.top());
+	if (topRight > 0.) {
+		path.arcTo(
+			QRectF(
+				rect.right() - 2 * topRight,
+				rect.top(),
+				2 * topRight,
+				2 * topRight),
+			90.,
+			-90.);
+	}
+	path.lineTo(rect.right(), rect.bottom() - bottomRight);
+	if (bottomRight > 0.) {
+		path.arcTo(
+			QRectF(
+				rect.right() - 2 * bottomRight,
+				rect.bottom() - 2 * bottomRight,
+				2 * bottomRight,
+				2 * bottomRight),
+			0.,
+			-90.);
+	}
+	path.lineTo(rect.left() + bottomLeft, rect.bottom());
+	if (bottomLeft > 0.) {
+		path.arcTo(
+			QRectF(
+				rect.left(),
+				rect.bottom() - 2 * bottomLeft,
+				2 * bottomLeft,
+				2 * bottomLeft),
+			270.,
+			-90.);
+	}
+	path.lineTo(rect.left(), rect.top() + topLeft);
+	if (topLeft > 0.) {
+		path.arcTo(
+			QRectF(
+				rect.left(),
+				rect.top(),
+				2 * topLeft,
+				2 * topLeft),
+			180.,
+			-90.);
+	}
+	path.closeSubpath();
+	return path;
+}
+
 } // namespace
 
 const char kOptionUnlimitedMessageWidth[]
@@ -2029,6 +2094,15 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 					.simple = simple,
 					.selection = mediaSelectionIntervals,
 				});
+		}
+
+		if (_editAnimation.animating()) {
+			const auto progress = _editAnimation.value(0.);
+			auto wash = stm->msgReplyBarColor->c;
+			wash.setAlphaF(wash.alphaF() * 0.22 * (1. - progress));
+			p.setPen(Qt::NoPen);
+			p.setBrush(wash);
+			p.drawPath(BubbleWashPath(simple.geometry, simple.rounding));
 		}
 
 		auto inner = g;
@@ -5648,6 +5722,12 @@ void Message::itemDataChanged() {
 	} else {
 		repaint();
 	}
+}
+
+void Message::animateEdit() {
+	_editAnimation.start([=](float64) {
+		repaint();
+	}, 0., 1., crl::time(900), anim::linear);
 }
 
 void Message::refreshDataIdHook() {

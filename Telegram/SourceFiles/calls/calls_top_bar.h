@@ -84,6 +84,7 @@ private:
 	const std::shared_ptr<Ui::Show> _show;
 
 	bool _muted = false;
+	bool _extremeBadgeShown = false;
 	std::vector<Ui::GroupCallUser> _users;
 	int _usersCount = 0;
 	std::unique_ptr<Ui::GroupCallUserpics> _userpics;
@@ -96,6 +97,7 @@ private:
 	object_ptr<Mute> _mute;
 	object_ptr<Ui::AbstractButton> _info;
 	object_ptr<Ui::IconButton> _hangup;
+	object_ptr<Ui::RpWidget> _extremeBadge;
 	base::unique_qptr<Ui::RpWidget> _blobs;
 
 	rpl::variable<bool> _isGroupConnecting = false;

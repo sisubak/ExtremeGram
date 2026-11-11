@@ -25,10 +25,17 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
   (history_view_message.cpp ~2617), в списке чатов (dialogs/ui/dialogs_layout.cpp
   ~933 — добавлено 53b41f4), в списке участников (info/profile/
   info_profile_members_controllers.cpp MemberListRow::paintNameIconGetWidth —
-  добавлено 53b41f4), в профиле (info_profile_top_bar.cpp ~587).
+  добавлено 53b41f4), в профиле (info_profile_top_bar.cpp ~587), в шапке
+  1:1-звонка (calls/calls_top_bar.cpp _extremeBadge, после центрированного
+  имени, только если влезает).
   ПКМ по сообщению → «Сведения о клиенте ExtremeGram» → бокс (имя жирным,
   @username, ID + кнопка «Копировать ID», регистрация, вход в группу,
   поясняющий текст) — history_view_context_menu.cpp AddExtremeBadgeAction.
+  Клик по бейджу в профиле/звонке → анимированный попап
+  (custom/client_badge_popup.{h,cpp}, ShowClientBadgePopup): карточка
+  сверху по центру окна, иконка 36px, «ExtremeGram» + подпись, show 240мс
+  (fade+scale+slide), hold 2.6с, hide 170мс, клик закрывает.
+  badgePreview() в детекторе — QImage для произвольного размера/фона/тинта.
 - Slowmode tracker (slowmode_tracker.cpp): Custom::SlowmodeFor(session) —
   рисует dial-иконку таймера у имён ограниченных юзеров в сообщениях.
 - Typing indicator (typing_indicator.{h,cpp}): полоса «печатает…» над полем
@@ -89,8 +96,11 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
   иначе verified-бейдж рисуется в освобождённый слот клиентского.
 
 ## Текущее состояние (на момент последнего обновления)
-- Последний зелёный релиз: build-42861335614 (коммит 16eb0cc) — запущен у
-  пользователя. В нём: фикс-батч + первая версия layout-редизайна.
+- Последний зелёный релиз: build-43041765462 (коммит d075da5) — скачан,
+  ждёт установки пользователем (старый инстанс держит tdata-лок).
+  build-43061945603 (b7b967c, whois-датасет) — в процессе на момент записи.
+- В рабочем дереве (не закоммичено на момент записи): анимированный попап
+  бейджа, бейдж в шапке звонка, анимация изменения сообщений (wash 900мс).
 - Сборки 42822671841 (133d5f9) и 42825628094 (087579f) — FAILED:
   FlatLabel не принимает TextWithEntities (нужен rpl::producer) и
   lt_amount остался после удаления {amount} из lang-строки. Исправлено
@@ -139,6 +149,16 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
     списке участников; hit-test в сообщениях совпадает с отрисовкой
     (client badge + slowmode icon); карточка профиля рисуется оверлеем
     (без setClipPath), Ultra-профиль — paintEdges(st::windowBg).
+15. [x] Анимированный попап бейджа вместо toast в профиле + клик по бейджу
+    в шапке 1:1-звонка (custom/client_badge_popup.{h,cpp}).
+16. [x] Анимация изменения сообщений: wash цвета msgReplyBarColor 900мс,
+    хук Element::animateEdit() из HistoryItem::finishEdition (view при
+    edit пересоздаётся, поэтому состояние живёт в view).
+17. [ ] Клик по бейджу в сообщениях (getStateFromName возвращает name-
+    TextState) и в списке участников/чатов — пока не сделан.
+18. [ ] Баг «плавные анимации не работают при звонке» — причина не найдена:
+    Simple не проверяет anim::Disabled, PowerSaving::kCalls не выставляется,
+    call-панель без SlideAnimation. Нужны уточнения у пользователя.
 
 ## Открытые вопросы
 - Нет. Решения: Modern = карточки (список чатов + профиль), Ultra = плотный

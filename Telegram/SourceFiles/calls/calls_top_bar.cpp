@@ -6,6 +6,8 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/calls_top_bar.h"
+#include "custom/client_badge_detector.h"
+#include "custom/client_badge_popup.h"
 
 #include "ui/effects/cross_line.h"
 #include "ui/paint/blobs_linear.h"
@@ -38,6 +40,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_calls.h"
 #include "styles/style_chat_helpers.h" // style::GroupCallUserpics
 #include "styles/style_layers.h"
+
+#include <QtGui/QMouseEvent>
 
 namespace Calls {
 
@@ -288,6 +292,39 @@ void TopBar::setupInitialBrush() {
 }
 
 void TopBar::initControls() {
+	if (const auto call = _call.get()) {
+		const auto user = call->user();
+		_extremeBadge = object_ptr<Ui::RpWidget>(this);
+		_extremeBadge->resize(
+			style::ConvertScale(20),
+			st::callBarInfoLabel.style.font->height);
+		_extremeBadge->setCursor(style::cur_pointer);
+		_extremeBadge->events(
+		) | rpl::filter([](not_null<QEvent*> e) {
+			return e->type() == QEvent::MouseButtonRelease;
+		}) | rpl::on_next([=](not_null<QEvent*> e) {
+			const auto mouse = static_cast<QMouseEvent*>(e.get());
+			if (mouse->button() == Qt::LeftButton) {
+				Custom::ShowClientBadgePopup(_extremeBadge.get(), user);
+			}
+		}, _extremeBadge->lifetime());
+		_extremeBadge->paintRequest(
+		) | rpl::on_next([=] {
+			QPainter p(_extremeBadge.get());
+			Custom::ClientBadgeFor(&user->session()).drawBadgeGetWidth(
+				p,
+				0,
+				0,
+				_extremeBadge->height(),
+				user,
+				st::groupCallLive1->c,
+				st::callBarFg->c);
+		}, _extremeBadge->lifetime());
+		_extremeBadgeShown = Custom::ClientBadgeFor(
+			&user->session()).hasCustomClientBadge(user);
+		_extremeBadge->hide();
+	}
+
 	_mute->setClickedCallback([=] {
 		if (const auto call = _call.get()) {
 			call->setMuted(!call->muted());
@@ -808,6 +845,18 @@ void TopBar::updateControlsGeometry() {
 	if (_shortInfoLabel) {
 		_shortInfoLabel->setVisible(!showFull);
 		setInfoLabelGeometry(_shortInfoLabel);
+	}
+
+	if (_extremeBadge) {
+		const auto textWidth = _fullInfoLabel->textMaxWidth();
+		const auto infoLeft = (width() - textWidth) / 2;
+		const auto fits = showFull && (infoLeft >= std::max(left, right));
+		if (fits) {
+			_extremeBadge->moveToLeft(
+				infoLeft + textWidth + style::ConvertScale(4),
+				st::callBarLabelTop);
+		}
+		_extremeBadge->setVisible(_extremeBadgeShown && fits);
 	}
 
 	_gradients.set_points(
