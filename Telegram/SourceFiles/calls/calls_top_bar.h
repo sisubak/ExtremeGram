@@ -97,7 +97,7 @@ private:
 	object_ptr<Mute> _mute;
 	object_ptr<Ui::AbstractButton> _info;
 	object_ptr<Ui::IconButton> _hangup;
-	object_ptr<Ui::RpWidget> _extremeBadge;
+	object_ptr<Ui::RpWidget> _extremeBadge = { nullptr };
 	base::unique_qptr<Ui::RpWidget> _blobs;
 
 	rpl::variable<bool> _isGroupConnecting = false;
