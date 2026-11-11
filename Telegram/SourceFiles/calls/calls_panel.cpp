@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/calls_panel.h"
 
 #include "boxes/peers/replace_boost_box.h" // CreateUserpicsWithMoreBadge
+#include "custom/smooth_animations.h"
 #include "calls/calls_panel_background.h"
 #include "calls/calls_rate_call.h"
 #include "data/data_photo.h"
@@ -1076,7 +1077,17 @@ rpl::lifetime &Panel::lifetime() {
 void Panel::initGeometry() {
 	window()->setGeometry(panelGeometry());
 	window()->setMinimumSize({ st::callWidthMin, st::callHeightMin });
+	const auto animateAppear = !anim::Disabled();
+	if (animateAppear) {
+		window()->setWindowOpacity(0.);
+	}
 	window()->show();
+	if (animateAppear) {
+		_appearAnimation.start([=](float64 value) {
+			window()->setWindowOpacity(value);
+		}, 0., 1., st::callPanelDuration, anim::transition(
+			Custom::Animations::CubicSmoothOut));
+	}
 	updateControlsGeometry();
 
 	_geometryLifetime = window()->geometryValue(

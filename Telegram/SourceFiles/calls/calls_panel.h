@@ -238,6 +238,7 @@ private:
 	bool _unpinnedMaximized = false;
 	rpl::variable<bool> _fullScreenOrMaximized;
 	Ui::Animations::Simple _controlsShownAnimation;
+	Ui::Animations::Simple _appearAnimation;
 	bool _controlsShownForce = false;
 	bool _controlsShown = true;
 	bool _mouseInside = false;
