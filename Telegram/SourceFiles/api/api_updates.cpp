@@ -1046,13 +1046,12 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	} else if (onlineSpamActive) {
 		const auto configured = EnhancedSettings::Get(
 			EnhancedSettings::Option::OnlineSpamInterval);
-		if (configured <= 0) {
-			isOnline = true;
-		} else {
-			const auto spamInterval = crl::time(configured);
-			isOnline = (ms / spamInterval) % 2 == 0;
-			updateIn = int(spamInterval - (ms % spamInterval));
-		}
+		constexpr auto kMinimumInterval = crl::time(10);
+		const auto spamInterval = std::max(
+			crl::time(configured),
+			kMinimumInterval);
+		isOnline = (ms / spamInterval) % 2 == 0;
+		updateIn = int(spamInterval - (ms % spamInterval));
 	}
 	if (isOnline != _lastWasOnline
 		|| (isOnline && _lastSetOnline + config.onlineUpdatePeriod <= ms)

@@ -2968,16 +2968,6 @@ void TopBar::paintEvent(QPaintEvent *e) {
 	const auto geometry = userpicGeometry();
 	const auto clipBounds = e->region().boundingRect();
 	const auto tokens = Custom::DesignTokensForCurrentMode();
-	if (tokens.cardProfile) {
-		const auto inset = style::ConvertScaleExact(10.);
-		const auto radius = style::ConvertScaleExact(tokens.radiusId * 1.);
-		auto path = QPainterPath();
-		path.addRoundedRect(
-			QRectF(rect()).adjusted(inset, 0, -inset, 0),
-			radius,
-			radius);
-		p.setClipPath(path);
-	}
 
 	if (_hasGradientBg && _cachedGradient.isNull()) {
 		const auto collectible = effectiveCollectible();
@@ -3003,7 +2993,7 @@ void TopBar::paintEvent(QPaintEvent *e) {
 		}
 	}
 	if (tokens.minimalProfile) {
-		p.fillRect(rect(), st::windowBg);
+		paintEdges(p, clipBounds, st::windowBg);
 	} else if (!_hasGradientBg) {
 		paintEdges(p, clipBounds);
 	} else {
@@ -3023,7 +3013,7 @@ void TopBar::paintEvent(QPaintEvent *e) {
 			}
 			auto hq = PainterHighQualityEnabler(p);
 			p.setPen(Qt::NoPen);
-			p.setClipPath(_cachedClipPath, Qt::IntersectClip);
+			p.setClipPath(_cachedClipPath);
 			p.drawImage(x, y, _cachedGradient);
 		} else {
 			p.drawImage(x, y, _cachedGradient);
@@ -3031,6 +3021,24 @@ void TopBar::paintEvent(QPaintEvent *e) {
 	}
 	if (!tokens.minimalProfile && _patternEmoji && _patternEmoji->ready()) {
 		paintAnimatedPattern(p, clipBounds, geometry);
+	}
+	if (tokens.cardProfile && tokens.accent.isValid()) {
+		const auto inset = style::ConvertScaleExact(10.);
+		const auto radius = style::ConvertScaleExact(tokens.radiusId * 1.);
+		const auto card = QRectF(rect()).adjusted(inset, 0, -inset, 0);
+		auto wash = tokens.accent;
+		wash.setAlpha(tokens.accentWashAlpha);
+		auto border = tokens.accent;
+		border.setAlpha(60);
+		{
+			auto hq = PainterHighQualityEnabler(p);
+			p.setPen(Qt::NoPen);
+			p.setBrush(wash);
+			p.drawRoundedRect(card, radius, radius);
+			p.setPen(QPen(border, 1.));
+			p.setBrush(Qt::NoBrush);
+			p.drawRoundedRect(card, radius, radius);
+		}
 	}
 
 	if (clipBounds.bottom() >= geometry.top()

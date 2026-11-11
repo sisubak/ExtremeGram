@@ -974,12 +974,6 @@ void PaintRow(
 					- muteIcon.width()
 					- st::dialogsMuteIconSkip);
 		}
-		auto badgeWidth = 0;
-		if ((history || sublist) && !context.search) {
-			const auto widthBefore = rectForName.width();
-			paintPeerBadge(rowName.maxWidth());
-			badgeWidth = widthBefore - rectForName.width();
-		}
 		auto clientBadgeWidth = 0;
 		if (!context.search) {
 			auto &detector = Custom::ClientBadgeFor(
@@ -988,6 +982,12 @@ void PaintRow(
 				clientBadgeWidth = detector.badgeWidth(from);
 				rectForName.setWidth(rectForName.width() - clientBadgeWidth);
 			}
+		}
+		auto badgeWidth = 0;
+		if ((history || sublist) && !context.search) {
+			const auto widthBefore = rectForName.width();
+			paintPeerBadge(rowName.maxWidth());
+			badgeWidth = widthBefore - rectForName.width();
 		}
 		p.setPen(context.active
 			? st::dialogsNameFgActive

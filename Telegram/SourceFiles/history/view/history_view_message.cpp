@@ -4312,21 +4312,28 @@ bool Message::getStateFromName(
 		const auto statusWidth = (from && _fromNameStatus)
 			? st::dialogsPremiumIcon.icon.width()
 			: 0;
+		const auto customIconsWidth = from
+			? (Custom::ClientBadgeFor(&history()->session()).badgeWidth(from)
+				+ Custom::SlowmodeFor(&history()->session()).iconWidth(
+					history()->peer,
+					from))
+			: 0;
+		const auto totalBadgesWidth = statusWidth + customIconsWidth;
 		const auto via = item->Get<HistoryMessageVia>();
 		const auto viaShown = via && !displayForwardedFrom() && via->width;
 		const auto viaSkipWidth = viaShown
 			? (via->width + st::msgServiceFont->spacew)
 			: 0;
 		const auto nameAvailableWidth = std::max(
-			((statusWidth && availableWidth > statusWidth)
-				? (availableWidth - statusWidth)
+			((totalBadgesWidth && availableWidth > totalBadgesWidth)
+				? (availableWidth - totalBadgesWidth)
 				: availableWidth) - viaSkipWidth,
 			0);
 		const auto nameWidth = std::min(
 			nameText->maxWidth(),
 			nameAvailableWidth);
 		if (statusWidth
-			&& availableWidth > statusWidth
+			&& availableWidth > totalBadgesWidth
 			&& (from->isPremium() || fromNameStatusId(from))) {
 			const auto x = availableLeft
 				+ nameWidth
@@ -4353,6 +4360,9 @@ bool Message::getStateFromName(
 			+ (_fromNameStatus
 				? (st::dialogsPremiumIcon.icon.width()
 					+ st::msgServiceFont->spacew)
+				: 0)
+			+ ((customIconsWidth && availableWidth > totalBadgesWidth)
+				? customIconsWidth
 				: 0)
 			+ st::msgServiceFont->spacew;
 		availableLeft += skipWidth;

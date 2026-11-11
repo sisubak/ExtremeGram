@@ -431,16 +431,15 @@ const style::DialogRow &Row::ComputeSt(
 
 void Row::recountHeight(float64 narrowRatio, FilterId filterId) {
 	const auto &st = ComputeSt(_id.entry(), filterId);
-	auto height = ((&st == &st::defaultDialogRow) || !_id.history())
-		? st::defaultDialogRow.height
+	const auto base = Custom::DesignTokensForCurrentMode().denseChatList
+		? style::ConvertScale(56)
+		: st::defaultDialogRow.height;
+	_height = ((&st == &st::defaultDialogRow) || !_id.history())
+		? base
 		: anim::interpolate(
 			st.height,
-			st::defaultDialogRow.height,
+			base,
 			narrowRatio);
-	if (Custom::DesignTokensForCurrentMode().denseChatList) {
-		height = style::ConvertScale(56);
-	}
-	_height = height;
 }
 
 uint64 Row::sortKey(FilterId filterId) const {

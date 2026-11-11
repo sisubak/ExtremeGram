@@ -9648,7 +9648,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_redesign_modern" = "Современный";
 "lng_extremegram_redesign_ultra" = "Ultra";
 
-"lng_extremegram_online_spam_about" = "Приложение мигает статусом «в сети», пока окно активно: чат выглядит «живым». Интервал — период переключения в миллисекундах (0 — всегда «в сети», без мигания).";
+"lng_extremegram_online_spam_about" = "Приложение мигает статусом «в сети», пока окно активно: чат выглядит «живым». Интервал — период переключения в миллисекундах. 0 — максимально быстро (около 10 мс): это очень частые запросы к серверу, возможен flood-wait.";
 "lng_extremegram_online_spam_interval" = "Интервал мигания";
 "lng_extremegram_online_spam_interval_ms" = "{amount} мс";
 

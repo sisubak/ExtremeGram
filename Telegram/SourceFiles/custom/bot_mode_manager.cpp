@@ -89,8 +89,9 @@ constexpr std::array<IdBirthMark, 19> kIdBirthMarks{{
 } // namespace
 
 std::optional<int64> ApproximateRegistrationEpoch(int64 userId) {
+	const auto now = int64(base::unixtime::now());
 	if (userId <= kIdBirthMarks.front().id) {
-		return kIdBirthMarks.front().epoch;
+		return std::min(int64(kIdBirthMarks.front().epoch), now);
 	}
 	for (auto i = std::size_t(1); i < kIdBirthMarks.size(); ++i) {
 		const auto &right = kIdBirthMarks[i];
@@ -100,16 +101,17 @@ std::optional<int64> ApproximateRegistrationEpoch(int64 userId) {
 		const auto &left = kIdBirthMarks[i - 1];
 		const auto span = double(right.id - left.id);
 		const auto progress = double(userId - left.id) / std::max(span, 1.0);
-		return left.epoch
+		const auto epoch = int64(left.epoch)
 			+ int64((right.epoch - left.epoch) * progress);
+		return std::min(epoch, now);
 	}
 	const auto &last = kIdBirthMarks.back();
-	const auto &prev = kIdBirthMarks[kIdBirthMarks.size() - 2];
-	const auto idsPerSecond = double(last.id - prev.id)
-		/ double(std::max<int64>(last.epoch - prev.epoch, 1));
+	const auto &first = kIdBirthMarks.front();
+	const auto idsPerSecond = double(last.id - first.id)
+		/ double(std::max<int64>(last.epoch - first.epoch, 1));
 	const auto extraSeconds = int64(
 		double(userId - last.id) / std::max(idsPerSecond, 1.0));
-	return last.epoch + extraSeconds;
+	return std::min(int64(last.epoch) + extraSeconds, now);
 }
 
 QString FormatRegistrationDay(int64 epoch) {

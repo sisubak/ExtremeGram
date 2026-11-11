@@ -541,6 +541,8 @@ int MemberListRow::paintNameIconGetWidth(
 		int availableWidth,
 		int outerWidth,
 		bool selected) {
+	auto &detector = Custom::ClientBadgeFor(&peer()->owner().session());
+	const auto clientReserve = detector.badgeWidth(peer());
 	const auto base = PeerListRow::paintNameIconGetWidth(
 		p,
 		std::move(repaint),
@@ -548,15 +550,16 @@ int MemberListRow::paintNameIconGetWidth(
 		nameLeft,
 		nameTop,
 		nameWidth,
-		availableWidth,
+		availableWidth - clientReserve,
 		outerWidth,
 		selected);
 	auto added = base;
-	auto &detector = Custom::ClientBadgeFor(&peer()->owner().session());
-	if (detector.hasCustomClientBadge(peer())) {
+	if (clientReserve) {
 		added += detector.drawBadgeGetWidth(
 			p,
-			nameLeft + nameWidth + added,
+			nameLeft
+				+ std::min(nameWidth, availableWidth - clientReserve - base)
+				+ base,
 			nameTop,
 			st::msgNameFont->height,
 			peer(),

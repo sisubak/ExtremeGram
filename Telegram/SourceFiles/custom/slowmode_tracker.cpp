@@ -172,10 +172,11 @@ int SlowmodeTracker::drawIconGetWidth(
 		QPointF(cx + style::ConvertScaleExact(2.0), rect.top() + 0.8));
 
 	const auto startAngle16 = 90 * 16;
-	const auto spanAngle16 = static_cast<int>(std::round(ratio * 360.0 * 16.0));
+	const auto spanAngle16 = -static_cast<int>(
+		std::round(ratio * 360.0 * 16.0));
 	p.drawArc(dialRect, startAngle16, spanAngle16);
 
-	const auto angleRad = (0.5 + 2.0 * (1.0 - ratio)) * M_PI;
+	const auto angleRad = (0.5 - 2.0 * ratio) * M_PI;
 	const auto radius = dialRect.width() * 0.32;
 	p.drawLine(
 		dialRect.center(),

@@ -365,7 +365,19 @@ InnerWidget::InnerWidget(
 
 	Custom::TokensChanged(
 	) | rpl::on_next([=] {
-		if (_shownList->updateHeights(_narrowRatio)) {
+		auto changed = _shownList->updateHeights(_narrowRatio);
+		if (communityModeShown()) {
+			const auto was = _communityViewable.height();
+			_communityViewable.recountHeights(_narrowRatio);
+			if (_communityViewable.height() != was) {
+				changed = true;
+			}
+		}
+		if (_state == WidgetState::Filtered && !_filter.isEmpty()) {
+			refreshFilterResults();
+			changed = true;
+		}
+		if (changed) {
 			refresh();
 		} else {
 			update();
@@ -3033,10 +3045,15 @@ bool InnerWidget::pinnedShiftAnimationCallback(crl::time now) {
 		if (updateMax < _draggingIndex) updateMax = _draggingIndex;
 	}
 	if (updateMin >= 0) {
-		const auto minHeight = _st->height;
 		const auto maxHeight = st::taggedForumDialogRow.height;
 		auto top = pinnedOffset();
-		auto updateFrom = top + minHeight * (updateMin - 1);
+		auto updateFrom = top - _st->height;
+		if (updateMin > 0) {
+			const auto promoted = fixedOnTopCount();
+			updateFrom = top
+				+ (*(_shownList->cbegin() + promoted + updateMin - 1))->top()
+				- (*(_shownList->cbegin() + promoted))->top();
+		}
 		auto updateHeight = maxHeight * (updateMax - updateMin + 3);
 		if (base::in_range(_aboveIndex, 0, _pinnedRows.size())) {
 			// Always include currently dragged chat in its current and old positions.
@@ -5731,7 +5748,11 @@ void InnerWidget::scrollToEntry(const RowDescriptor &entry) {
 
 void InnerWidget::selectSkipPage(int32 pixels, int32 direction) {
 	clearMouseSelection();
-	int toSkip = pixels / _st->height;
+	const auto rowHeight = (_state == WidgetState::Default
+		&& !_shownList->empty())
+		? std::min(_st->height, (*(_shownList->cbegin()))->height())
+		: _st->height;
+	int toSkip = pixels / rowHeight;
 	if (_state != WidgetState::Default) {
 		selectSkip(direction * toSkip);
 		return;
@@ -5790,12 +5811,12 @@ void InnerWidget::preloadRowsData() {
 	auto yFrom = _visibleTop;
 	auto yTo = _visibleTop + (_visibleBottom - _visibleTop) * (PreloadHeightsCount + 1);
 	if (_state == WidgetState::Default) {
-		auto otherStart = _shownList->size() * _st->height;
+		auto otherStart = _shownList->height();
 		if (yFrom < otherStart) {
 			for (auto i = _shownList->findByY(yFrom), end = _shownList->cend()
 				; i != end
 				; ++i) {
-				if (((*i)->index() * _st->height) >= yTo) {
+				if ((*i)->top() >= yTo) {
 					break;
 				}
 				(*i)->entry()->chatListPreloadData();
@@ -6400,13 +6421,12 @@ void InnerWidget::updateRowCornerStatusShown(not_null<History*> history) {
 			_filterResults,
 			Key(history),
 			&FilterResult::key);
-		const auto index = (i - begin(_filterResults));
 		const auto row = (i == end(_filterResults)) ? nullptr : i->row.get();
-		return { row, filteredOffset() + index * _st->height };
+		return { row, row ? (filteredOffset() + i->top) : 0 };
 	};
 	if (const auto &[row, top] = findRow(history); row != nullptr) {
 		const auto visible = (top < _visibleBottom)
-			&& (top + _st->height > _visibleTop);
+			&& (top + row->height() > _visibleTop);
 		row->updateCornerBadgeShown(
 			history->peer,
 			visible ? Fn<void()>(crl::guard(this, repaint)) : nullptr);
