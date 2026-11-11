@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "core/update_checker.h"
 #include "custom/client_badge_detector.h"
+#include "custom/client_badge_popup.h"
 #include "custom/slowmode_tracker.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history_item_components.h"
@@ -4428,6 +4429,26 @@ bool Message::getStateFromName(
 			recordLinkRipplePoint(point, trect.topLeft());
 			_fromLinkRipplePointSet = 1;
 			return true;
+		}
+		if (from && customIconsWidth && availableWidth > totalBadgesWidth) {
+			const auto session = &history()->session();
+			const auto badgeX = availableLeft + nameWidth + statusWidth;
+			const auto clientBadgeWidth = Custom::ClientBadgeFor(
+				session).badgeWidth(from);
+			if (clientBadgeWidth
+				&& point.x() >= badgeX
+				&& point.x() < badgeX + clientBadgeWidth) {
+				outResult->link = std::make_shared<LambdaClickHandler>(
+					[=](ClickContext context) {
+						if (context.button != Qt::LeftButton) {
+							return;
+						}
+						if (const auto window = session->tryResolveWindow(from)) {
+							Custom::ShowClientBadgePopup(window->widget(), from);
+						}
+					});
+				return true;
+			}
 		}
 
 		const auto skipWidth = nameWidth
