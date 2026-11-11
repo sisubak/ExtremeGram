@@ -4444,7 +4444,9 @@ bool Message::getStateFromName(
 							return;
 						}
 						if (const auto window = session->tryResolveWindow(from)) {
-							Custom::ShowClientBadgePopup(window->widget(), from);
+							Custom::ShowClientBadgePopup(
+								window->widget().get(),
+								from);
 						}
 					});
 				return true;
