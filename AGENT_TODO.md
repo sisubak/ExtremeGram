@@ -156,6 +156,9 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
     edit пересоздаётся, поэтому состояние живёт в view).
 17. [ ] Клик по бейджу в сообщениях (getStateFromName возвращает name-
     TextState) и в списке участников/чатов — пока не сделан.
+    Аудит-фиксы: _previousMode в history_view_reply.h инициализирован
+    (= false, было UB); computeIsAttachToPrevious/displayFromName совпадают
+    с upstream — не трогать; рассинхрон ширины бейджа не подтвердился.
 18. [x] Баг «плавные анимации становятся резкими при звонке» — решено:
     в запиненном lib_ui (c3f7343) Simple::BasicCallback ПРОВЕРЯЕТ
     anim::Disabled() и прыгает в конец; флаг ставит только

@@ -159,7 +159,7 @@ private:
 	mutable Ui::Text::String _name;
 	mutable Ui::Text::String _text;
 	mutable QString _stateText;
-	mutable bool _previousMode;
+	mutable bool _previousMode = false;
 	mutable int _maxWidth = 0;
 	mutable int _minHeight = 0;
 	mutable int _height = 0;
