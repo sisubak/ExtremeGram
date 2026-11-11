@@ -156,14 +156,13 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
     edit пересоздаётся, поэтому состояние живёт в view).
 17. [ ] Клик по бейджу в сообщениях (getStateFromName возвращает name-
     TextState) и в списке участников/чатов — пока не сделан.
-18. [ ] Баг «плавные анимации становятся резкими при звонке» — установлено:
+18. [x] Баг «плавные анимации становятся резкими при звонке» — решено:
     в запиненном lib_ui (c3f7343) Simple::BasicCallback ПРОВЕРЯЕТ
     anim::Disabled() и прыгает в конец; флаг ставит только
-    PowerSaving::Set/SetForceAll (ui/power_saving.cpp). Выставляется из
-    storage (dbiPowerSaving — чекбокс «Disable UI animations» в настройках
-    Power Saving) или автоматически при battery saver (SetForceAll).
-    Код звонков PowerSaving не трогает. Проверить у пользователя: чекбокс
-    в Settings → Advanced → Power Saving и поведение на батарее.
+    PowerSaving::Set/SetForceAll (ui/power_saving.cpp). Причина у
+    пользователя: включён чекбокс «Disable UI animations» в
+    Settings → Advanced → Power Saving. Решение: снять галочку.
+    Код звонков PowerSaving не трогает (проверено grep-ом).
 19. [x] Появление окна 1:1-звонка: fade-in 150мс (window opacity,
     CubicSmoothOut) в Panel::initGeometry, только если !anim::Disabled().
     На Wayland setWindowOpacity игнорируется — окно просто появляется.
