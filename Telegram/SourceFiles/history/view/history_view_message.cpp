@@ -61,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_message_reactions.h"
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
+#include "mainwindow.h"
 #include "main/main_session.h"
 #include "settings/sections/settings_premium.h"
 #include "ui/text/text_options.h"
