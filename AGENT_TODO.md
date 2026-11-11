@@ -98,22 +98,26 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
   `object_ptr<T> _x = { nullptr };`, иначе ошибка в конце init-list ctor.
 - not_null<T*> не конвертируется неявно в T* — использовать `.get()`
   (например, SessionController::widget() → MainWindow* → QWidget*).
+- ::MainWindow объявлен только forward-decl в window_session_controller.h:
+  для widget()->... или конверсии в QWidget* нужен include "mainwindow.h"
+  (он же тянет platform_main_window.h).
 - Ui::Animations::Simple в запиненном lib_ui (c3f7343) прыгает в конец при
   anim::Disabled() — см. пункт 18 (Power Saving).
 
 ## Текущее состояние (на момент последнего обновления)
-- HEAD: 8ea0bfb. Ветка запушена, рабочее дерево чистое.
+- HEAD: b0e28bc. Ветка запушена, рабочее дерево чистое.
 - Зелёный релиз build-43061945603 (b7b967c, whois-датасет) скачан в
   /tmp/opencode/extre_43061945603; build-43041765462 (d075da5) тоже лежит
   рядом. Оба ждут установки пользователем.
-- build-43091534460 (eeeb56d) — идёт на момент записи; это первая сборка
-  после фиксов компиляции cc3ccbe (object_ptr) и eeeb56d (not_null).
+- build-43110062477 (b0e28bc) — идёт на момент записи.
 - Попап бейджа, бейдж в шапке звонка, анимация изменения сообщений и клик
   по бейджу в сообщениях закоммичены (6a684c0, ffc7d11, 11593f5).
-- FAILED 43066932523 (6a684c0) и 43069241136 (ffc7d11): только две ошибки
-  компиляции — object_ptr без дефолтного ctor в calls_top_bar.cpp и
-  not_null<MainWindow*> → QWidget* в history_view_message.cpp. Обе
-  исправлены; 43090056589 отменена после фикса.
+- FAILED 43066932523 (6a684c0) и 43069241136 (ffc7d11): object_ptr без
+  дефолтного ctor в calls_top_bar.cpp и not_null<MainWindow*> → QWidget*
+  в history_view_message.cpp. Исправлено в cc3ccbe и eeeb56d.
+- FAILED 43091534460 (eeeb56d): та же конверсия, но из-за неполного типа
+  ::MainWindow (виден только forward-decl из window_session_controller.h).
+  Фикс b0e28bc: include "mainwindow.h" в history_view_message.cpp.
 - DesignTokens: флаги chatListCards/denseChatList/cardProfile/minimalProfile.
   Modern = карточки в списке + карточка-оверлей в профиле; Ultra = плотный
   список (56px только для обычных строк) + плоский профиль.
