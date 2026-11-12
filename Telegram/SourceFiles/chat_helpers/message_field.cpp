@@ -1022,6 +1022,15 @@ AutocompleteQuery ParseMentionHashtagBotCommandQuery(
 					result.query = text.mid(i - 1, position - fragmentPosition - i + 1);
 				}
 				return result;
+			} else if (text[i - 1] == '!') {
+				if (!features.autocompleteModeCommands) {
+					return {};
+				}
+				if (i < 2 && !fragmentPosition) {
+					result.fromStart = (i == 1) && (fragmentPosition == 0);
+					result.query = text.mid(i - 1, position - fragmentPosition - i + 1);
+				}
+				return result;
 			}
 			if (position - fragmentPosition - i > 127 || (!mentionInCommand && (position - fragmentPosition - i > 63))) {
 				break;

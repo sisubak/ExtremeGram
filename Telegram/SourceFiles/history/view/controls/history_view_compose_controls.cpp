@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/mime_type.h"
 #include "core/shortcuts.h"
 #include "core/ui_integration.h"
+#include "custom/autistic/autistic_mode.h"
 #include "custom/mention_pins.h"
 #include "custom/typing_indicator.h"
 #include "data/components/ephemeral_messages.h"
@@ -3472,13 +3473,17 @@ void ComposeControls::initFieldAutocomplete() {
 		.peer = _history->peer,
 		.features = [=] {
 			auto result = _features;
+			result.autocompleteModeCommands = Autistic::on(
+				EnhancedSettings::Option::AutisticCommands);
 			if (_inlineBot && !_inlineLookingUpBot) {
 				result.autocompleteMentions = false;
 				result.autocompleteHashtags = false;
 				result.autocompleteCommands = false;
+				result.autocompleteModeCommands = false;
 			}
 			if (isEditingMessage()) {
 				result.autocompleteCommands = false;
+				result.autocompleteModeCommands = false;
 				result.suggestStickersByEmoji = false;
 			}
 			return result;

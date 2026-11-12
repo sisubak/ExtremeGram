@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 class History;
@@ -72,6 +73,13 @@ class BotModeManager final {
 public:
 	explicit BotModeManager(not_null<Main::Session*> session);
 	~BotModeManager();
+
+	// Registry of every "!" command of the mode: command (without the "!"
+	// prefix) and a short hint. Single source for the !-suggestion bar,
+	// the !help reply and the settings description.
+	[[nodiscard]] static const std::vector<
+		std::pair<QString, QString>
+	> &CommandHints();
 
 	bool interceptCommand(
 		not_null<History*> history,

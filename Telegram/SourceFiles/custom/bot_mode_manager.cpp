@@ -401,6 +401,24 @@ BotModeManager::~BotModeManager() {
 	}
 }
 
+const std::vector<std::pair<QString, QString>>
+	&BotModeManager::CommandHints() {
+	static const auto value = std::vector<std::pair<QString, QString>>{
+		{ u"account"_q, u"данные автора ответа: ID и регистрация"_q },
+		{ u"vxod"_q, u"дата входа автора ответа в группу"_q },
+		{ u"ignore"_q, u"игнор-лист: добавить автора / @user, без аргументов — показать список"_q },
+		{ u"unignore"_q, u"убрать автора ответа / @user из игнор-листа"_q },
+		{ u"bot"_q, u"включить бот-команды (!mute, !stats, !stop)"_q },
+		{ u"stopbot"_q, u"выключить бот-команды"_q },
+		{ u"whois"_q, u"полный профиль автора ответа"_q },
+		{ u"mute"_q, u"ограничить ответом: !mute [время] [причина]"_q },
+		{ u"stats"_q, u"подсчёт сообщений чата"_q },
+		{ u"stop"_q, u"остановить подсчёт статистики"_q },
+		{ u"help"_q, u"этот список"_q },
+	};
+	return value;
+}
+
 bool BotModeManager::interceptCommand(
 		not_null<History*> history,
 		const QString &text,
@@ -492,17 +510,11 @@ bool BotModeManager::interceptCommand(
 			isUnignore);
 	}
 	if (controller && isHelp) {
-		controller->showToast(QString::fromUtf8(
-			"Команды ExtremeGram:\n"
-			"!account / !vxod — данные автора ответа (ID, регистрация / вход)\n"
-			"!ignore / !unignore [ответ или @user] — локальный игнор-лист\n"
-			"!ignore — показать игнор-лист\n"
-			"!bot / !stopbot — включить/выключить бот-команды\n"
-			"!mute [время] [причина] — ограничить ответом (30с–366д: 90m, 2h, 1d)\n"
-			"!whois — полный профиль автора ответа\n"
-			"!stats — подсчёт сообщений чата\n"
-			"!stop — остановить подсчёт\n"
-			"!help — этот список"));
+		auto text = QString::fromUtf8("Команды ExtremeGram:");
+		for (const auto &[command, hint] : CommandHints()) {
+			text += QString::fromUtf8("\n!%1 — %2").arg(command, hint);
+		}
+		controller->showToast(text);
 	}
 	if (isHelp) {
 		return true;

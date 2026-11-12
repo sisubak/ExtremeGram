@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/field_autocomplete.h"
 
+#include "custom/bot_mode_manager.h"
+
 #include "custom/client_badge_detector.h"
 #include "custom/mention_pins.h"
 #include "dialogs/dialogs_three_state_icon.h"
@@ -265,7 +267,8 @@ struct FieldAutocomplete::MentionRow {
 };
 
 struct FieldAutocomplete::BotCommandRow {
-	not_null<UserData*> user;
+	// Null for Autistic mode command rows (no userpic / username).
+	UserData *user = nullptr;
 	QString command;
 	QString description;
 	Ui::PeerUserpicView userpic;
@@ -451,6 +454,10 @@ void FieldAutocomplete::showFiltered(
 		break;
 	case '/':
 		type = Type::BotCommands;
+		plainQuery = base::StringViewMid(query, 1);
+		break;
+	case '!':
+		type = Type::ModeCommands;
 		plainQuery = base::StringViewMid(query, 1);
 		break;
 	}
@@ -729,6 +736,19 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 				continue;
 			}
 			hrows.push_back(tag);
+		}
+	} else if (_type == Type::ModeCommands) {
+		const auto listAllSuggestions = _filter.isEmpty();
+		for (const auto &[command, hint] : BotModeManager::CommandHints()) {
+			if (!listAllSuggestions
+				&& !command.startsWith(_filter, Qt::CaseInsensitive)) {
+				continue;
+			}
+			brows.push_back({
+				.user = nullptr,
+				.command = command,
+				.description = hint,
+			});
 		}
 	} else if (_type == Type::BotCommands) {
 		const auto listAllSuggestions = _filter.isEmpty();
@@ -1650,7 +1670,7 @@ void FieldAutocomplete::Inner::paintRows(Painter &p, QRect clip) {
 		} else {
 			auto &row = _brows->at(i);
 			const auto user = row.user;
-			if (user->isSelf() && row.command.isEmpty()) {
+			if (user && user->isSelf() && row.command.isEmpty()) {
 				p.setPen(st::windowActiveTextFg);
 				p.setFont(st::semiboldFont);
 				p.drawText(
@@ -1661,30 +1681,36 @@ void FieldAutocomplete::Inner::paintRows(Painter &p, QRect clip) {
 			}
 
 			auto toHighlight = row.command;
-			if (withUsername) {
+			if (user && withUsername) {
 				toHighlight += '@' + PrimaryUsername(user);
 			}
-			user->loadUserpic();
-			user->paintUserpicLeft(
-				p,
-				row.userpic,
-				st::mentionPadding.left(),
-				top + st::mentionPadding.top(),
-				width(),
-				st::mentionPhotoSize);
+			const auto textLeft = user ? mentionLeft : st::mentionPadding.left();
+			if (user) {
+				user->loadUserpic();
+				user->paintUserpicLeft(
+					p,
+					row.userpic,
+					st::mentionPadding.left(),
+					top + st::mentionPadding.top(),
+					width(),
+					st::mentionPhotoSize);
+			}
 
-			const auto commandText = '/' + toHighlight;
+			const auto commandText = (user ? u"/"_q : u"!"_q) + toHighlight;
 
 			p.setPen(selected ? st::mentionNameFgOver : st::mentionNameFg);
 			p.setFont(st::semiboldFont);
 			p.drawText(
-				mentionLeft,
+				textLeft,
 				textTop + st::semiboldFont->ascent,
 				commandText);
 
 			auto addLeft = st::semiboldFont->width(commandText)
 				+ st::mentionPadding.left();
-			auto widthLeft = mentionWidth - addLeft;
+			auto widthLeft = (user
+				? mentionWidth
+				: width() - textLeft - 2 * st::mentionPadding.right()
+			) - addLeft;
 
 			if (row.ephemeral) {
 				const auto &icon = selected
@@ -1846,6 +1872,7 @@ void FieldAutocomplete::Inner::clearSel(bool hidden) {
 	setSel((_mrows->empty() && _brows->empty() && _hrows->empty())
 		? -1
 		: (_brows->size() > 1
+			&& _brows->front().user
 			&& _brows->front().user->isSelf()
 			&& _brows->front().command.isEmpty())
 		? 1
@@ -1939,11 +1966,13 @@ bool FieldAutocomplete::Inner::chooseAtIndex(
 		if (index < _brows->size()) {
 			const auto user = _brows->at(index).user;
 			const auto &command = _brows->at(index).command;
-			const auto commandString = u"/%1%2"_q.arg(
-				command,
-				commandsWithUsername()
-					? ('@' + PrimaryUsername(user))
-					: QString());
+			const auto commandString = user
+				? u"/%1%2"_q.arg(
+					command,
+					commandsWithUsername()
+						? ('@' + PrimaryUsername(user))
+						: QString())
+				: ('!' + command);
 			_botCommandChosen.fire({ user, commandString, method });
 			return true;
 		}
@@ -2510,6 +2539,11 @@ void InitFieldAutocomplete(
 	raw->botCommandChosen(
 	) | rpl::on_next([=](FieldAutocomplete::BotCommandChosen data) {
 		if (!features().autocompleteCommands) {
+			return;
+		}
+		if (!data.user) {
+			// Mode command: insert into the field, the user sends it.
+			field->insertTag(data.command);
 			return;
 		}
 		using Method = FieldAutocompleteChooseMethod;
