@@ -24,7 +24,7 @@ rpl::lifetime &RelayoutSubscription() {
 
 void SubscribeRelayout() {
 	auto &lifetime = RelayoutSubscription();
-	using Option = EnhancedSettings::Option;
+	namespace Option = EnhancedSettings::Option;
 	const auto watchBool = [&](EnhancedSettings::Key<bool> key) {
 		EnhancedSettings::Changes(key) | rpl::on_next([=] {
 			RelayoutStream().fire({});

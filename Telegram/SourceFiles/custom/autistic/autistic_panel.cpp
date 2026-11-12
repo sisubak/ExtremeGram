@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
+#include "window/window_main.h"
 #include "window/window_session_controller.h"
 
 #include <QtCore/QEvent>
@@ -49,15 +50,16 @@ private:
 Panel::Panel(not_null<Window::SessionController*> controller)
 : Ui::RpWidget(controller->widget().get())
 , _controller(controller) {
-	using Option = EnhancedSettings::Option;
+	namespace Option = EnhancedSettings::Option;
 	const auto apply = [=](EnhancedSettings::Key<bool> key, bool value) {
 		EnhancedSettings::ApplyOption(_controller, key, value);
 	};
 
 	const auto body = Ui::CreateChild<Ui::RpWidget>(this);
 	body->paintRequest(
-	) | rpl::on_next([=](Painter &p) {
-		p.fillRect(body->rect(), st::boxBg);
+	) | rpl::on_next([=](const QRect &r) {
+		QPainter p(body.get());
+		p.fillRect(r, st::boxBg);
 	}, body->lifetime());
 
 	const auto rowHeight = st::settingsButtonNoIcon.height;

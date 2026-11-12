@@ -739,7 +739,8 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 		}
 	} else if (_type == Type::ModeCommands) {
 		const auto listAllSuggestions = _filter.isEmpty();
-		for (const auto &[command, hint] : BotModeManager::CommandHints()) {
+		for (const auto &[command, hint]
+				: Custom::BotModeManager::CommandHints()) {
 			if (!listAllSuggestions
 				&& !command.startsWith(_filter, Qt::CaseInsensitive)) {
 				continue;
