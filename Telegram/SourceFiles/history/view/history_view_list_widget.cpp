@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "api/api_who_reacted.h"
 #include "api/api_views.h"
+#include "custom/autistic/autistic_mode.h"
 #include "layout/layout_selection.h"
 #include "payments/payments_reaction_process.h"
 #include "history/view/history_view_reaction_preview.h"
@@ -4601,6 +4602,12 @@ void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& (_overElement->data()->isRegular()
 			|| CanReplyToEphemeral(_overElement->data()))) {
 		mouseActionCancel();
+		if (Autistic::on(EnhancedSettings::Option::AutisticHeart)) {
+			_overElement->data()->toggleReaction(
+				Data::ReactionId{ u"❤"_q },
+				HistoryReactionSource::Quick);
+			return;
+		}
 		switch (CurrentQuickAction()) {
 		case DoubleClickQuickAction::Reply: {
 			replyToMessageRequestNotify({ _overElement->data()->fullId() });

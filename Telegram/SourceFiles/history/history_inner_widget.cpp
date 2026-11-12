@@ -75,6 +75,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h"
 #include "window/window_peer_menu.h"
 #include "window/notifications_manager.h"
+#include "custom/autistic/autistic_mode.h"
 #include "custom/client_badge_detector.h"
 #include "custom/smooth_animations.h"
 #include "info/info_memento.h"
@@ -3097,6 +3098,12 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& e->button() == Qt::LeftButton) {
 		if (const auto view = Element::Moused()) {
 			mouseActionCancel();
+			if (Autistic::on(EnhancedSettings::Option::AutisticHeart)) {
+				view->data()->toggleReaction(
+					Data::ReactionId{ u"❤"_q },
+					HistoryReactionSource::Quick);
+				return;
+			}
 			switch (HistoryView::CurrentQuickAction()) {
 			case HistoryView::DoubleClickQuickAction::Reply: {
 				_widget->replyToMessage(view->data());
