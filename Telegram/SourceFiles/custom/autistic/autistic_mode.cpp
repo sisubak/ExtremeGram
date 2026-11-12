@@ -52,4 +52,37 @@ rpl::producer<> RelayoutRequested() {
 	return RelayoutStream().events();
 }
 
+void ToggleMaster(not_null<Window::SessionController*> controller) {
+	const auto next = !masterOn();
+	EnhancedSettings::ApplyOption(
+		controller,
+		EnhancedSettings::Option::AutisticTelegram,
+		next);
+	if (next && EnhancedSettings::Get(
+			EnhancedSettings::Option::OnlineSpamInterval) <= 1000) {
+		EnhancedSettings::Set(
+			EnhancedSettings::Option::OnlineSpamInterval,
+			4000);
+	} else if (!next && EnhancedSettings::Get(
+			EnhancedSettings::Option::OnlineSpamInterval) == 4000) {
+		EnhancedSettings::Set(
+			EnhancedSettings::Option::OnlineSpamInterval,
+			10);
+	}
+	RelayoutStream().fire({});
+}
+
+QString HideForeignLabel(HideForeign mode) {
+	switch (mode) {
+	case HideForeign::Blur:
+		return QString::fromUtf8("размытие");
+	case HideForeign::Invisible:
+		return QString::fromUtf8("невидимые");
+	case HideForeign::Collapsed:
+		return QString::fromUtf8("схлопнутые");
+	default:
+		return QString::fromUtf8("выкл");
+	}
+}
+
 } // namespace Autistic
