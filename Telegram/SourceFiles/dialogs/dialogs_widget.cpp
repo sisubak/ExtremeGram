@@ -21,6 +21,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_top_bar_suggestion.h"
 #include "dialogs/dialogs_quick_action.h"
 #include "dialogs/dialogs_key.h"
+#include "custom/autistic/autistic_panel.h"
+#include "custom/autistic/autistic_mode.h"
 #include "custom/client_badge_popup.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -1981,6 +1983,18 @@ void Widget::setupShortcuts() {
 					Window::ActivateWindow(controller());
 					_inner->showPeerMenu();
 				}
+				return true;
+			});
+			request->check(Command::AutisticPanel, 1) && request->handle([=] {
+				Autistic::TogglePanel(controller());
+				return true;
+			});
+			request->check(Command::AutisticHideForeignCycle, 1)
+			&& request->handle([=] {
+				Autistic::CycleHideForeign();
+				controller()->showToast(
+					QString::fromUtf8("Скрытие чужих: ")
+					+ Autistic::HideForeignLabel(Autistic::hideForeign()));
 				return true;
 			});
 			request->check(Command::ShowChatPreview, 1)

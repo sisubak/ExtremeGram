@@ -605,6 +605,8 @@ PRIVATE
     core/enhanced_settings.h
     custom/autistic/autistic_mode.cpp
     custom/autistic/autistic_mode.h
+    custom/autistic/autistic_panel.cpp
+    custom/autistic/autistic_panel.h
     custom/bot_mode_manager.cpp
     custom/bot_mode_manager.h
     custom/client_badge_detector.cpp

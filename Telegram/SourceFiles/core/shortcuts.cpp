@@ -140,6 +140,8 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"edit_next_message"_q             , Command::EditNextMessage },
 	{ u"edit_link_preview"_q             , Command::EditLinkPreview },
 	{ u"choose_bot_use"_q                , Command::ChooseBotUse },
+	{ u"autistic_panel"_q                , Command::AutisticPanel },
+	{ u"autistic_hide_foreign_cycle"_q   , Command::AutisticHideForeignCycle },
 
 	// Shortcuts that have no default values.
 	{ u"message"_q                       , Command::JustSendMessage },
@@ -562,6 +564,8 @@ void Manager::fillDefaults() {
 	set(u"alt+shift+down"_q          , Command::EditNextMessage);
 	set(u"ctrl+shift+k"_q            , Command::EditLinkPreview);
 	set(u"ctrl+shift+b"_q            , Command::ChooseBotUse);
+	set(u"ctrl+shift+a"_q            , Command::AutisticPanel);
+	set(u"ctrl+shift+h"_q            , Command::AutisticHideForeignCycle);
 
 	set(u"ctrl+\\"_q                 , Command::ShowChatMenu);
 	set(u"ctrl+]"_q                  , Command::ShowChatPreview);

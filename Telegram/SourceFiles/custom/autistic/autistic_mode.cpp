@@ -15,6 +15,33 @@ rpl::event_stream<> &RelayoutStream() {
 	return stream;
 }
 
+// Any relevant option change (from the panel, the settings section or a
+// shortcut) must re-layout the history view.
+rpl::lifetime &RelayoutSubscription() {
+	static rpl::lifetime lifetime;
+	return lifetime;
+}
+
+void SubscribeRelayout() {
+	auto &lifetime = RelayoutSubscription();
+	using Option = EnhancedSettings::Option;
+	const auto watchBool = [&](EnhancedSettings::Key<bool> key) {
+		EnhancedSettings::Changes(key) | rpl::on_next([=] {
+			RelayoutStream().fire({});
+		}, lifetime);
+	};
+	watchBool(Option::AutisticTelegram);
+	watchBool(Option::AutisticIgnore);
+	watchBool(Option::AutisticGhosts);
+	watchBool(Option::AutisticShowOrig);
+	watchBool(Option::AutisticLayoutFix);
+	EnhancedSettings::Changes(
+		Option::AutisticHideForeign
+	) | rpl::on_next([=] {
+		RelayoutStream().fire({});
+	}, lifetime);
+}
+
 } // namespace
 
 bool masterOn() {
@@ -26,6 +53,7 @@ bool on(EnhancedSettings::Key<bool> key) {
 }
 
 rpl::producer<bool> onStream(EnhancedSettings::Key<bool> key) {
+	SubscribeRelayout();
 	return rpl::combine(
 		EnhancedSettings::Watch(EnhancedSettings::Option::AutisticTelegram),
 		EnhancedSettings::Watch(key)
@@ -41,6 +69,7 @@ HideForeign hideForeign() {
 }
 
 void CycleHideForeign() {
+	SubscribeRelayout();
 	const auto next = (static_cast<int>(hideForeign()) + 1) % 4;
 	EnhancedSettings::Set(
 		EnhancedSettings::Option::AutisticHideForeign,
@@ -49,10 +78,12 @@ void CycleHideForeign() {
 }
 
 rpl::producer<> RelayoutRequested() {
+	SubscribeRelayout();
 	return RelayoutStream().events();
 }
 
 void ToggleMaster(not_null<Window::SessionController*> controller) {
+	SubscribeRelayout();
 	const auto next = !masterOn();
 	EnhancedSettings::ApplyOption(
 		controller,

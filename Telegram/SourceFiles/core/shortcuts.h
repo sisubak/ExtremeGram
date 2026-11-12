@@ -102,6 +102,8 @@ enum class Command {
 	EditNextMessage,
 	EditLinkPreview,
 	ChooseBotUse,
+	AutisticPanel,
+	AutisticHideForeignCycle,
 };
 
 [[maybe_unused]] constexpr auto kShowFolder = {
