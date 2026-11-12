@@ -99,10 +99,14 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 360
     steps:
+      # Checkout one level deeper: prepare.py places Libraries/, ThirdParty/
+      # and cache_keys/ next to the checkout, so nesting the repo under
+      # TBuild/ keeps all build inputs inside the workspace and cacheable.
       - name: Checkout source and submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          path: TBuild/ExtremeGram
       - name: Check configuration
         env:
           API_ID: ${{ secrets.TDESKTOP_API_ID }}
@@ -113,50 +117,120 @@ jobs:
             echo 'Missing repository secrets TDESKTOP_API_ID or TDESKTOP_API_HASH.' >&2
             exit 1
           fi
-      - name: Restore build cache
-        uses: actions/cache@v4
+      - name: Compute prepare hash
+        id: keys
+        shell: bash
+        run: |
+          HASH=$(sha256sum "$GITHUB_WORKSPACE/TBuild/ExtremeGram/Telegram/build/prepare/prepare.py" | awk '{ print $1 }')
+          echo "third=win-thirdparty-${HASH}" >> "$GITHUB_OUTPUT"
+          echo "libs=win-libs-${HASH}" >> "$GITHUB_OUTPUT"
+          echo "qt=win-qt-${HASH}" >> "$GITHUB_OUTPUT"
+      - name: Restore ThirdParty cache
+        uses: actions/cache/restore@v4
+        with:
+          path: TBuild/ThirdParty
+          key: ${{ steps.keys.outputs.third }}
+          restore-keys: |
+            win-thirdparty-
+      - name: Restore libraries cache
+        uses: actions/cache/restore@v4
         with:
           path: |
-            Libraries/win64/local
-            Libraries/win64/Qt-6.11.2
-            ThirdParty
-            cache_keys
-          key: win-libs-qt6112-v1
+            TBuild/Libraries/win64/*
+            !TBuild/Libraries/win64/cache_keys
+            !TBuild/Libraries/win64/[qQ]t[_-]*
+            TBuild/Libraries/win64/cache_keys/*
+            !TBuild/Libraries/win64/cache_keys/[qQ]t[_-]*
+          key: ${{ steps.keys.outputs.libs }}
+          restore-keys: |
+            win-libs-
+      - name: Restore Qt cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            TBuild/Libraries/win64/[qQ]t[_-]*
+            TBuild/Libraries/win64/cache_keys/[qQ]t[_-]*
+          key: ${{ steps.keys.outputs.qt }}
+          restore-keys: |
+            win-qt-
       - name: Prepare dependencies
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cd /d "%GITHUB_WORKSPACE%\Telegram\build\prepare"
+          cd /d "%GITHUB_WORKSPACE%\TBuild\ExtremeGram\Telegram\build\prepare"
           win.bat qt6 skip-debug skip-dump-syms silent
+      # Drop intermediates so the caches stay below the 10 GB limit.
+      - name: Prune libraries for cache
+        shell: bash
+        run: |
+          LIBS="$GITHUB_WORKSPACE/TBuild/Libraries/win64"
+          find "$LIBS" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' \
+            -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' \
+            -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' \
+            -o -path '*/cache_keys/*' -o -path '*/patches/*' \
+            -o -path '*/nv-codec-headers/*' -o -path '*/src/wallet_engine/*' \
+            -o '(' '(' -path '*/tlottie/*' -o -path '*/wallet-engine/*' ')' \
+            ! -path '*/target/*' ')' ')' -type f ')' \
+            -o '(' -empty ! -path '*/tlottie/*' ! -path '*/wallet-engine/*' ')' \
+            ')' -delete
+      - name: Save ThirdParty cache
+        if: steps.third.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: TBuild/ThirdParty
+          key: ${{ steps.keys.outputs.third }}
+      - name: Save libraries cache
+        if: steps.libs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            TBuild/Libraries/win64/*
+            !TBuild/Libraries/win64/cache_keys
+            !TBuild/Libraries/win64/[qQ]t[_-]*
+            TBuild/Libraries/win64/cache_keys/*
+            !TBuild/Libraries/win64/cache_keys/[qQ]t[_-]*
+          key: ${{ steps.keys.outputs.libs }}
+      - name: Save Qt cache
+        if: steps.qt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            TBuild/Libraries/win64/[qQ]t[_-]*
+            TBuild/Libraries/win64/cache_keys/[qQ]t[_-]*
+          key: ${{ steps.keys.outputs.qt }}
+      # NtCreatePagingFile: expands commit limit live, no reboot needed.
+      - name: Configure page file
+        uses: al-cheb/configure-pagefile-action@v1.5
+        with:
+          minimum-size: 16GB
+          maximum-size: 32GB
+          disk-root: "D:"
       - name: Configure
         shell: cmd
         env:
           API_ID: ${{ secrets.TDESKTOP_API_ID }}
           API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
         run: |
-          cd /d "%GITHUB_WORKSPACE%\Telegram"
-          configure.bat x64 -D TDESKTOP_API_ID=%API_ID% -D TDESKTOP_API_HASH=%API_HASH% -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd /d "%GITHUB_WORKSPACE%\TBuild\ExtremeGram\Telegram"
+          configure.bat -G "Ninja Multi-Config" -D TDESKTOP_API_ID=%API_ID% -D TDESKTOP_API_HASH=%API_HASH% -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
       - name: Compile
         shell: cmd
         run: |
-          cd /d "%GITHUB_WORKSPACE%\Telegram"
-          cmake --build ../out --config Release --parallel 2
-      - name: Install application
-        shell: cmd
-        run: |
-          cd /d "%GITHUB_WORKSPACE%\Telegram"
-          cmake --install ../out --config Release --prefix ../out/pkg
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd /d "%GITHUB_WORKSPACE%\TBuild\ExtremeGram\Telegram"
+          cmake --build ../out --config Release --parallel 4
       - name: Package
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path out/pkg -Recurse -Filter Telegram.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $exe) {
-            New-Item -ItemType Directory -Force -Path out/pkg | Out-Null
-            Copy-Item out/Release/Telegram.exe out/pkg/Telegram.exe
+          $out = "TBuild/ExtremeGram/out/Release"
+          $exe = Join-Path $out "Telegram.exe"
+          if (-not (Test-Path $exe)) {
+            Get-ChildItem -Path TBuild/ExtremeGram/out -Recurse -Filter Telegram.exe | Select-Object FullName | Out-String
+            throw "Telegram.exe not found under out/"
           }
-          Compress-Archive -Path out/pkg/* -DestinationPath ExtremeGram-win64.zip -Force
+          Compress-Archive -Path $exe -DestinationPath ExtremeGram-win64.zip -Force
           (Get-FileHash ExtremeGram-win64.zip -Algorithm SHA256).Hash | Out-File -Encoding ascii ExtremeGram-win64.zip.sha256
-          Get-ChildItem -Recurse out/pkg | Select-Object FullName | Out-String
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         continue-on-error: true

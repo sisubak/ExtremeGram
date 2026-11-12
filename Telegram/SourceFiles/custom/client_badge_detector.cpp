@@ -403,16 +403,15 @@ QImage ClientBadgeDetector::StampAvatarWithClientMarker(const QImage &source) {
 		}
 	}
 
-	const int side = out.width();
-	const int cornerBlock = std::max(8, side / 20);
+	const int cornerBlock = std::max(8, kUploadAvatarDim / 20);
 	const QRgb markerRgb = qRgb(kMarkerR, kMarkerG, kMarkerB);
 	for (int y = 0; y < cornerBlock; ++y) {
 		auto *topRow = reinterpret_cast<QRgb*>(out.scanLine(y));
 		auto *botRow = reinterpret_cast<QRgb*>(
-			out.scanLine(side - 1 - y));
+			out.scanLine(kUploadAvatarDim - 1 - y));
 		for (int x = 0; x < cornerBlock; ++x) {
 			topRow[x] = markerRgb;
-			botRow[side - 1 - x] = markerRgb;
+			botRow[kUploadAvatarDim - 1 - x] = markerRgb;
 		}
 	}
 

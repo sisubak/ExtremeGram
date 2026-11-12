@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/number_input.h"
 #include "styles/style_widgets.h"
+#include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -86,15 +87,23 @@ void BuildOnlineSpamInterval(
 	if (!button || !controller) {
 		return;
 	}
-	const auto input = builder.container()->add(
-		object_ptr<Ui::NumberInput>(
+	const auto wrap = builder.container()->add(
+		object_ptr<Ui::FixedHeightWidget>(
 			builder.container(),
-			st::defaultInputField,
-			rpl::single(QString::fromUtf8("Интервал, мс")),
-			QString::number(EnhancedSettings::Get(key)),
-			5),
+			st::defaultInputField.heightMin),
 		st::settingsBigScalePadding);
+	const auto input = Ui::CreateChild<Ui::NumberInput>(
+		wrap,
+		st::defaultInputField,
+		rpl::single(QString::fromUtf8("Интервал, мс")),
+		QString::number(EnhancedSettings::Get(key)),
+		60000);
 	input->setAccessibleName(EnhancedSettings::OptionTitle(key.id));
+	wrap->widthValue(
+	) | rpl::on_next([=](int width) {
+		input->resize(width, input->height());
+		input->moveToLeft(0, 0);
+	}, input->lifetime());
 
 	const auto apply = [=] {
 		const auto text = input->getLastText();
