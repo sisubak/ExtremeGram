@@ -31,10 +31,13 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
   ПКМ по сообщению → «Сведения о клиенте ExtremeGram» → бокс (имя жирным,
   @username, ID + кнопка «Копировать ID», регистрация, вход в группу,
   поясняющий текст) — history_view_context_menu.cpp AddExtremeBadgeAction.
-  Клик по бейджу в профиле/звонке → анимированный попап
+  Клик по бейджу → анимированный попап
   (custom/client_badge_popup.{h,cpp}, ShowClientBadgePopup): карточка
-  сверху по центру окна, иконка 36px, «ExtremeGram» + подпись, show 240мс
-  (fade+scale+slide), hold 2.6с, hide 170мс, клик закрывает.
+  с настоящей размытой тенью (Ui::Shadow + st::boxRoundShadow), радиус
+  из токенов редизайна (DesignTokensForCurrentMode().radiusId), иконка
+  36px с анимацией «штамп» (scale 1.4→1 + пружина, задержка 70мс) и
+  кольцом-пульсом, «ExtremeGram» + подпись, show 220мс (fade+scale+slide),
+  hold 2.6с, hide 160мс, клик закрывает. Якорь — бейдж (anchor rect).
   badgePreview() в детекторе — QImage для произвольного размера/фона/тинта.
 - Slowmode tracker (slowmode_tracker.cpp): Custom::SlowmodeFor(session) —
   рисует dial-иконку таймера у имён ограниченных юзеров в сообщениях.
@@ -165,9 +168,14 @@ ExtremeGram — форк tdesktop (Telegram Desktop) с расширенными
 16. [x] Анимация изменения сообщений: wash цвета msgReplyBarColor 900мс,
     хук Element::animateEdit() из HistoryItem::finishEdition (view при
     edit пересоздаётся, поэтому состояние живёт в view).
-17. [~] Клик по бейджу: в сообщениях сделан (getStateFromName → отдельный
-    LambdaClickHandler → ShowClientBadgePopup через tryResolveWindow);
-    в списке участников/чатов — пока нет. Аудит-фиксы: _previousMode
+17. [x] Клик по бейджу везде: сообщения (getStateFromName → LambdaClickHandler),
+    профиль и шапка звонка (виджет бейджа), список чатов (BasicRow хранит
+    прямоугольник бейджа при paint → Row::lookupIsInClientBadge →
+    InnerWidget::isClientBadgePress → ChosenRow::clientBadgeClick →
+    Widget::chosenRow), список участников (MemberListRow::clientBadgeAt →
+    PeerListContent::mousePressReleased). Попап якоряется в бейдж (anchor
+    rect в глобальных координатах), иначе — в позицию курсора.
+    Аудит-фиксы: _previousMode
     в history_view_reply.h инициализирован (= false, было UB);
     computeIsAttachToPrevious/displayFromName совпадают с upstream — не
     трогать; рассинхрон 19/20px — резерв badgeWidth() 20 vs рисование 19,

@@ -143,6 +143,10 @@ public:
 	[[nodiscard]] QRect statusIconRect() const {
 		return _statusIconRect;
 	}
+
+	[[nodiscard]] virtual bool clientBadgeAt(QPoint point) const {
+		return false;
+	}
 	void paintStatusIcon(Painter &p, crl::time now, bool paused);
 
 	void rememberUserpicKey();

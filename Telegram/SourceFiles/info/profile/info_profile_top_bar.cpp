@@ -580,7 +580,13 @@ TopBar::TopBar(
 		}) | rpl::on_next([=](not_null<QEvent*> e) {
 			const auto mouse = static_cast<QMouseEvent*>(e.get());
 			if (mouse->button() == Qt::LeftButton) {
-				Custom::ShowClientBadgePopup(_extremeBadge.get(), _peer);
+				const auto anchor = QRect(
+					_extremeBadge->mapToGlobal(QPoint(0, 0)),
+					_extremeBadge->size());
+				Custom::ShowClientBadgePopup(
+					_extremeBadge.get(),
+					_peer,
+					anchor);
 			}
 		}, _extremeBadge->lifetime());
 		const auto refreshExtremeBadge = [=] {

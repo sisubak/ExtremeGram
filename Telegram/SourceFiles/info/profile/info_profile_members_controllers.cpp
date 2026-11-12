@@ -100,6 +100,10 @@ UserData *MemberListRow::user() const {
 	return peer()->asUser();
 }
 
+bool MemberListRow::clientBadgeAt(QPoint point) const {
+	return _clientBadgeRect.contains(point);
+}
+
 void MemberListRow::setRefreshCallback(Fn<void()> callback) {
 	_refreshCallback = std::move(callback);
 }
@@ -554,17 +558,25 @@ int MemberListRow::paintNameIconGetWidth(
 		outerWidth,
 		selected);
 	auto added = base;
+	_clientBadgeRect = QRect();
 	if (clientReserve) {
-		added += detector.drawBadgeGetWidth(
+		const auto badgeLeft = nameLeft
+			+ std::min(nameWidth, availableWidth - clientReserve - base)
+			+ base;
+		const auto badgeWidth = detector.drawBadgeGetWidth(
 			p,
-			nameLeft
-				+ std::min(nameWidth, availableWidth - clientReserve - base)
-				+ base,
+			badgeLeft,
 			nameTop,
 			st::msgNameFont->height,
 			peer(),
 			st::boxBg->c,
 			(selected ? st::windowSubTextFgOver : st::windowSubTextFg)->c);
+		_clientBadgeRect = QRect(
+			badgeLeft,
+			nameTop,
+			std::max(badgeWidth, clientReserve),
+			st::msgNameFont->height);
+		added += badgeWidth;
 	}
 	if (!_type.restricted) {
 		return added;

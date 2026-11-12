@@ -100,6 +100,7 @@ struct ChosenRow {
 	QByteArray sponsoredRandomId;
 	bool userpicClick : 1 = false;
 	bool communityBadgeClick : 1 = false;
+	bool clientBadgeClick : 1 = false;
 	bool filteredRow : 1 = false;
 	bool newWindow : 1 = false;
 };
@@ -177,6 +178,7 @@ public:
 	[[nodiscard]] bool isUserpicPress() const;
 	[[nodiscard]] bool isUserpicPressOnWide() const;
 	[[nodiscard]] bool isCommunityBadgePressOnNarrow() const;
+	[[nodiscard]] bool isClientBadgePress() const;
 	void cancelChatPreview();
 	bool scheduleChatPreview(QPoint positionOverride);
 	bool showChatPreview();

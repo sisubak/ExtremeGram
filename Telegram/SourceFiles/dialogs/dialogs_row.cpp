@@ -933,6 +933,10 @@ bool Row::lookupIsInCommunityBadge(
 	).marginsAdded({ stroke, stroke, stroke, stroke }).contains(x, y);
 }
 
+bool Row::lookupIsInClientBadge(int x, int y) const {
+	return clientBadgeRect().contains(x, y);
+}
+
 void Row::stopLastRipple() {
 	BasicRow::stopLastRipple();
 	const auto history = this->history();

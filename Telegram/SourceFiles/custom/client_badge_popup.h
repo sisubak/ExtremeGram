@@ -9,11 +9,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/basic_types.h"
 
+#include <QtCore/QRect>
+
 class QWidget;
 class PeerData;
 
 namespace Custom {
 
-void ShowClientBadgePopup(QWidget *parent, not_null<PeerData*> peer);
+void ShowClientBadgePopup(
+	QWidget *parent,
+	not_null<PeerData*> peer,
+	const QRect &anchor = QRect());
 
 } // namespace Custom

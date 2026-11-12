@@ -59,6 +59,8 @@ public:
 
 	[[nodiscard]] UserData *user() const;
 
+	[[nodiscard]] bool clientBadgeAt(QPoint point) const override;
+
 	int elementsCount() const override;
 	QRect elementGeometry(int element, int outerWidth) const override;
 	bool elementDisabled(int element) const override;
@@ -149,6 +151,7 @@ private:
 	std::unique_ptr<Ui::RippleAnimation> _removeRipple;
 	Fn<void()> _refreshCallback;
 	base::Timer _restrictionTimer;
+	QRect _clientBadgeRect;
 	bool _wasHovered = false;
 
 };

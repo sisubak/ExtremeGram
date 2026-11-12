@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_top_bar_suggestion.h"
 #include "dialogs/dialogs_quick_action.h"
 #include "dialogs/dialogs_key.h"
+#include "custom/client_badge_popup.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/history_view_chat_section.h"
@@ -1044,6 +1045,15 @@ void Widget::setupSwipeBack() {
 
 void Widget::chosenRow(const ChosenRow &row) {
 	storiesToggleExplicitExpand(false);
+
+	if (row.clientBadgeClick) {
+		if (const auto history = row.key.history()) {
+			Custom::ShowClientBadgePopup(
+				controller()->widget().get(),
+				history->peer);
+		}
+		return;
+	}
 
 	if (!row.sponsoredRandomId.isEmpty()) {
 		auto &messages = session().sponsoredMessages();

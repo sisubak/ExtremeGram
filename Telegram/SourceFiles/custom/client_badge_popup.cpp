@@ -7,19 +7,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/client_badge_popup.h"
 
+#include "base/timer.h"
 #include "custom/client_badge_detector.h"
+#include "custom/redesign.h"
 #include "custom/smooth_animations.h"
 #include "data/data_peer.h"
 #include "lang/lang_keys.h"
 #include "styles/palette.h"
 #include "styles/style_basic.h"
+#include "styles/style_layers.h"
 #include "ui/effects/animations.h"
 #include "ui/painter.h"
 #include "ui/rp_widget.h"
+#include "ui/widgets/shadow.h"
 
 #include <QtCore/QEvent>
 #include <QtCore/QPointer>
-#include <QtCore/QTimer>
+#include <QtGui/QCursor>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QPainter>
 
@@ -29,18 +33,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Custom {
 namespace {
 
-constexpr auto kCardRadius = 14;
 constexpr auto kIconSize = 36;
 constexpr auto kPadding = 14;
-constexpr auto kShadow = 10;
 constexpr auto kTextSkip = 12;
-constexpr auto kShowDuration = crl::time(240);
-constexpr auto kHideDuration = crl::time(170);
+constexpr auto kGap = 10;
+constexpr auto kShowDuration = crl::time(220);
+constexpr auto kHideDuration = crl::time(160);
 constexpr auto kHoldDuration = crl::time(2600);
+constexpr auto kIconDelay = crl::time(70);
+constexpr auto kIconDuration = crl::time(300);
+constexpr auto kPulseDuration = crl::time(480);
 
 class BadgePopup final : public Ui::RpWidget {
 public:
-	BadgePopup(QWidget *parent, QImage icon);
+	BadgePopup(QWidget *parent, QImage icon, QRect anchor);
 	~BadgePopup();
 
 	void startShow();
@@ -51,22 +57,32 @@ protected:
 	bool eventFilter(QObject *object, QEvent *event) override;
 
 private:
+	void startIcon();
 	void startHide();
 	void updatePosition();
+	[[nodiscard]] QRect cardGeometry() const;
+	[[nodiscard]] QColor accentColor() const;
 
 	QImage _icon;
 	QString _title;
 	QString _subtitle;
+	QRect _anchor;
 	Ui::Animations::Simple _animation;
-	QTimer _holdTimer;
+	Ui::Animations::Simple _iconAnimation;
+	Ui::Animations::Simple _pulseAnimation;
+	base::Timer _iconDelay;
+	base::Timer _holdTimer;
 	float64 _progress = 0.;
+	float64 _iconProgress = 0.;
+	float64 _pulseProgress = 0.;
 	bool _hiding = false;
 
 };
 
-BadgePopup::BadgePopup(QWidget *parent, QImage icon)
+BadgePopup::BadgePopup(QWidget *parent, QImage icon, QRect anchor)
 : Ui::RpWidget(parent)
-, _icon(std::move(icon)) {
+, _icon(std::move(icon))
+, _anchor(anchor) {
 	setCursor(style::cur_pointer);
 	setAttribute(Qt::WA_ShowWithoutActivating);
 
@@ -76,7 +92,7 @@ BadgePopup::BadgePopup(QWidget *parent, QImage icon)
 	const auto iconSize = style::ConvertScale(kIconSize);
 	const auto padding = style::ConvertScale(kPadding);
 	const auto textSkip = style::ConvertScale(kTextSkip);
-	const auto shadow = style::ConvertScale(kShadow);
+	const auto shadow = st::boxRoundShadow.extend;
 	const auto textWidth = std::max(
 		st::semiboldFont->width(_title),
 		st::normalFont->width(_subtitle));
@@ -84,21 +100,21 @@ BadgePopup::BadgePopup(QWidget *parent, QImage icon)
 		style::ConvertScale(280),
 		std::min(
 			style::ConvertScale(430),
-			parent->width() - 2 * shadow - style::ConvertScale(24)));
+			parent->width()
+				- shadow.left()
+				- shadow.right()
+				- style::ConvertScale(24)));
 	const auto cardWidth = std::clamp(
 		padding + iconSize + textSkip + textWidth + padding,
 		style::ConvertScale(280),
 		maxCard);
 	const auto cardHeight = padding + iconSize + padding;
-	resize(cardWidth + 2 * shadow, cardHeight + 2 * shadow);
+	resize(
+		cardWidth + shadow.left() + shadow.right(),
+		cardHeight + shadow.top() + shadow.bottom());
 	updatePosition();
 
 	parent->installEventFilter(this);
-
-	_holdTimer.setSingleShot(true);
-	QObject::connect(&_holdTimer, &QTimer::timeout, [this] {
-		startHide();
-	});
 }
 
 BadgePopup::~BadgePopup() {
@@ -110,12 +126,31 @@ BadgePopup::~BadgePopup() {
 void BadgePopup::startShow() {
 	show();
 	raise();
-	_animation.start([this](float64 value) {
+	_animation.start([=](float64 value) {
 		_progress = value;
 		update();
 	}, 0., 1., kShowDuration, anim::transition(
 		Custom::Animations::CubicSmoothOut));
-	_holdTimer.start(int(kHoldDuration + kShowDuration));
+	if (anim::Disabled()) {
+		startIcon();
+	} else {
+		_iconDelay.setCallback([=] { startIcon(); });
+		_iconDelay.callOnce(kIconDelay);
+	}
+	_holdTimer.setCallback([=] { startHide(); });
+	_holdTimer.callOnce(kHoldDuration + kShowDuration);
+}
+
+void BadgePopup::startIcon() {
+	_iconAnimation.start([=](float64 value) {
+		_iconProgress = value;
+		update();
+	}, 0., 1., kIconDuration, anim::transition(
+		Custom::Animations::SpringSmooth));
+	_pulseAnimation.start([=](float64 value) {
+		_pulseProgress = value;
+		update();
+	}, 0., 1., kPulseDuration, anim::linear);
 }
 
 void BadgePopup::startHide() {
@@ -123,8 +158,9 @@ void BadgePopup::startHide() {
 		return;
 	}
 	_hiding = true;
-	_holdTimer.stop();
-	_animation.start([this](float64 value) {
+	_holdTimer.cancel();
+	_iconDelay.cancel();
+	_animation.start([=](float64 value) {
 		_progress = value;
 		update();
 		if (value <= 0.) {
@@ -134,13 +170,45 @@ void BadgePopup::startHide() {
 		Custom::Animations::CubicSmoothOut));
 }
 
+QRect BadgePopup::cardGeometry() const {
+	const auto shadow = st::boxRoundShadow.extend;
+	return QRect(
+		shadow.left(),
+		shadow.top(),
+		width() - shadow.left() - shadow.right(),
+		height() - shadow.top() - shadow.bottom());
+}
+
+QColor BadgePopup::accentColor() const {
+	const auto accent = Custom::DesignTokensForCurrentMode().accent;
+	return accent.isValid() ? accent : st::windowActiveTextFg->c;
+}
+
 void BadgePopup::updatePosition() {
 	const auto parent = parentWidget();
 	if (!parent) {
 		return;
 	}
-	const auto x = (parent->width() - width()) / 2;
-	move(std::max(0, x), style::ConvertScale(4));
+	const auto shadow = st::boxRoundShadow.extend;
+	const auto card = cardGeometry();
+	const auto gap = style::ConvertScale(kGap);
+	const auto anchor = _anchor.isValid()
+		? QRect(parent->mapFromGlobal(_anchor.topLeft()), _anchor.size())
+		: QRect(parent->mapFromGlobal(QCursor::pos()), QSize(1, 1));
+	auto x = anchor.center().x() - card.width() / 2;
+	auto y = anchor.top() - card.height() - gap;
+	if (y < 0) {
+		y = anchor.bottom() + gap;
+	}
+	const auto maxX = std::max(
+		shadow.left(),
+		parent->width() - shadow.right() - card.width());
+	const auto maxY = std::max(
+		shadow.top(),
+		parent->height() - shadow.bottom() - card.height());
+	x = std::max(shadow.left(), std::min(x, maxX));
+	y = std::max(shadow.top(), std::min(y, maxY));
+	move(x - shadow.left(), y - shadow.top());
 }
 
 void BadgePopup::paintEvent(QPaintEvent *) {
@@ -152,34 +220,20 @@ void BadgePopup::paintEvent(QPaintEvent *) {
 	auto p = QPainter(this);
 	p.setOpacity(progress);
 
-	const auto shadow = style::ConvertScale(kShadow);
-	const auto radius = style::ConvertScale(kCardRadius);
-	auto card = QRectF(
-		shadow,
-		shadow,
-		width() - 2 * shadow,
-		height() - 2 * shadow);
+	const auto card = cardGeometry();
+	const auto radius = style::ConvertScale(
+		Custom::DesignTokensForCurrentMode().radiusId);
 
-	const auto scale = 0.96 + 0.04 * progress;
+	const auto scale = 0.94 + 0.06 * progress;
 	p.translate(width() / 2., height() / 2.);
 	p.scale(scale, scale);
 	p.translate(-width() / 2., -height() / 2.);
-	p.translate(0., -style::ConvertScale(10) * (1. - progress));
+	p.translate(0., -style::ConvertScale(12) * (1. - progress));
 
-	const auto shadowColor = st::shadowFg->c;
-	for (auto i = 3; i >= 1; --i) {
-		auto color = shadowColor;
-		color.setAlphaF(std::min(1., color.alphaF() * 0.5 * i));
-		p.setPen(Qt::NoPen);
-		p.setBrush(color);
-		p.drawRoundedRect(
-			card.adjusted(-i, -i + 2., i, i + 2.),
-			radius + i,
-			radius + i);
-	}
+	Ui::Shadow::paint(p, card, width(), st::boxRoundShadow);
 
 	auto border = st::windowActiveTextFg->c;
-	border.setAlphaF(0.35);
+	border.setAlphaF(0.3);
 	p.setPen(QPen(border, 1.));
 	p.setBrush(st::boxBg);
 	p.drawRoundedRect(card, radius, radius);
@@ -191,8 +245,27 @@ void BadgePopup::paintEvent(QPaintEvent *) {
 		card.top() + (card.height() - iconSize) / 2.,
 		iconSize,
 		iconSize);
-	if (!_icon.isNull()) {
+
+	if (_pulseProgress > 0. && _pulseProgress < 1.) {
+		const auto t = _pulseProgress;
+		auto ring = accentColor();
+		ring.setAlphaF(0.3 * (1. - t));
+		p.setPen(QPen(ring, style::ConvertScale(1.5)));
+		p.setBrush(Qt::NoBrush);
+		const auto ringRadius = iconSize * (0.34 + 0.3 * t);
+		p.drawEllipse(iconTarget.center(), ringRadius, ringRadius);
+	}
+
+	const auto iconProgress = _iconProgress;
+	if (iconProgress > 0. && !_icon.isNull()) {
+		p.save();
+		p.translate(iconTarget.center());
+		const auto iconScale = 1.4 - 0.4 * iconProgress;
+		p.scale(iconScale, iconScale);
+		p.translate(-iconTarget.center());
+		p.setOpacity(progress * std::clamp(iconProgress, 0., 1.));
 		p.drawImage(iconTarget, _icon);
+		p.restore();
 	}
 
 	const auto textLeft = iconTarget.right() + style::ConvertScale(kTextSkip);
@@ -204,7 +277,7 @@ void BadgePopup::paintEvent(QPaintEvent *) {
 	auto textTop = card.top() + (card.height() - total) / 2.;
 
 	p.setFont(st::semiboldFont);
-	p.setPen(st::windowFg);
+	p.setPen(accentColor());
 	p.drawText(
 		QRectF(textLeft, textTop, textWidth, titleHeight),
 		Qt::AlignLeft | Qt::AlignVCenter,
@@ -238,7 +311,10 @@ QPointer<BadgePopup> CurrentPopup;
 
 } // namespace
 
-void ShowClientBadgePopup(QWidget *parent, not_null<PeerData*> peer) {
+void ShowClientBadgePopup(
+		QWidget *parent,
+		not_null<PeerData*> peer,
+		const QRect &anchor) {
 	if (!parent) {
 		return;
 	}
@@ -258,7 +334,7 @@ void ShowClientBadgePopup(QWidget *parent, not_null<PeerData*> peer) {
 		CurrentPopup->deleteLater();
 		CurrentPopup = nullptr;
 	}
-	const auto popup = new BadgePopup(window, icon);
+	const auto popup = new BadgePopup(window, icon, anchor);
 	CurrentPopup = popup;
 	popup->startShow();
 }

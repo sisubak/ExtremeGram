@@ -6080,6 +6080,16 @@ bool InnerWidget::isCommunityBadgePressOnNarrow() const {
 		*_st);
 }
 
+bool InnerWidget::isClientBadgePress() const {
+	if (!_selected || !_lastMousePosition) {
+		return false;
+	}
+	const auto local = mapFromGlobal(*_lastMousePosition);
+	return _selected->lookupIsInClientBadge(
+		local.x(),
+		local.y() - dialogsOffset() - _selected->top());
+}
+
 bool InnerWidget::chooseRow(
 		Qt::KeyboardModifiers modifiers,
 		MsgId pressedTopicRootId,
@@ -6122,6 +6132,7 @@ bool InnerWidget::chooseRow(
 		}
 		row.userpicClick = isUserpicPressOnWide();
 		row.communityBadgeClick = isCommunityBadgePressOnNarrow();
+		row.clientBadgeClick = isClientBadgePress();
 		return row;
 	};
 	auto chosen = modifyChosenRow(computeChosenRow(), modifiers);

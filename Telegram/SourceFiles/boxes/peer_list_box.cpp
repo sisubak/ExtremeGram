@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peer_list_section_headers.h"
 #include "boxes/peer_list_section_index.h"
+#include "custom/client_badge_popup.h"
 #include "history/history.h" // chatListNameSortKey.
 #include "main/session/session_show.h"
 #include "main/main_session.h"
@@ -1948,6 +1949,12 @@ void PeerListContent::mousePressReleased(Qt::MouseButton button) {
 			if (pressed.element) {
 				_controller->rowElementClicked(row, pressed.element);
 			} else {
+				const auto point = mapFromGlobal(QCursor::pos())
+					- QPoint(0, getRowTop(pressed.index));
+				if (row->clientBadgeAt(point)) {
+					Custom::ShowClientBadgePopup(this, row->peer());
+					return;
+				}
 				_controller->rowClicked(row);
 			}
 		}

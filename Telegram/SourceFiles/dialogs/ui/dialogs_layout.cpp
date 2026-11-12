@@ -462,6 +462,7 @@ void PaintRow(
 	if (supportMode) {
 		draft = nullptr;
 	}
+	row->setClientBadgeRect(QRect());
 
 	const auto history = entry->asHistory();
 	const auto thread = entry->asThread();
@@ -1003,11 +1004,12 @@ void PaintRow(
 			const auto nameW = std::min(
 				rowName.maxWidth(),
 				rectForName.width());
-			Custom::ClientBadgeFor(
+			const auto badgeLeft = rectForName.left() + nameW + badgeWidth;
+			const auto badgePainted = Custom::ClientBadgeFor(
 				&from->owner().session()
 			).drawBadgeGetWidth(
 				p,
-				rectForName.left() + nameW + badgeWidth,
+				badgeLeft,
 				rectForName.top(),
 				st::semiboldFont->height,
 				from,
@@ -1021,6 +1023,11 @@ void PaintRow(
 					: context.selected
 					? st::dialogsNameFgOver
 					: st::dialogsNameFg)->c);
+			row->setClientBadgeRect(QRect(
+				badgeLeft,
+				rectForName.top(),
+				std::max(badgePainted, clientBadgeWidth),
+				st::semiboldFont->height));
 		}
 		if (drawMuteIcon) {
 			const auto &muteIcon = ThreeStateIcon(

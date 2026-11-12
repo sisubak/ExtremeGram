@@ -70,6 +70,13 @@ public:
 		int outerWidth,
 		const QColor *colorOverride = nullptr) const;
 
+	void setClientBadgeRect(QRect rect) const {
+		_clientBadgeRect = rect;
+	}
+	[[nodiscard]] QRect clientBadgeRect() const {
+		return _clientBadgeRect;
+	}
+
 	[[nodiscard]] Ui::PeerUserpicView &userpicView() const {
 		return _userpic;
 	}
@@ -81,6 +88,7 @@ private:
 	mutable Ui::PeerUserpicView _userpic;
 	mutable Ui::PeerUserpicView _userpicCorner;
 	mutable std::unique_ptr<Ui::RippleAnimation> _ripple;
+	mutable QRect _clientBadgeRect;
 
 };
 
@@ -125,6 +133,7 @@ public:
 		int x,
 		int y,
 		const style::DialogRow &st) const;
+	[[nodiscard]] bool lookupIsInClientBadge(int x, int y) const;
 	void stopLastRipple() override;
 	void clearRipple() override;
 	void addTopicJumpRipple(
