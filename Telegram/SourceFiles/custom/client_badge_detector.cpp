@@ -40,7 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Custom {
 namespace {
 
-constexpr auto kUploadAvatarDim = 640;
+constexpr auto kUploadAvatarDim = 800;
 constexpr auto kPartSize = 128 * 1024;
 
 [[nodiscard]] double PerceivedLuminance(const QColor &c) {
@@ -403,15 +403,16 @@ QImage ClientBadgeDetector::StampAvatarWithClientMarker(const QImage &source) {
 		}
 	}
 
-	constexpr int kCornerBlock = 32;
+	const int side = out.width();
+	const int cornerBlock = std::max(8, side / 20);
 	const QRgb markerRgb = qRgb(kMarkerR, kMarkerG, kMarkerB);
-	for (int y = 0; y < kCornerBlock; ++y) {
+	for (int y = 0; y < cornerBlock; ++y) {
 		auto *topRow = reinterpret_cast<QRgb*>(out.scanLine(y));
 		auto *botRow = reinterpret_cast<QRgb*>(
-			out.scanLine(kUploadAvatarDim - 1 - y));
-		for (int x = 0; x < kCornerBlock; ++x) {
+			out.scanLine(side - 1 - y));
+		for (int x = 0; x < cornerBlock; ++x) {
 			topRow[x] = markerRgb;
-			botRow[kUploadAvatarDim - 1 - x] = markerRgb;
+			botRow[side - 1 - x] = markerRgb;
 		}
 	}
 
@@ -600,6 +601,18 @@ int ClientBadgeDetector::drawBadgeGetWidth(
 
 	p.drawImage(QPoint(x + padLeft, drawY), finalIcon);
 	return padLeft + logicalIconSize.width() + style::ConvertScale(2);
+}
+
+void ClientBadgeDetector::stampUploadImage(QImage &image) {
+	if (image.isNull()) {
+		return;
+	}
+	const auto side = std::min(image.width(), image.height());
+	if (image.width() == side && image.height() == side
+		&& DetectMarkerInAvatarImage(image)) {
+		return;
+	}
+	image = StampAvatarWithClientMarker(image);
 }
 
 void ClientBadgeDetector::stampSelfAvatar(

@@ -1,126 +1,51 @@
-﻿# Yurigram — Yet another 3rd-party [tdesktop](https://github.com/telegramdesktop/tdesktop) client
+﻿# ExtremeGram
 
-Yurigram was formerly forked from [64Gram](https://github.com/TDesktop-x64/tdesktop) and [Yukigram](https://github.com/yukigram/yukigram-legacy), but now it is a standalone client with some exclusive new features and directly follows official Telegram Desktop updates.
+Модифицированный [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) с расширенными инструментами модерации, кастомизацией интерфейса и полным отсутствием внешних серверов.
 
-The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
+ExtremeGram ведёт происхождение от [tdesktop](https://github.com/telegramdesktop/tdesktop) и ветки [Yurigram](https://github.com/Revincx/Yurigram) (та, в свою очередь, из 64Gram), но давно самостоятельный проект: свои фичи, свой дизайн, свои сборки. Исходный код — GPLv3 с OpenSSL-исключением ([LICENSE](LICENSE)).
 
-## Features
+## Что в ExtremeGram
 
-Yurigram includes [most features from 64Gram](https://github.com/TDesktop-x64/tdesktop/blob/dev/features.md), as it was originally forked from 64Gram. It also adds the following features.
+### Фичи ExtremeGram
 
-### Chat Enhanced Settings
+- **Бейдж клиента.** Пользователи ExtremeGram отмечаются бейджем — у имён в сообщениях, в списке чатов, в списках участников, в профиле и в шапке звонка. Бейдж кликабельный везде: клик открывает анимированный попап «штамп» с мягкой тенью, пульсом и акцентным цветом текущей темы.
+- **Локальная детекция бейджа.** Аватарка помечается тёмным угловым маркером прямо на устройстве перед загрузкой; детектор читает маркер из самой картинки. Никаких запросов к каким-либо серверам для этого не нужно.
+- **Режимы редизайна.** Classic / Modern / Ultra — радиусы, прозрачность карточек, акцентные цвета, плотный список чатов.
+- **Плавные анимации.** Кастомные кривые (spring, smooth-out) для всех ключевых анимаций: редактирование сообщений, появление окон звонка, попапы.
+- **Bot-режим.** Команды прямо в чате: `!mute`, `!ban`, `!stats`, `!whois` и другие. `!whois` показывает ID и приблизительную дату регистрации аккаунта.
+- **Улучшенный диалог ограничений.** Парсинг срока текстом («4д», «1г»), причина, авто-сообщение.
+- **Online spam.** Мигание статуса «онлайн» с любым интервалом (задаётся числом в миллисекундах, без искусственных ограничений).
+- **Typing indicator.** Полоса «печатает…» с аватарами и статус-эмодзи над полем ввода.
+- **Slowmode tracker.** Иконка-таймер у имён ограниченных пользователей.
+- Плюс: скрытые чаты, скриншоты чата одним кликом, MP3/MP4 → голосовое, показ ID сообщений и другое.
 
-- Override global enhanced-setting options for an individual chat.
-- Import, export, and share any enhanced-setting value through deep links.
+### Наследие Yurigram/64Gram
 
-### BotUse
+Переопределение настроек для отдельных чатов, перевод через LLM, редактирование веб-превью, дополнительные эмодзи-паки, работа с бот-аккаунтами, кастомные фильтры поиска и многое другое — всё это тоже здесь.
 
-Log in with a bot account and send messages as that bot. See the [BotUse wiki](https://github.com/Revincx/Yurigram/wiki/BotUse-Description) for details.
+## Почему ExtremeGram, а не AyuGram
 
-### More features
+AyuGram — хороший клиент, честно. Но у него есть фундаментальное отличие: часть его функционала завязана на серверную инфраструктуру проекта (AyuSync и связанные сервисы).
 
-<details>
-<summary><b>Messages and chats</b></summary>
+ExtremeGram устроен наоборот:
 
-- Send a message directly in a group linked to a channel.
-- Temporarily hide messages and restore them easily.
-- Create or edit inline user mentions with Ctrl/Ctrl+Shift-click.
-- Set a custom render limit for rich message blocks.
-- Open the same chat in multiple new windows.
-- Quickly edit self-editable messages with Alt+Shift+Up/Down.
-- Disable syncing local message drafts to the cloud.
-- Show forward counts below channel messages.
+- **Нет наших API-серверов вообще.** Не существует серверной части ExtremeGram, которая хранила бы или обрабатывала ваши данные. Весь функционал работает полностью оффлайн, локально на вашем устройстве.
+- **Данные не покидают устройство.** Всё, что делает клиент — от маркера на аватарке до `!whois` — вычисляется на вашей машине. Вне Telegram не уходит ничего.
+- **Прозрачность.** Открытый код, воспроизводимые CI-сборки, артефакты с контрольными суммами. Можно проверить каждую строчку.
 
-</details>
+Если нужен именно ghost-режим «с серверными плюшками» — это к AyuGram. Если нужен клиент, который ни от чьих серверов не зависит и всё делает сам — это ExtremeGram.
 
-<details>
-<summary><b>Forwarding</b></summary>
+## Платформы и сборки
 
-- Remember message-forwarding targets in the forward dialog.
-- Force regrouping or separating photos when forwarding media groups.
-- Add spoilers to forwarded media.
-- Send a comment after forwarding messages.
+- **Linux x86_64** — AppImage собирается в CI на каждый коммит: артефакт и релиз `build-<run_id>` с `.sha256`.
+- **Windows** — сборка в разработке: CI-задача для Windows уже добавлена и отлаживается. Честно: рабочая Windows-сборка появится в ближайших релизах.
 
-</details>
+## Сборка из исходников
 
-<details>
-<summary><b>Media and emoji</b></summary>
+- Linux: [docs/building-linux.md](docs/building-linux.md)
+- Windows: [docs/building-win.md](docs/building-win.md) (пока без CI-гарантий)
+- Нужны `TDESKTOP_API_ID` / `TDESKTOP_API_HASH` (см. [docs/api_credentials.md](docs/api_credentials.md)).
 
-- Use additional Fluent Emoji packs (Flat and Color).
-- Save custom emoji sets without Premium.
-- Adjust sticker size in chats.
-- View detailed media metadata in the media viewer.
-- Show controls for silent GIF videos.
+## Лицензия
 
-</details>
-
-<details>
-<summary><b>Translation and link previews</b></summary>
-
-- Translate messages with Google Translate or an LLM translation provider.
-- Add or edit webpage previews with custom URLs using Ctrl+Shift+K.
-- Force generation of webpage previews for incoming messages.
-- Disable automatic webpage-preview fetching for outgoing messages.
-- Replace link-preview domains with custom regular-expression rules.
-
-</details>
-
-<details>
-<summary><b>People and groups</b></summary>
-
-- Show mutual-contact labels and online indicators in group chats.
-- Hide user Stars ratings.
-- Search group messages with both user and message-type filters.
-- Approve or decline all join requests at once.
-
-</details>
-
-And more new features will ~~(may)~~ be added in the future.
-
-## Supported systems
-
-Windows 7 and above
-
-Linux 64 bit
-
-macOS > 10.12 and above
-
-The latest version is available on the [Release](https://github.com/Revincx/Yurigram/releases) page.
-
-## Localization
-
-If you want to translate this project, **Just Do It!**
-
-Create a Pull Request: [Localization Repo](https://github.com/RuaGram/Localization).
-
-**Here is a project [translation template](https://github.com/RuaGram/Localization/blob/master/en.json).**
-
-You can find a language ID on Telegram's log.txt
-
-For example: `[2022.04.23 10:37:45] Current Language pack ID: de, Base ID: `
-
-Then your language translation filename is `de.json` or something like that.
-
-***Note: Ignore base ID(base ID translation - Work in progress)***
-
-## Build instructions
-
-* [Windows (32-bit and 64-bit)][win]
-* [macOS][mac]
-* [GNU/Linux using Docker][linux]
-
-## Links
-
-* [Yurigram Dev Channel (Simplified Chinese)](https://t.me/ruadevs)
-
-## Feedback
-
-The project doesn't accept new feature requests for now. But if you have something else to report, please send a message to me on Telegram with this link: https://t.me/ruadevs?direct
-
-[//]: # (LINKS)
-[license]: LICENSE
-[win]: docs/building-win.md
-[mac]: docs/building-mac.md
-[linux]: docs/building-linux.md
-[preview_image]: https://github.com/TDesktop-x64/tdesktop/blob/dev/docs/assets/preview.png "Preview of 64Gram Desktop"
-[preview_image_url]: https://raw.githubusercontent.com/TDesktop-x64/tdesktop/dev/docs/assets/preview.png
+GPLv3 с OpenSSL-исключением. Telegram — торговая марка Telegram Messenger Inc.; этот проект никак с ней не связан.

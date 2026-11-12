@@ -51,6 +51,8 @@ public:
 	void stampSelfAvatar(
 		Fn<void(bool ok, QString message)> done = nullptr);
 
+	void stampUploadImage(QImage &image);
+
 	int drawBadgeGetWidth(
 		QPainter &p,
 		int x,

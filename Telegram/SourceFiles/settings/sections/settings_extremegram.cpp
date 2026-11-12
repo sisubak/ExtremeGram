@@ -20,9 +20,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
-#include "ui/widgets/continuous_sliders.h"
+#include "ui/widgets/fields/number_input.h"
+#include "styles/style_widgets.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
+
+#include <algorithm>
 
 namespace Settings {
 namespace {
@@ -83,31 +86,40 @@ void BuildOnlineSpamInterval(
 	if (!button || !controller) {
 		return;
 	}
-	const auto slider = builder.container()->add(
-		object_ptr<Ui::MediaSliderWheelless>(
+	const auto input = builder.container()->add(
+		object_ptr<Ui::NumberInput>(
 			builder.container(),
-			st::settingsScale),
+			st::defaultInputField,
+			rpl::single(QString::fromUtf8("Интервал, мс")),
+			QString::number(EnhancedSettings::Get(key)),
+			5),
 		st::settingsBigScalePadding);
-	slider->resize(slider->width(), st::settingsScale.seekSize.height());
-	slider->setAccessibleName(EnhancedSettings::OptionTitle(key.id));
+	input->setAccessibleName(EnhancedSettings::OptionTitle(key.id));
 
-	constexpr auto kMsStep = 100;
-	constexpr auto kMaximumMs = 600000;
-	const auto sections = kMaximumMs / kMsStep;
-	slider->setPseudoDiscrete(
-		sections + 1,
-		[](int index) { return index; },
-		EnhancedSettings::Get(key) / kMsStep,
-		[=](int index) { valueLabel->fire(label(index * kMsStep)); },
-		[=](int index) {
+	const auto apply = [=] {
+		const auto text = input->getLastText();
+		const auto current = EnhancedSettings::Get(key);
+		const auto value = text.isEmpty()
+			? current
+			: std::clamp(text.toInt(), 10, 60000);
+		if (value != current) {
 			EnhancedSettings::ApplyOption(
 				not_null<Window::SessionController*>(controller),
 				key,
-				index * kMsStep);
-		});
+				value);
+		}
+		input->setText(QString::number(EnhancedSettings::Get(key)));
+	};
+	QObject::connect(
+		input,
+		&Ui::NumberInput::submitted,
+		[=](Qt::KeyboardModifiers) { apply(); });
+	QObject::connect(input, &Ui::NumberInput::blurred, apply);
 	EnhancedSettings::Changes(key) | rpl::on_next([=] {
 		const auto value = EnhancedSettings::Get(key);
-		slider->setValue(value / float64(kMaximumMs));
+		if (input->getLastText().toInt() != value) {
+			input->setText(QString::number(value));
+		}
 		valueLabel->fire(label(value));
 	}, builder.container()->lifetime());
 }

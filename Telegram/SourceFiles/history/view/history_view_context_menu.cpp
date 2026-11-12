@@ -1641,6 +1641,9 @@ void AddExtremeBadgeAction(
 	if (!user) {
 		return;
 	}
+	if (item->out() || user->isSelf()) {
+		return;
+	}
 	if (!Custom::ClientBadgeFor(
 			&item->history()->session()
 		).hasCustomClientBadge(item->from())) {

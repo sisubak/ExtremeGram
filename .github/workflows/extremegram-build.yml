@@ -1,4 +1,4 @@
-name: Build ExtremeGram AppImage
+name: Build ExtremeGram
 on:
   workflow_dispatch:
 permissions:
@@ -93,4 +93,93 @@ jobs:
           gh release upload "$tag" \
             ExtremeGram-x86_64.AppImage \
             ExtremeGram-x86_64.AppImage.sha256 \
+            --clobber
+
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - name: Checkout source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Check configuration
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        shell: bash
+        run: |
+          if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
+            echo 'Missing repository secrets TDESKTOP_API_ID or TDESKTOP_API_HASH.' >&2
+            exit 1
+          fi
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            Libraries/win64/local
+            Libraries/win64/Qt-6.11.2
+            ThirdParty
+            cache_keys
+          key: win-libs-qt6112-v1
+      - name: Prepare dependencies
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd /d "%GITHUB_WORKSPACE%\Telegram\build\prepare"
+          win.bat qt6 skip-debug skip-dump-syms silent
+      - name: Configure
+        shell: cmd
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          cd /d "%GITHUB_WORKSPACE%\Telegram"
+          configure.bat x64 -D TDESKTOP_API_ID=%API_ID% -D TDESKTOP_API_HASH=%API_HASH% -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+      - name: Compile
+        shell: cmd
+        run: |
+          cd /d "%GITHUB_WORKSPACE%\Telegram"
+          cmake --build ../out --config Release --parallel 2
+      - name: Install application
+        shell: cmd
+        run: |
+          cd /d "%GITHUB_WORKSPACE%\Telegram"
+          cmake --install ../out --config Release --prefix ../out/pkg
+      - name: Package
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path out/pkg -Recurse -Filter Telegram.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) {
+            New-Item -ItemType Directory -Force -Path out/pkg | Out-Null
+            Copy-Item out/Release/Telegram.exe out/pkg/Telegram.exe
+          }
+          Compress-Archive -Path out/pkg/* -DestinationPath ExtremeGram-win64.zip -Force
+          (Get-FileHash ExtremeGram-win64.zip -Algorithm SHA256).Hash | Out-File -Encoding ascii ExtremeGram-win64.zip.sha256
+          Get-ChildItem -Recurse out/pkg | Select-Object FullName | Out-String
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: ExtremeGram-win64
+          path: |
+            ExtremeGram-win64.zip
+            ExtremeGram-win64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag="build-${GITHUB_RUN_ID}"
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "ExtremeGram build ${GITHUB_RUN_ID}" \
+            --notes "Automated builds of ${GITHUB_REF_NAME} at ${GITHUB_SHA}." \
+            || true
+          gh release upload "$tag" \
+            ExtremeGram-win64.zip \
+            ExtremeGram-win64.zip.sha256 \
             --clobber

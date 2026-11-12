@@ -76,3 +76,17 @@ settings.local.json
 
 # Generated changelog page (built by CI, deployed to GitHub Pages)
 /docs/changelog/
+
+# Agent work files (kept locally, not part of the project)
+/.agents/
+/.claude/
+/.grok/
+/.oss-scanner/
+/.cursor/
+/CLAUDE.md
+/GROK.md
+/AGENTS.md
+/AGENT_TODO.md
+/REVIEW.md
+/tasks/
+/scripts/

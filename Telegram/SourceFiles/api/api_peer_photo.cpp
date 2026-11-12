@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "base/random.h"
 #include "base/unixtime.h"
+#include "core/enhanced_settings.h"
+#include "custom/client_badge_detector.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -356,10 +358,15 @@ void PeerPhoto::upload(
 	if (mtpMarkup) {
 		ready(fakeId, { .videoSize = mtpMarkup });
 	} else {
+		auto image = base::take(photo.image);
+		if (peer->isSelf()
+			&& EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+			Custom::ClientBadgeFor(_session).stampUploadImage(image);
+		}
 		const auto prepared = PreparePeerPhoto(
 			_api.instance().mainDcId(),
 			peer->id,
-			base::take(photo.image));
+			std::move(image));
 		it->second.photoId = prepared->thumbId;
 		_session->uploader().upload(fakeId, prepared);
 	}
@@ -467,10 +474,15 @@ void PeerPhoto::videoTranscoded(
 	value.waitingVideo = true;
 	_videoToPhotoId.emplace(videoId, msgId);
 
+	auto cover = std::move(result.cover);
+	if (peer->isSelf()
+		&& EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+		Custom::ClientBadgeFor(_session).stampUploadImage(cover);
+	}
 	const auto prepared = PreparePeerPhoto(
 		_api.instance().mainDcId(),
 		peer->id,
-		std::move(result.cover));
+		std::move(cover));
 	value.photoId = prepared->thumbId;
 	_session->uploader().upload(msgId, prepared);
 	_session->uploader().upload(videoId, PreparePeerVideo(content));
