@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/basic_types.h"
 
+class HistoryItem;
 class PeerData;
 class QString;
 
@@ -26,5 +27,9 @@ void UnignorePeer(not_null<PeerData*> peer);
 // Human-readable list for the !ignore command reply.
 [[nodiscard]] QString IgnoredListText(not_null<Main::Session*> session);
 [[nodiscard]] int IgnoredCount(not_null<Main::Session*> session);
+
+// The message collapses into an empty slot when its author is ignored.
+// Implemented next to MessageExtraState::shouldHideBlockedMessage.
+[[nodiscard]] bool ShouldCollapseIgnored(not_null<HistoryItem*> item);
 
 } // namespace Autistic

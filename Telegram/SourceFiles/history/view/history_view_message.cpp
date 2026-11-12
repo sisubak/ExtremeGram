@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "core/ui_integration.h"
 #include "core/update_checker.h"
+#include "core/msg_extra_state.h"
+
 #include "custom/client_badge_detector.h"
 #include "custom/client_badge_popup.h"
 #include "custom/slowmode_tracker.h"
@@ -1925,6 +1927,13 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		return;
 	}
 
+	// Autistic ghosts render at reduced opacity; reset before the only
+	// function exit below (early returns are all above this point).
+	const auto ghosted = MessageExtraState::IsGhosted(item);
+	if (ghosted) {
+		p.setOpacity(0.35);
+	}
+
 	const auto entry = logEntryOriginal();
 	const auto check = factcheckBlock();
 	auto mediaDisplayed = media && media->isDisplayed();
@@ -2467,6 +2476,9 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		}
 	} else if (!context.skipSelectionCheck) {
 		_selectionRoundCheckbox = nullptr;
+	}
+	if (ghosted) {
+		p.setOpacity(1.);
 	}
 }
 

@@ -47,6 +47,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "core/enhanced_settings.h"
 #include "core/msg_extra_state.h"
+
+#include "custom/autistic/autistic_ignore.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
 #include "main/main_app_config.h"
@@ -1661,7 +1663,9 @@ bool Element::isHiddenByGroup() const {
 }
 
 bool Element::isHidden() const {
-	return MessageExtraState::isHidden(data()) || isHiddenByGroup();
+	return MessageExtraState::isHidden(data())
+		|| isHiddenByGroup()
+		|| Autistic::ShouldCollapseIgnored(data());
 }
 
 void Element::overrideMedia(std::unique_ptr<Media> media) {

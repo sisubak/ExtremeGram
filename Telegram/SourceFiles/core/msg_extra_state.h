@@ -92,6 +92,12 @@ void hideMessages(
 	HiddenSource source = HiddenSource::Manual,
 	std::optional<HiddenScope> scope = std::nullopt);
 [[nodiscard]] bool shouldHideBlockedMessage(not_null<HistoryItem*> item);
+
+// Autistic "ghosts": messages deleted by the peer stay in the list,
+// dimmed, until the app restart.
+[[nodiscard]] bool IsGhosted(not_null<HistoryItem*> item);
+void MarkGhosted(not_null<HistoryItem*> item);
+
 [[nodiscard]] rpl::producer<PeerId> changes();
 
 } // namespace MessageExtraState

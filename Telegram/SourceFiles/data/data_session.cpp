@@ -21,6 +21,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/msg_extra_state.h"
+
+#include "custom/autistic/autistic_mode.h"
 #include "core/mime_type.h" // Core::IsMimeSticker
 #include "ui/image/image_location_factory.h" // Images::FromPhotoSize
 #include "ui/text/format_values.h" // Ui::FormatPhone
@@ -3364,6 +3366,15 @@ void Session::processMessagesDeleted(
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
 			const auto history = i->second->history();
+			if (Autistic::on(EnhancedSettings::Option::AutisticGhosts)
+				&& !i->second->out()
+				&& !i->second->isService()
+				&& !MessageExtraState::IsGhosted(i->second)) {
+				// Keep the deleted message in the list, dimmed.
+				MessageExtraState::MarkGhosted(i->second);
+				histories().readClientSideMessage(i->second);
+				continue;
+			}
 			toDestroy.push_back(i->second);
 			historiesToCheck.emplace(history);
 		} else if (affected) {
@@ -3389,6 +3400,15 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
 			const auto history = item->history();
+			if (Autistic::on(EnhancedSettings::Option::AutisticGhosts)
+				&& !item->out()
+				&& !item->isService()
+				&& !MessageExtraState::IsGhosted(item)) {
+				// Keep the deleted message in the list, dimmed.
+				MessageExtraState::MarkGhosted(item);
+				histories().readClientSideMessage(item);
+				continue;
+			}
 			toDestroy.push_back(item);
 			historiesToCheck.emplace(history);
 		}
