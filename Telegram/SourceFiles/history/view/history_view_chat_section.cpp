@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_chat_section.h"
 
 #include "core/enhanced_settings.h"
+#include "custom/autistic/autistic_mode.h"
+#include "custom/autistic/layout_converter.h"
 #include "custom/bot_mode_manager.h"
 #include "custom/mention_pins.h"
 #include "history/admin_log/history_admin_log_section.h"
@@ -2752,6 +2754,14 @@ void ChatWidget::sendTextWithTags(
 		message.textWithTags = Custom::ApplyMentionNames(
 			&session(),
 			std::move(message.textWithTags));
+	}
+	if (!options.scheduled
+		&& Autistic::on(EnhancedSettings::Option::AutisticLayoutFix)) {
+		const auto utf16 = message.textWithTags.text.toStdU16String();
+		if (Autistic::NeedsLayoutFix(utf16)) {
+			message.textWithTags.text = QString::fromStdU16String(
+				Autistic::FixKeyboardLayout(utf16));
+		}
 	}
 	if (const auto bot = BotUse::Selected(_history)) {
 		if (const auto error = BotUse::ValidateSend(bot, message.action)) {
