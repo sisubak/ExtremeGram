@@ -607,6 +607,8 @@ PRIVATE
     custom/autistic/autistic_ignore.h
     custom/autistic/autistic_mode.cpp
     custom/autistic/autistic_mode.h
+    custom/autistic/autistic_orig.cpp
+    custom/autistic/autistic_orig.h
     custom/autistic/autistic_panel.cpp
     custom/autistic/autistic_panel.h
     custom/bot_mode_manager.cpp

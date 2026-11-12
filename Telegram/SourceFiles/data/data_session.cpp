@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/msg_extra_state.h"
 
 #include "custom/autistic/autistic_mode.h"
+#include "custom/autistic/autistic_orig.h"
 #include "core/mime_type.h" // Core::IsMimeSticker
 #include "ui/image/image_location_factory.h" // Images::FromPhotoSize
 #include "ui/text/format_values.h" // Ui::FormatPhone
@@ -3083,6 +3084,13 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 	}
 	if (existing->isLocalUpdateMedia() && data.type() == mtpc_message) {
 		updateExistingMessage(data.c_message());
+	}
+	if (Autistic::on(EnhancedSettings::Option::AutisticShowOrig)
+		&& !existing->isService()) {
+		// Snapshot the pre-edit text before the edition is applied.
+		Autistic::RememberOriginal(
+			existing->fullId(),
+			existing->originalText());
 	}
 	data.match([](const MTPDmessageEmpty &) {
 	}, [&](const MTPDmessageService &data) {

@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "core/msg_extra_state.h"
 
+#include "custom/autistic/autistic_orig.h"
 #include "custom/client_badge_detector.h"
 #include "custom/client_badge_popup.h"
 #include "custom/slowmode_tracker.h"
@@ -3269,6 +3270,21 @@ void Message::paintText(
 		.useFullWidth = true,
 		.linePostprocess = linePostprocess ? &*linePostprocess : nullptr,
 	});
+	// Autistic "orig": the pre-edit text snapshot as a small line below.
+	if (Autistic::ShowOrigFor(data())) {
+		if (const auto original = Autistic::OriginalFor(data()->fullId())) {
+			p.setFont(st::fwdTextStyle);
+			p.setPen(st::windowSubTextFg);
+			const auto line = QString::fromUtf8("orig: ") + original->text;
+			const auto y = trect.y() + textHeightFor(trect.width())
+				+ (Autistic::OrigExtraHeight() - st::fwdTextStyle->height) / 2;
+			p.drawTextLeft(
+				trect.x(),
+				y,
+				width(),
+				st::fwdTextStyle->font->elided(line, trect.width()));
+		}
+	}
 	if (needRippleMask && !ripplePath.isEmpty()) {
 		createLinkRippleMask(
 			ripplePath,
@@ -7016,6 +7032,9 @@ int Message::resizeContentGetHeight(int newWidth) {
 			_reactions->resizeGetHeight(textWidth);
 		}
 		if (contentWidth == maxWidth() && !appearing) {
+			if (Autistic::ShowOrigFor(item)) {
+				newHeight += Autistic::OrigExtraHeight();
+			}
 			if (mediaDisplayed) {
 				newHeight += media->height() - media->minHeight();
 				if (check) {
@@ -7044,6 +7063,9 @@ int Message::resizeContentGetHeight(int newWidth) {
 					newHeight += appearing->shownHeight;
 				} else {
 					newHeight += textHeightFor(textWidth);
+					if (Autistic::ShowOrigFor(item)) {
+						newHeight += Autistic::OrigExtraHeight();
+					}
 				}
 			}
 			if (!mediaOnBottom && (!_viewButton || !reactionsInBubble)) {
