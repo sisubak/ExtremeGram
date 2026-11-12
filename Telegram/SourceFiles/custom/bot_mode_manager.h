@@ -107,6 +107,12 @@ private:
 		base::flat_map<PeerId, UserStatEntry> counts;
 	};
 
+	enum class WhoisStyle {
+		Full,     // name + ID + registration + group join date
+		Account,  // name + ID + registration date only
+		Vxod,     // group join date only (megagroups)
+	};
+
 	bool handleMuteCommand(
 		not_null<History*> history,
 		const QString &argsText,
@@ -118,7 +124,14 @@ private:
 		not_null<History*> history,
 		const QString &argsText,
 		FullMsgId replyToId,
-		Window::SessionController *controller);
+		Window::SessionController *controller,
+		WhoisStyle style = WhoisStyle::Full);
+	bool handleIgnoreCommand(
+		not_null<History*> history,
+		const QString &argsText,
+		FullMsgId replyToId,
+		Window::SessionController *controller,
+		bool unignore);
 
 	void requestBatch(PeerId peerId);
 	void scheduleRetry(PeerId peerId, int seconds, Fn<void()> retryFn);

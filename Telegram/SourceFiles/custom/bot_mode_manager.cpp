@@ -6,6 +6,8 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/bot_mode_manager.h"
+#include "custom/autistic/autistic_ignore.h"
+#include "custom/autistic/autistic_mode.h"
 #include "custom/redesign.h"
 #include "custom/smooth_animations.h"
 
@@ -420,13 +422,96 @@ bool BotModeManager::interceptCommand(
 	const auto isWhois = (trimmed.compare(u"!whois"_q, Qt::CaseInsensitive) == 0)
 		|| trimmed.startsWith(u"!whois "_q, Qt::CaseInsensitive)
 		|| trimmed.startsWith(u"!whois@"_q, Qt::CaseInsensitive);
-	if (!isMute && !isStats && !isStop && !isHelp && !isWhois) {
+	const auto isAccount = (trimmed.compare(u"!account"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!account "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!account@"_q, Qt::CaseInsensitive);
+	const auto isVxod = (trimmed.compare(u"!vxod"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!vxod "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!vxod@"_q, Qt::CaseInsensitive);
+	const auto isUnignore = (trimmed.compare(u"!unignore"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!unignore "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!unignore@"_q, Qt::CaseInsensitive);
+	const auto isIgnore = (trimmed.compare(u"!ignore"_q, Qt::CaseInsensitive) == 0)
+		|| trimmed.startsWith(u"!ignore "_q, Qt::CaseInsensitive)
+		|| trimmed.startsWith(u"!ignore@"_q, Qt::CaseInsensitive);
+	const auto isBot = (trimmed.compare(u"!bot"_q, Qt::CaseInsensitive) == 0);
+	const auto isStopBot = (trimmed.compare(u"!stopbot"_q, Qt::CaseInsensitive) == 0);
+	if (!isMute && !isStats && !isStop && !isHelp && !isWhois
+		&& !isAccount && !isVxod && !isIgnore && !isUnignore
+		&& !isBot && !isStopBot) {
 		return false;
+	}
+	// Autistic-mode commands are plain text while the mode is off.
+	const auto commandsOn = Autistic::on(
+		EnhancedSettings::Option::AutisticCommands);
+	if ((isBot || isStopBot || isAccount || isVxod || isIgnore || isUnignore)
+		&& !commandsOn) {
+		return false;
+	}
+	// !bot / !stopbot toggle the bot-mode preference itself, so they run
+	// before the gate below (otherwise they would be unreachable while the
+	// mode they enable is off).
+	if (isBot || isStopBot) {
+		const auto enable = isBot;
+		EnhancedSettings::Set(EnhancedSettings::Option::BotMode, enable);
+		if (!enable) {
+			stopScan(history);
+		}
+		if (controller) {
+			controller->showToast(QString::fromUtf8(enable
+				? "Бот-режим включён: доступны !mute, !stats, !stop."
+				: "Бот-режим выключен."));
+		}
+		return true;
+	}
+	// Informational commands work without the bot-mode gate.
+	if (isWhois || isAccount || isVxod) {
+		const auto spaceIdx = trimmed.indexOf(QChar(' '));
+		const auto rest = (spaceIdx >= 0)
+			? trimmed.mid(spaceIdx + 1).trimmed()
+			: QString();
+		return handleWhoisCommand(
+			history,
+			rest,
+			replyToId,
+			controller,
+			isWhois
+				? WhoisStyle::Full
+				: isAccount ? WhoisStyle::Account : WhoisStyle::Vxod);
+	}
+	if (isIgnore || isUnignore) {
+		const auto spaceIdx = trimmed.indexOf(QChar(' '));
+		const auto rest = (spaceIdx >= 0)
+			? trimmed.mid(spaceIdx + 1).trimmed()
+			: QString();
+		return handleIgnoreCommand(
+			history,
+			rest,
+			replyToId,
+			controller,
+			isUnignore);
+	}
+	if (controller && isHelp) {
+		controller->showToast(QString::fromUtf8(
+			"Команды ExtremeGram:\n"
+			"!account / !vxod — данные автора ответа (ID, регистрация / вход)\n"
+			"!ignore / !unignore [ответ или @user] — локальный игнор-лист\n"
+			"!ignore — показать игнор-лист\n"
+			"!bot / !stopbot — включить/выключить бот-команды\n"
+			"!mute [время] [причина] — ограничить ответом (30с–366д: 90m, 2h, 1d)\n"
+			"!whois — полный профиль автора ответа\n"
+			"!stats — подсчёт сообщений чата\n"
+			"!stop — остановить подсчёт\n"
+			"!help — этот список"));
+	}
+	if (isHelp) {
+		return true;
 	}
 	if (!EnhancedSettings::Get(EnhancedSettings::Option::BotMode)) {
 		if (controller) {
-			controller->showToast(QString::fromUtf8(
-				"Бот-режим выключен. Включите его в настройках ExtremeGram."));
+			controller->showToast(QString::fromUtf8(commandsOn
+				? "Бот-режим выключен. Отправьте !bot, чтобы включить."
+				: "Бот-режим выключен. Включите его в настройках ExtremeGram."));
 		}
 		return true;
 	}
@@ -445,25 +530,6 @@ bool BotModeManager::interceptCommand(
 			controller->showToast(QString::fromUtf8(
 				"В этом чате нет активного подсчёта статистики."));
 		}
-		return true;
-	}
-	if (isWhois) {
-		const auto spaceIdx = trimmed.indexOf(QChar(' '));
-		const auto rest = (spaceIdx >= 0)
-			? trimmed.mid(spaceIdx + 1).trimmed()
-			: QString();
-		return handleWhoisCommand(history, rest, replyToId, controller);
-	}
-	if (controller && isHelp) {
-		controller->showToast(QString::fromUtf8(
-			"Бот-режим ExtremeGram: команды\n"
-			"!mute [время] [причина] — ограничить ответом (30с–366д: 90m, 2h, 1d)\n"
-			"!whois — данные автора ответа: ID, дата регистрации, вход в группу\n"
-			"!stats — подсчёт сообщений чата\n"
-			"!stop — остановить подсчёт\n"
-			"!help — этот список"));
-	}
-	if (isHelp) {
 		return true;
 	}
 	if (controller) {
@@ -626,7 +692,8 @@ bool BotModeManager::handleWhoisCommand(
 		not_null<History*> history,
 		const QString &argsText,
 		FullMsgId replyToId,
-		Window::SessionController *controller) {
+		Window::SessionController *controller,
+		WhoisStyle style) {
 	PeerData *targetPeer = nullptr;
 	if (replyToId) {
 		if (const auto replyItem = _session->data().message(replyToId)) {
@@ -677,7 +744,19 @@ bool BotModeManager::handleWhoisCommand(
 			.arg(registeredLine);
 	}
 
+	if (style == WhoisStyle::Account) {
+		sendWithRetry(peer, base, replyToId, nullptr);
+		return true;
+	}
 	const auto channel = peer->asChannel();
+	if (style == WhoisStyle::Vxod && !(channel && channel->isMegagroup())) {
+		sendWithRetry(
+			peer,
+			QString::fromUtf8("!vxod: дата входа видна только в супергруппах."),
+			replyToId,
+			nullptr);
+		return true;
+	}
 	if (channel && channel->isMegagroup()) {
 		_api.request(MTPchannels_GetParticipant(
 			channel->inputChannel(),
@@ -702,15 +781,84 @@ bool BotModeManager::handleWhoisCommand(
 			}, [](const auto &) {});
 			const auto report = QString::fromUtf8(
 				"%1\nВход в группу: %2")
-				.arg(base, joinedLine);
+				.arg(
+					(style == WhoisStyle::Vxod) ? user->name() : base,
+					joinedLine);
 			sendWithRetry(lower, report, FullMsgId(), nullptr);
 		}).fail([=, lower = history->peer](const MTP::Error &) {
-			const auto report = base + QString::fromUtf8(
+			const auto report = ((style == WhoisStyle::Vxod)
+				? user->name()
+				: base) + QString::fromUtf8(
 				"\nВход в группу: участник не найден");
 			sendWithRetry(lower, report, FullMsgId(), nullptr);
 		}).send();
 	} else {
 		sendWithRetry(peer, base, replyToId, nullptr);
+	}
+	return true;
+}
+
+bool BotModeManager::handleIgnoreCommand(
+		not_null<History*> history,
+		const QString &argsText,
+		FullMsgId replyToId,
+		Window::SessionController *controller,
+		bool unignore) {
+	PeerData *targetPeer = nullptr;
+	if (replyToId) {
+		if (const auto replyItem = _session->data().message(replyToId)) {
+			targetPeer = replyItem->from().get();
+		}
+	}
+	const auto trimmedArgs = argsText.trimmed();
+	if (!targetPeer && !trimmedArgs.isEmpty()) {
+		const auto uname = trimmedArgs.startsWith('@')
+			? trimmedArgs.mid(1).split(QChar(' '), Qt::SkipEmptyParts).value(0)
+			: QString();
+		targetPeer = uname.isEmpty()
+			? nullptr
+			: _session->data().peerByUsername(uname);
+	}
+	if (!targetPeer) {
+		if (trimmedArgs.isEmpty()) {
+			// No target at all: show the current list.
+			sendWithRetry(
+				history->peer,
+				Autistic::IgnoredListText(_session),
+				FullMsgId(),
+				nullptr);
+			return true;
+		}
+		if (controller) {
+			controller->showToast(QString::fromUtf8(unignore
+				? "Ответьте на сообщение участника или укажите @username: !unignore"
+				: "Ответьте на сообщение участника или укажите @username: !ignore"));
+		}
+		return true;
+	}
+	const auto user = targetPeer->asUser();
+	if (!user) {
+		sendWithRetry(
+			history->peer,
+			QString::fromUtf8("!ignore работает только с людьми."),
+			replyToId,
+			nullptr);
+		return true;
+	}
+	if (unignore) {
+		Autistic::UnignorePeer(user);
+		sendWithRetry(
+			history->peer,
+			QString::fromUtf8("%1 убран из игнор-листа.").arg(user->name()),
+			replyToId,
+			nullptr);
+	} else {
+		Autistic::IgnorePeer(user);
+		sendWithRetry(
+			history->peer,
+			QString::fromUtf8("%1 добавлен в игнор-лист.").arg(user->name()),
+			replyToId,
+			nullptr);
 	}
 	return true;
 }

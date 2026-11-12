@@ -603,6 +603,8 @@ PRIVATE
     core/deadlock_detector.h
     core/enhanced_settings.cpp
     core/enhanced_settings.h
+    custom/autistic/autistic_ignore.cpp
+    custom/autistic/autistic_ignore.h
     custom/autistic/autistic_mode.cpp
     custom/autistic/autistic_mode.h
     custom/autistic/autistic_panel.cpp
