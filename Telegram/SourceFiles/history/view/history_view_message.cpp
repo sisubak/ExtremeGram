@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "core/msg_extra_state.h"
 
+#include "custom/autistic/autistic_mode.h"
 #include "custom/autistic/autistic_orig.h"
 #include "custom/client_badge_detector.h"
 #include "custom/client_badge_popup.h"
@@ -48,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/torn_edge.h"
 #include "ui/effects/reaction_fly_animation.h"
 #include "ui/effects/ripple_animation.h"
+#include "ui/effects/spoiler_mess.h"
 #include "ui/text/text_utilities.h"
 #include "ui/text/text_custom_emoji.h"
 #include "ui/text/text_extended_data.h"
@@ -1928,6 +1930,18 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		return;
 	}
 
+	const auto foreign = Autistic::ForeignModeFor(item);
+	if (foreign == Autistic::HideForeign::Collapsed) {
+		p.setFont(st::msgDateFont);
+		p.setPen(st::windowSubTextFg);
+		p.drawTextLeft(
+			g.x(),
+			g.y() + (g.height() - st::msgDateFont->height) / 2,
+			width(),
+			QString::fromUtf8("[скрыто]"));
+		return;
+	}
+
 	// Autistic ghosts render at reduced opacity; reset before the only
 	// function exit below (early returns are all above this point).
 	const auto ghosted = MessageExtraState::IsGhosted(item);
@@ -2196,7 +2210,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		auto highlightRange = context.highlight.range;
 		const auto mediaHeight = mediaDisplayed ? media->height() : 0;
 		const auto paintMedia = [&](int top) {
-			if (!mediaDisplayed) {
+			if (!mediaDisplayed
+				|| foreign == Autistic::HideForeign::Invisible) {
 				return;
 			}
 			const auto mediaSelection = _invertMedia
@@ -2243,7 +2258,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			p.save();
 			p.setClipping(false);
 		}
-		if (drawText) {
+		if (drawText
+			&& foreign != Autistic::HideForeign::Invisible) {
 			auto copy = context;
 			copy.selection = textSelection;
 			copy.highlight.range = highlightRange;
@@ -2287,6 +2303,25 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			}
 			entry->draw(p, entryContext);
 			p.translate(-entryLeft, -entryTop);
+		}
+		// Autistic Blur: spoiler overlay above everything but the date.
+		if (foreign == Autistic::HideForeign::Blur) {
+			if (!_spoilerOverlay) {
+				_spoilerOverlay = std::make_unique<Ui::SpoilerAnimation>([=] {
+					history()->owner().requestViewRepaint(this);
+				});
+			}
+			auto contentRect = inner;
+			if (displayInfo) {
+				contentRect.setHeight(
+					contentRect.height() - bottomInfoHeight());
+			}
+			const auto paused = On(PowerSaving::kChatSpoiler);
+			FillSpoilerRect(
+				p,
+				contentRect,
+				DefaultImageSpoiler().frame(
+					_spoilerOverlay->index(context.now, paused)));
 		}
 		if (displayInfo) {
 			const auto bottomSelected = context.selected()
@@ -6907,6 +6942,12 @@ int Message::resizeContentGetHeight(int newWidth) {
 		return marginTop() + marginBottom();
 	} else if (newWidth < st::msgMinWidth) {
 		return height();
+	}
+	if (Autistic::ForeignModeFor(data())
+		== Autistic::HideForeign::Collapsed) {
+		return marginTop()
+			+ marginBottom()
+			+ st::msgDateFont->height;
 	}
 
 	const auto item = data();

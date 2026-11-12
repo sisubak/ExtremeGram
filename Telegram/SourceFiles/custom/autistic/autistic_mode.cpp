@@ -7,6 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/autistic/autistic_mode.h"
 
+#include "core/msg_extra_state.h"
+#include "custom/autistic/autistic_ignore.h"
+#include "history/history_item.h"
+
 namespace Autistic {
 namespace {
 
@@ -68,6 +72,18 @@ HideForeign hideForeign() {
 	return HideForeign(std::clamp(raw, 0, 3));
 }
 
+HideForeign ForeignModeFor(not_null<HistoryItem*> item) {
+	const auto mode = masterOn() ? hideForeign() : HideForeign::Off;
+	if (mode == HideForeign::Off || item->out() || item->isService()) {
+		return HideForeign::Off;
+	}
+	// Ghosts and ignore-collapsing own the rendering first.
+	if (MessageExtraState::IsGhosted(item) || ShouldCollapseIgnored(item)) {
+		return HideForeign::Off;
+	}
+	return mode;
+}
+
 void CycleHideForeign() {
 	SubscribeRelayout();
 	const auto next = (static_cast<int>(hideForeign()) + 1) % 4;
@@ -80,6 +96,11 @@ void CycleHideForeign() {
 rpl::producer<> RelayoutRequested() {
 	SubscribeRelayout();
 	return RelayoutStream().events();
+}
+
+void RequestRelayout() {
+	SubscribeRelayout();
+	RelayoutStream().fire({});
 }
 
 void ToggleMaster(not_null<Window::SessionController*> controller) {

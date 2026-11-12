@@ -446,6 +446,11 @@ Session::Session(not_null<Main::Session*> session)
 			requestItemViewRefresh(item);
 		}
 	}, _lifetime);
+
+	Autistic::RelayoutRequested(
+	) | rpl::on_next([=] {
+		_histories->refreshAutisticForeignModeViews();
+	}, _lifetime);
 }
 
 void Session::subscribeForTopicRepliesLists() {

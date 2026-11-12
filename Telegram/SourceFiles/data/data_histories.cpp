@@ -219,6 +219,12 @@ void Histories::refreshStickerViews() {
 	}
 }
 
+void Histories::refreshAutisticForeignModeViews() {
+	for (const auto &[peerId, history] : _map) {
+		history->refreshAutisticForeignModeViews();
+	}
+}
+
 void Histories::readInbox(not_null<History*> history) {
 	DEBUG_LOG(("Reading: readInbox called."));
 	if (history->lastServerMessageKnown()) {

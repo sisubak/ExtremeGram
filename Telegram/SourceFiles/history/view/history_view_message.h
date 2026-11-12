@@ -26,6 +26,7 @@ struct ReactionId;
 namespace Ui {
 struct BubbleRounding;
 class RoundCheckbox;
+class SpoilerAnimation;
 struct TornEdgeCache;
 } // namespace Ui
 
@@ -556,6 +557,7 @@ private:
 	mutable Ui::Text::String _fromName;
 	mutable std::unique_ptr<FromNameStatus> _fromNameStatus;
 	mutable std::unique_ptr<Ui::RoundCheckbox> _selectionRoundCheckbox;
+	mutable std::unique_ptr<Ui::SpoilerAnimation> _spoilerOverlay;
 	mutable bool _previousMode = false;
 	mutable uint32 _fromNameVersion : 16 = 0;
 	uint32 _nonTextMaxWidth : 16 = 0;

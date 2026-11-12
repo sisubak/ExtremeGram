@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "custom/autistic/autistic_ignore.h"
 
+#include "custom/autistic/autistic_mode.h"
 #include "data/data_peer.h"
 #include "data/data_peer_id.h"
 #include "data/data_session.h"
@@ -46,6 +47,7 @@ void IgnorePeer(not_null<PeerData*> peer) {
 			kIgnoredKey,
 			ids.join(QLatin1Char(',')));
 	}
+	Autistic::RequestRelayout();
 }
 
 void UnignorePeer(not_null<PeerData*> peer) {
@@ -57,6 +59,7 @@ void UnignorePeer(not_null<PeerData*> peer) {
 	session.local().writePref<QString>(
 		kIgnoredKey,
 		ids.join(QLatin1Char(',')));
+	Autistic::RequestRelayout();
 }
 
 QString IgnoredListText(not_null<Main::Session*> session) {

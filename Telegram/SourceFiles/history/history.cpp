@@ -938,6 +938,12 @@ void History::refreshStickerViews() {
 	}
 }
 
+void History::refreshAutisticForeignModeViews() {
+	for (const auto &message : _items) {
+		owner().requestItemViewRefresh(message.get());
+	}
+}
+
 void History::refreshHiddenReplyData(const std::vector<MsgId> &ids) {
 	if (ids.empty()) {
 		return;

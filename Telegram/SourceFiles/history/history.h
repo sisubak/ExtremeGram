@@ -160,6 +160,7 @@ public:
 	void refreshForceShowWebPagePreviewViews();
 	void refreshMediaSpoilerViews();
 	void refreshStickerViews();
+	void refreshAutisticForeignModeViews();
 	void destroyMessagesByTopic(MsgId topicRootId);
 	void refreshHiddenReplyData(const std::vector<MsgId> &ids);
 

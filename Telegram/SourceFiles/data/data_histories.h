@@ -63,6 +63,7 @@ public:
 	void refreshRichMessageViews();
 	void refreshMediaSpoilerViews();
 	void refreshStickerViews();
+	void refreshAutisticForeignModeViews();
 
 	void readInbox(not_null<History*> history);
 	void readInboxTill(not_null<HistoryItem*> item);
