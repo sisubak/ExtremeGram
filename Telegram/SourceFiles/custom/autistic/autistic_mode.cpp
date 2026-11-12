@@ -1,0 +1,55 @@
+/*
+This file is part of Telegram Desktop,
+the official desktop application for the Telegram messaging service.
+
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+*/
+#include "custom/autistic/autistic_mode.h"
+
+namespace Autistic {
+namespace {
+
+rpl::event_stream<> &RelayoutStream() {
+	static rpl::event_stream<> stream;
+	return stream;
+}
+
+} // namespace
+
+bool masterOn() {
+	return EnhancedSettings::Get(EnhancedSettings::Option::AutisticTelegram);
+}
+
+bool on(EnhancedSettings::Key<bool> key) {
+	return masterOn() && EnhancedSettings::Get(key);
+}
+
+rpl::producer<bool> onStream(EnhancedSettings::Key<bool> key) {
+	return rpl::combine(
+		EnhancedSettings::Watch(EnhancedSettings::Option::AutisticTelegram),
+		EnhancedSettings::Watch(key)
+	) | rpl::map([=](bool master, bool sub) {
+		return master && sub;
+	});
+}
+
+HideForeign hideForeign() {
+	const auto raw = EnhancedSettings::Get(
+		EnhancedSettings::Option::AutisticHideForeign);
+	return HideForeign(std::clamp(raw, 0, 3));
+}
+
+void CycleHideForeign() {
+	const auto next = (static_cast<int>(hideForeign()) + 1) % 4;
+	EnhancedSettings::Set(
+		EnhancedSettings::Option::AutisticHideForeign,
+		next);
+	RelayoutStream().fire({});
+}
+
+rpl::producer<> RelayoutRequested() {
+	return RelayoutStream().events();
+}
+
+} // namespace Autistic

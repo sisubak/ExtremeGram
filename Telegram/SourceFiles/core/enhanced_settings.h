@@ -107,6 +107,16 @@ enum class OptionId {
 	MentionAsName,
 	RedesignMode,
 	OnlineSpamInterval,
+	AutisticTelegram,
+	AutisticCommands,
+	AutisticIgnore,
+	AutisticAntiPing,
+	AutisticReadInvisible,
+	AutisticGhosts,
+	AutisticShowOrig,
+	AutisticLayoutFix,
+	AutisticHeart,
+	AutisticHideForeign,
 	Count,
 };
 
@@ -214,6 +224,23 @@ inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
 	inline constexpr auto RedesignMode = Key<int>{ OptionId::RedesignMode };
 	inline constexpr auto OnlineSpamInterval
 		= Key<int>{ OptionId::OnlineSpamInterval };
+	inline constexpr auto AutisticTelegram
+		= Key<bool>{ OptionId::AutisticTelegram };
+	inline constexpr auto AutisticCommands
+		= Key<bool>{ OptionId::AutisticCommands };
+	inline constexpr auto AutisticIgnore = Key<bool>{ OptionId::AutisticIgnore };
+	inline constexpr auto AutisticAntiPing
+		= Key<bool>{ OptionId::AutisticAntiPing };
+	inline constexpr auto AutisticReadInvisible
+		= Key<bool>{ OptionId::AutisticReadInvisible };
+	inline constexpr auto AutisticGhosts = Key<bool>{ OptionId::AutisticGhosts };
+	inline constexpr auto AutisticShowOrig
+		= Key<bool>{ OptionId::AutisticShowOrig };
+	inline constexpr auto AutisticLayoutFix
+		= Key<bool>{ OptionId::AutisticLayoutFix };
+	inline constexpr auto AutisticHeart = Key<bool>{ OptionId::AutisticHeart };
+	inline constexpr auto AutisticHideForeign
+		= Key<int>{ OptionId::AutisticHideForeign };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel

@@ -9659,3 +9659,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_mention_as_name_about" = "@username меняется на имя участника перед отправкой: сообщения видны всем, включая тех, у кого собеседник скрыт.";
 "lng_extremegram_redesign_about" = "Три стиля оформления: Классический, Современный (фиолетовый акцент) и Ultra (коралловый) с плавным переходом.";
 
+"lng_extremegram_autistic_telegram" = "Autistic Telegram: включить режим";
+"lng_extremegram_autistic_telegram_about" = "Полностью отдельный режим: включает все подфичи ниже разом. Управление подфичами — панель по Ctrl+Shift+A. Выключение полностью возвращает обычное поведение.";
+"lng_extremegram_autistic_commands" = "Команды и подсказки";
+"lng_extremegram_autistic_commands_about" = "Команды в чате: !account и !vxod — данные автора ответа, !ignore/!unignore — локальный игнор-лист, !bot/!stopbot — включение и выключение бот-команд (!mute, !stats, !stop), !help — справка. Наберите «!» в поле ввода — над ним появятся подсказки.";
+"lng_extremegram_autistic_ignore" = "Игнор-лист";
+"lng_extremegram_autistic_ignore_about" = "Сообщения добавленных через !ignore собеседников схлопываются в пустое место во всех чатах.";
+"lng_extremegram_autistic_anti_ping" = "Анти-пинг";
+"lng_extremegram_autistic_anti_ping_about" = "Упоминания тебя не поднимают бейдж, звук и всплывающие уведомления.";
+"lng_extremegram_autistic_read_invisible" = "Невидимка прочтения";
+"lng_extremegram_autistic_read_invisible_about" = "Прочитанные чаты не отправляют подтверждение на сервер: там они остаются непрочитанными. После реконнекта счётчики могут вернуться — это норма.";
+"lng_extremegram_autistic_ghosts" = "Призраки удалённых";
+"lng_extremegram_autistic_ghosts_about" = "Удалённые собеседником сообщения остаются видимыми (приглушёнными) до перезапуска приложения.";
+"lng_extremegram_autistic_show_orig" = "Оригинал до правки";
+"lng_extremegram_autistic_show_orig_about" = "Когда собеседник редактирует сообщение, под ним показывается его исходный текст («orig: …»).";
+"lng_extremegram_autistic_layout_fix" = "Исправление раскладки";
+"lng_extremegram_autistic_layout_fix_about" = "Отправка ghbdtn как «привет»: латиница целиком автоматически переводится в кириллицу. Команды (!, /) не трогаются.";
+"lng_extremegram_autistic_heart" = "Сердечко по двойному клику";
+"lng_extremegram_autistic_heart_about" = "Двойной клик по любому сообщению отправляет реакцию ❤, независимо от настройки быстрого действия.";
+"lng_extremegram_autistic_hide_foreign" = "Скрытие чужих сообщений";
+"lng_extremegram_autistic_hide_foreign_about" = "Цикл режимов по Ctrl+Shift+H: 0 — выкл, 1 — размытие (спойлер-стиль), 2 — невидимые (пустое место), 3 — схлопнутые (маленькая строка).";
+
