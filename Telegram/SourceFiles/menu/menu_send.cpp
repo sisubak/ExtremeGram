@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "menu/menu_send.h"
 
+#include "custom/autistic/autistic_mode.h"
+
 #include "menu/menu_checked_action.h"
 
 #include "api/api_common.h"
@@ -983,6 +985,11 @@ void SetupUnreadMentionsMenu(
 			auto resend) -> void {
 		const auto thread = weakThread.get();
 		if (!thread) {
+			done();
+			return;
+		}
+		if (Autistic::on(EnhancedSettings::Option::AutisticReadInvisible)) {
+			// Invisible read: never confirm mentions to the server.
 			done();
 			return;
 		}

@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/chat_enhanced_settings.h"
 #include "core/enhanced_settings.h"
+#include "custom/autistic/autistic_mode.h"
 #include "core/msg_extra_state.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
@@ -1854,15 +1855,18 @@ void History::newItemAdded(not_null<HistoryItem*> item, NewAddType type) {
 	}
 	item->contributeToSlowmode();
 	const auto pendingIncoming = item->isSending() && !item->out();
+	const auto antiPing = item->mentionsMe()
+		&& Autistic::on(EnhancedSettings::Option::AutisticAntiPing);
 	auto notification = Data::ItemNotification{
 		.item = item,
 		.type = Data::ItemNotificationType::Message,
 	};
-	if (!pendingIncoming && item->showNotification()) {
+	if (!pendingIncoming && !antiPing && item->showNotification()) {
 		item->notificationThread()->pushNotification(notification);
 	}
 	owner().notifyNewItemAdded(item);
-	const auto stillShow = !pendingIncoming && item->showNotification(); // Could be read already.
+	const auto stillShow = !pendingIncoming && !antiPing
+		&& item->showNotification(); // Could be read already.
 	if (stillShow) {
 		Core::App().notifications().schedule(notification);
 	}
@@ -3059,7 +3063,10 @@ Dialogs::UnreadState History::computeUnreadState() const {
 	result.messages = count;
 	result.chats = count ? 1 : 0;
 	result.marks = mark ? 1 : 0;
-	result.mentions = unreadMentions().has() ? 1 : 0;
+	result.mentions = (unreadMentions().has()
+		&& !Autistic::on(EnhancedSettings::Option::AutisticAntiPing))
+		? 1
+		: 0;
 	result.reactions = unreadReactions().has() ? 1 : 0;
 	result.polls = unreadPollVotes().has() ? 1 : 0;
 	result.messagesMuted = muted ? result.messages : 0;

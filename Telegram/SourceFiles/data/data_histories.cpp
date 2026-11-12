@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_histories.h"
 
+#include "custom/autistic/autistic_mode.h"
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/ephemeral_messages.h"
@@ -327,6 +328,16 @@ void Histories::readInboxTill(
 		return;
 	} else if (!history->trackUnreadMessages()) {
 		DEBUG_LOG(("Reading: readInboxTill finish 2."));
+		return;
+	}
+	if (Autistic::on(EnhancedSettings::Option::AutisticReadInvisible)) {
+		// Invisible read: mark locally, never tell the server.
+		if (IsServerMsgId(tillId)) {
+			history->setInboxReadTill(tillId);
+			history->setUnreadCount(
+				history->countStillUnreadLocal(tillId).value_or(0));
+			history->updateChatListEntry();
+		}
 		return;
 	}
 	const auto maybeState = lookup(history);
