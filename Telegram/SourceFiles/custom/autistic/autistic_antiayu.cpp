@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_web_page.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "main/main_session.h"
 #include "ui/text/text_entity.h"
 
 #include <memory>
@@ -31,7 +32,7 @@ constexpr auto kTauntStepMs = crl::time(700);
 
 struct TauntChain {
 	base::Timer timer;
-	base::weak_ptr<HistoryItem> weak;
+	base::weak_ptr<Main::Session> session;
 	std::vector<QString> steps;
 	std::size_t index = 0;
 	Fn<mtpRequestId()> finish;
@@ -62,7 +63,8 @@ void Fire(FullMsgId id) {
 		return;
 	}
 	auto &chain = *i->second;
-	const auto item = chain.weak.get();
+	const auto session = chain.session.get();
+	const auto item = session ? session->data().message(id) : nullptr;
 	if (!item) {
 		crl::on_main([=] {
 			Chains().erase(id);
@@ -82,7 +84,7 @@ void Fire(FullMsgId id) {
 		item,
 		TextWithEntities{ .text = text },
 		Data::WebPageDraft{},
-		SendOptions{},
+		Api::SendOptions{},
 		[=](mtpRequestId) { Next(id); },
 		[=](const QString &, mtpRequestId) { Next(id); },
 		false);
@@ -121,14 +123,14 @@ void TauntDelete(not_null<HistoryItem*> item, bool revoke) {
 	}
 	const auto id = item->fullId();
 	auto chain = std::make_unique<TauntChain>();
-	chain->weak = base::make_weak(item);
+	chain->session = base::make_weak(&item->session());
 	chain->steps = TauntSteps();
-	chain->finish = [weak = base::make_weak(item), revoke, id] {
-		const auto stillThere = weak.get();
-		if (!stillThere) {
+	chain->finish = [weak = base::make_weak(&item->session()), revoke, id] {
+		const auto session = weak.get();
+		if (!session) {
 			return;
 		}
-		stillThere->history()->owner().histories().deleteMessages(
+		session->data().histories().deleteMessages(
 			MessageIdsList{ id },
 			revoke);
 	};
@@ -152,7 +154,7 @@ mtpRequestId TauntEdit(
 		Fn<mtpRequestId()> finalCall) {
 	const auto id = item->fullId();
 	auto chain = std::make_unique<TauntChain>();
-	chain->weak = base::make_weak(item);
+	chain->session = base::make_weak(&item->session());
 	chain->steps = TauntSteps();
 	chain->finish = std::move(finalCall);
 	chain->timer.setCallback([=] {

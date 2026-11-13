@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/unixtime.h"
 #include "core/enhanced_settings.h"
+#include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "main/main_session.h"
@@ -69,7 +70,8 @@ void OnlineSpamFilter::onTick() {
 		auto &entry = it->second;
 		if (entry.active && now >= entry.activeUntil) {
 			entry.active = false;
-			if (const auto user = _session->data().userLoaded(it->first)) {
+			if (const auto user = _session->data().userLoaded(
+					peerToUser(it->first))) {
 				_session->changes().peerUpdated(
 					user,
 					Data::PeerUpdate::Flag::OnlineStatus);
