@@ -18,7 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
-#include "window/window_main.h"
+#include "window/main_window.h"
 #include "window/window_session_controller.h"
 
 #include <QtCore/QEvent>
