@@ -48,7 +48,7 @@ bool ShowOrigFor(not_null<HistoryItem*> item) {
 }
 
 int OrigExtraHeight() {
-	return st::fwdTextStyle->height * 5 / 4;
+	return st::fwdTextStyle.font->height * 5 / 4;
 }
 
 } // namespace Autistic

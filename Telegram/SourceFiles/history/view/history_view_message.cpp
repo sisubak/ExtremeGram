@@ -3273,16 +3273,17 @@ void Message::paintText(
 	// Autistic "orig": the pre-edit text snapshot as a small line below.
 	if (Autistic::ShowOrigFor(data())) {
 		if (const auto original = Autistic::OriginalFor(data()->fullId())) {
-			p.setFont(st::fwdTextStyle);
+			p.setFont(st::fwdTextStyle.font);
 			p.setPen(st::windowSubTextFg);
 			const auto line = QString::fromUtf8("orig: ") + original->text;
 			const auto y = trect.y() + textHeightFor(trect.width())
-				+ (Autistic::OrigExtraHeight() - st::fwdTextStyle->height) / 2;
+				+ (Autistic::OrigExtraHeight()
+					- st::fwdTextStyle.font->height) / 2;
 			p.drawTextLeft(
 				trect.x(),
 				y,
 				width(),
-				st::fwdTextStyle->font->elided(line, trect.width()));
+				st::fwdTextStyle.font->elided(line, trect.width()));
 		}
 	}
 	if (needRippleMask && !ripplePath.isEmpty()) {
