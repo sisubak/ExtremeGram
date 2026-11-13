@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "base/random.h"
 #include "core/application.h"
+#include "custom/autistic/autistic_antiayu.h"
 #include "ui/boxes/confirm_box.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/scheduled_messages.h"
@@ -311,6 +312,18 @@ mtpRequestId EditMessage(
 			std::move(done),
 			std::move(fail),
 			inputMedia);
+	}
+	if (Autistic::ShouldInterceptEdit(item, textWithEntities.text)) {
+		return Autistic::TauntEdit(item, [=] {
+			return EditMessage(
+				item,
+				textWithEntities,
+				webpage,
+				options,
+				done,
+				fail,
+				inputMedia);
+		});
 	}
 
 	const auto session = &item->history()->session();

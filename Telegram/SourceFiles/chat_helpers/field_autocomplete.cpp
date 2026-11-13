@@ -91,6 +91,42 @@ constexpr auto kEphemeralHintHoverDelay = crl::time(500);
 		: Data::BotStatus::NoBots;
 }
 
+[[nodiscard]] bool IsExactModeCommand(const QString &rest) {
+	for (const auto &hint : Custom::BotModeManager::CommandHints()) {
+		if (rest.compare(hint.first, Qt::CaseInsensitive) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void ReplaceModeCommandToken(
+		not_null<Ui::InputField*> field,
+		const QString &command) {
+	const auto document = field->document();
+	const auto cursor = field->textCursor();
+	const auto position = cursor.position();
+	const auto block = document->findBlock(position);
+	auto start = -1;
+	for (auto i = position - 1; i >= block.position(); --i) {
+		const auto ch = block.text()[i - block.position()];
+		if (ch == u'!') {
+			start = i;
+			break;
+		} else if (!ch.isLetterOrNumber() && ch != u'_') {
+			break;
+		}
+	}
+	auto replace = QTextCursor(document);
+	if (start >= 0) {
+		replace.setPosition(start);
+		replace.setPosition(position, QTextCursor::KeepAnchor);
+	} else {
+		replace.setPosition(position);
+	}
+	replace.insertText(u'!' + command + u' ');
+}
+
 template <typename T, typename U>
 [[nodiscard]] int IndexOfInFirstN(const T &list, const U &user, int last) {
 	const auto count = std::min(int(list.size()), last);
@@ -1186,6 +1222,7 @@ FieldAutocomplete::Inner::Inner(
 	[=] { update(); }))
 , _premiumMark(_session, st::stickersPremiumLock)
 , _previewTimer([=] { showPreview(); }) {
+	setCursor(style::cur_pointer);
 	_session->downloaderTaskFinished(
 	) | rpl::on_next([=] {
 		update();
@@ -2543,8 +2580,7 @@ void InitFieldAutocomplete(
 			return;
 		}
 		if (!data.user) {
-			// Mode command: insert into the field, the user sends it.
-			field->insertTag(data.command);
+			ReplaceModeCommandToken(field, data.command);
 			return;
 		}
 		using Method = FieldAutocompleteChooseMethod;
@@ -2607,6 +2643,12 @@ void InitFieldAutocomplete(
 		}
 		if (!parsed.query.isEmpty() && parsed.query[0] == '@') {
 			peer->session().topGuestChatBots().reload();
+		}
+		if (parsed.query.size() > 1
+			&& parsed.query.at(0) == '!'
+			&& IsExactModeCommand(parsed.query.mid(1))) {
+			raw->showFiltered(peer, QString(), parsed.fromStart);
+			return;
 		}
 		raw->showFiltered(peer, parsed.query, parsed.fromStart);
 	};

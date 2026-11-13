@@ -9679,4 +9679,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_autistic_heart_about" = "Двойной клик по любому сообщению отправляет реакцию ❤, независимо от настройки быстрого действия.";
 "lng_extremegram_autistic_hide_foreign" = "Скрытие чужих сообщений";
 "lng_extremegram_autistic_hide_foreign_about" = "Цикл режимов по Ctrl+Shift+H: 0 — выкл, 1 — размытие (спойлер-стиль), 2 — невидимые (пустое место), 3 — схлопнутые (маленькая строка).";
+"lng_extremegram_autistic_anti_ayu" = "Анти-АюГрамм";
+"lng_extremegram_autistic_anti_ayu_about" = "Перед удалением «своего» сообщения оно трижды меняется: FUCK YOU → FUCK → F, и только потом исчезает. При правке — та же последовательность перед итоговым текстом.";
 

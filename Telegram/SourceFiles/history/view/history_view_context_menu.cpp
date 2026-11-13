@@ -1658,7 +1658,10 @@ void AddExtremeBadgeAction(
 			QString::fromUtf8("недоступно"));
 	};
 	if (!channel || !channel->isMegagroup()) {
-		fallback();
+		menu->addAction(
+			QString::fromUtf8("Сведения о клиенте ExtremeGram"),
+			fallback,
+			&st::menuIconInfo);
 		return;
 	}
 	menu->addAction(

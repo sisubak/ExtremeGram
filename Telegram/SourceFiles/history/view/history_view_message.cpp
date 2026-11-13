@@ -1932,13 +1932,28 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 	const auto foreign = Autistic::ForeignModeFor(item);
 	if (foreign == Autistic::HideForeign::Collapsed) {
-		p.setFont(st::msgDateFont);
-		p.setPen(st::windowSubTextFg);
-		p.drawTextLeft(
-			g.x(),
-			g.y() + (g.height() - st::msgDateFont->height) / 2,
-			width(),
-			QString::fromUtf8("[скрыто]"));
+		const auto font = st::msgServiceFont;
+		const auto label = QString::fromUtf8("скрыто");
+		const auto pad = style::ConvertScale(3);
+		const auto pillHeight = font->height + 2 * pad;
+		const auto pillWidth = font->width(label) + 4 * pad;
+		const auto pill = QRect(
+			g.x() + (g.width() - pillWidth) / 2,
+			g.y() + (g.height() - pillHeight) / 2,
+			pillWidth,
+			pillHeight);
+		{
+			PainterHighQualityEnabler hq(p);
+			p.setPen(Qt::NoPen);
+			p.setBrush(st::msgServiceBg);
+			p.drawRoundedRect(
+				pill,
+				pillHeight / 2.0,
+				pillHeight / 2.0);
+		}
+		p.setFont(font);
+		p.setPen(st::msgServiceFg);
+		p.drawText(pill, Qt::AlignCenter, label);
 		return;
 	}
 
@@ -1946,7 +1961,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 	// function exit below (early returns are all above this point).
 	const auto ghosted = MessageExtraState::IsGhosted(item);
 	if (ghosted) {
-		p.setOpacity(0.35);
+		p.setOpacity(0.55);
 	}
 
 	const auto entry = logEntryOriginal();
@@ -2317,11 +2332,38 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 					contentRect.height() - bottomInfoHeight());
 			}
 			const auto paused = On(PowerSaving::kChatSpoiler);
-			FillSpoilerRect(
+			Ui::FillSpoilerRect(
 				p,
 				contentRect,
-				DefaultImageSpoiler().frame(
+				Ui::DefaultImageSpoiler().frame(
 					_spoilerOverlay->index(context.now, paused)));
+		}
+		if (ghosted) {
+			const auto font = st::msgServiceFont;
+			const auto label = QString::fromUtf8("удалено");
+			const auto pad = style::ConvertScale(3);
+			const auto chipHeight = font->height + 2 * pad;
+			const auto chipWidth = font->width(label) + 4 * pad;
+			const auto chip = QRect(
+				inner.x() + (inner.width() - chipWidth) / 2,
+				inner.y() - chipHeight / 2,
+				chipWidth,
+				chipHeight);
+			const auto previousOpacity = p.opacity();
+			p.setOpacity(1.0);
+			{
+				PainterHighQualityEnabler hq(p);
+				p.setPen(Qt::NoPen);
+				p.setBrush(st::msgServiceBg);
+				p.drawRoundedRect(
+					chip,
+					chipHeight / 2.0,
+					chipHeight / 2.0);
+			}
+			p.setFont(font);
+			p.setPen(st::msgServiceFg);
+			p.drawText(chip, Qt::AlignCenter, label);
+			p.setOpacity(previousOpacity);
 		}
 		if (displayInfo) {
 			const auto bottomSelected = context.selected()
@@ -3308,17 +3350,17 @@ void Message::paintText(
 	// Autistic "orig": the pre-edit text snapshot as a small line below.
 	if (Autistic::ShowOrigFor(data())) {
 		if (const auto original = Autistic::OriginalFor(data()->fullId())) {
-			p.setFont(st::fwdTextStyle.font);
-			p.setPen(st::windowSubTextFg);
 			const auto line = QString::fromUtf8("orig: ") + original->text;
+			p.setFont(st::msgServiceFont);
+			p.setPen(stm->msgServiceFg);
 			const auto y = trect.y() + textHeightFor(trect.width())
 				+ (Autistic::OrigExtraHeight()
-					- st::fwdTextStyle.font->height) / 2;
+					- st::msgServiceFont->height) / 2;
 			p.drawTextLeft(
 				trect.x(),
 				y,
 				width(),
-				st::fwdTextStyle.font->elided(line, trect.width()));
+				st::msgServiceFont->elided(line, trect.width()));
 		}
 	}
 	if (needRippleMask && !ripplePath.isEmpty()) {

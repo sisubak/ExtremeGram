@@ -436,6 +436,13 @@ const DescriptorList &DescriptorData() {
 				"enhanced/extremegram-autistic-hide-foreign",
 				{ .minimum = 0, .maximum = 3, .allowZero = true });
 		}(),
+		Bool(OptionId::AutisticAntiAyu,
+			"extremegram_autistic_anti_ayu",
+			&tr::lng_extremegram_autistic_anti_ayu,
+			"enhanced/extremegram-autistic-anti-ayu",
+			{},
+			false,
+			true),
 	};
 	return result;
 }

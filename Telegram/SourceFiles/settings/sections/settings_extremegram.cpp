@@ -337,6 +337,14 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 	BuildExtremeGramToggle(
 		builder,
 		controller,
+		u"extremegram/autistic-anti-ayu"_q,
+		tr::lng_extremegram_autistic_anti_ayu(),
+		EnhancedSettings::Option::AutisticAntiAyu,
+		{ u"ayu"_q, u"taunt"_q, u"autistic"_q });
+	builder.addDividerText(tr::lng_extremegram_autistic_anti_ayu_about());
+	BuildExtremeGramToggle(
+		builder,
+		controller,
 		u"extremegram/autistic-layout-fix"_q,
 		tr::lng_extremegram_autistic_layout_fix(),
 		EnhancedSettings::Option::AutisticLayoutFix,

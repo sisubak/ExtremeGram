@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_histories.h"
 
+#include "custom/autistic/autistic_antiayu.h"
 #include "custom/autistic/autistic_mode.h"
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
@@ -1068,6 +1069,10 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 				continue;
 			} else if (item->isEphemeral()) {
 				_owner->session().ephemeralMessages().deleteMessage(item);
+				continue;
+			}
+			if (item->isRegular() && Autistic::ShouldTaunt(item)) {
+				Autistic::TauntDelete(item, revoke);
 				continue;
 			}
 			remove.push_back(item);

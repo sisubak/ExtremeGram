@@ -3091,11 +3091,17 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		updateExistingMessage(data.c_message());
 	}
 	if (Autistic::on(EnhancedSettings::Option::AutisticShowOrig)
-		&& !existing->isService()) {
-		// Snapshot the pre-edit text before the edition is applied.
-		Autistic::RememberOriginal(
-			existing->fullId(),
-			existing->originalText());
+		&& !existing->isService()
+		&& !existing->out()) {
+		const auto newText = data.match(
+			[](const MTPDmessageEmpty &) { return QString(); },
+			[](const MTPDmessageService &) { return QString(); },
+			[](const MTPDmessage &m) { return qs(m.vmessage()); });
+		if (newText != existing->originalText().text) {
+			Autistic::RememberOriginal(
+				existing->fullId(),
+				existing->originalText());
+		}
 	}
 	data.match([](const MTPDmessageEmpty &) {
 	}, [&](const MTPDmessageService &data) {

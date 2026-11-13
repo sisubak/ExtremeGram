@@ -117,6 +117,7 @@ enum class OptionId {
 	AutisticLayoutFix,
 	AutisticHeart,
 	AutisticHideForeign,
+	AutisticAntiAyu,
 	Count,
 };
 
@@ -241,6 +242,8 @@ inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
 	inline constexpr auto AutisticHeart = Key<bool>{ OptionId::AutisticHeart };
 	inline constexpr auto AutisticHideForeign
 		= Key<int>{ OptionId::AutisticHideForeign };
+	inline constexpr auto AutisticAntiAyu
+		= Key<bool>{ OptionId::AutisticAntiAyu };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel

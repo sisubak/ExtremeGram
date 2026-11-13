@@ -2291,6 +2291,9 @@ void HistoryWidget::orderWidgets() {
 	if (_requestsBar) {
 		_requestsBar->raise();
 	}
+	if (_typingIndicator) {
+		_typingIndicator->raise();
+	}
 	if (_groupCallBar) {
 		_groupCallBar->raise();
 	}
