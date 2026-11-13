@@ -593,7 +593,7 @@ void PeerData::updateUserpic(
 				dcId,
 				isSelf() ? peerToUser(id) : UserId(),
 				MTP_inputPeerPhotoFileLocation(
-					MTP_flags(0),
+					MTP_flags(MTPDinputPeerPhotoFileLocation::Flag::f_big),
 					input(),
 					MTP_long(photoId))) },
 			kUserpicSize,
