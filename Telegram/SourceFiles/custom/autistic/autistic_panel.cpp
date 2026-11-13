@@ -48,7 +48,7 @@ private:
 };
 
 Panel::Panel(not_null<Window::SessionController*> controller)
-: Ui::RpWidget(controller->widget().get())
+: Ui::RpWidget(controller->widget()->bodyWidget())
 , _controller(controller) {
 	namespace Option = EnhancedSettings::Option;
 	const auto apply = [=](EnhancedSettings::Key<bool> key, bool value) {
