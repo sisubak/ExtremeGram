@@ -845,7 +845,10 @@ struct DecodeEnhancedSettingsResult {
 	}
 
 	void Enhanced::setupBehavior(not_null<Ui::VerticalLayout*> content) {
-		addToggleOption(content, EnhancedSettings::Option::OnlineSpam);
+		addToggleOption(
+			content,
+			EnhancedSettings::Option::OnlineSpam,
+			tr::lng_settings_online_spam_about());
 		addToggleOption(content, EnhancedSettings::Option::ShowSimilarOnJoined);
 		addToggleOption(
 			content,

@@ -3,10 +3,10 @@
     <id>rua.Yurigram</id>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
-    <name>Yurigram</name>
+    <name>ExtremeGram</name>
     <summary>Unofficial Telegram desktop client with additional features</summary>
     <description>
-        <p>Yurigram is an unofficial Telegram desktop client with additional features and enhancements.</p>
+        <p>ExtremeGram is an unofficial Telegram desktop client with additional features and enhancements.</p>
     </description>
     <categories>
         <category>Network</category>

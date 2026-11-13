@@ -9616,4 +9616,5 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_link_preview_rule_pattern" = "URL Regex";
 "lng_link_preview_rule_domain" = "Domain";
 
-"lng_settings_online_spam" = "Online status spam";
+"lng_settings_online_spam" = "Cycle online status every 5 seconds";
+"lng_settings_online_spam_about" = "Repeatedly switches your Telegram online status between online and offline, even while you're inactive. Telegram privacy settings still apply, and frequent updates may be rate limited.";

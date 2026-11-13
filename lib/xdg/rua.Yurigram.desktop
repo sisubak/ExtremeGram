@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=Yurigram
+Name=ExtremeGram
 Comment=Unofficial desktop version of Telegram messaging app
 TryExec=yurigram
 Exec=yurigram -- %U
@@ -18,5 +18,5 @@ X-GNOME-SingleWindow=true
 
 [Desktop Action quit]
 Exec=yurigram -quit
-Name=Quit Yurigram
+Name=Quit ExtremeGram
 Icon=application-exit
