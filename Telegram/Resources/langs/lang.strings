@@ -9679,6 +9679,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_autistic_heart_about" = "Двойной клик по любому сообщению отправляет реакцию ❤, независимо от настройки быстрого действия.";
 "lng_extremegram_autistic_hide_foreign" = "Скрытие чужих сообщений";
 "lng_extremegram_autistic_hide_foreign_about" = "Цикл режимов по Ctrl+Shift+H: 0 — выкл, 1 — размытие (спойлер-стиль), 2 — невидимые (пустое место), 3 — схлопнутые (маленькая строка).";
+"lng_extremegram_autistic_title" = "AutisticGramm";
 "lng_extremegram_autistic_anti_ayu" = "Анти-АюГрамм";
 "lng_extremegram_autistic_anti_ayu_about" = "Перед удалением «своего» сообщения оно трижды меняется: FUCK YOU → FUCK → F, и только потом исчезает. При правке — та же последовательность перед итоговым текстом.";
+"lng_extremegram_anti_online_spam" = "Анти-спам онлайном";
+"lng_extremegram_anti_online_spam_about" = "Если собеседник дёргает вход/выход из «в сети», статус показывается как стабильный «в сети», пока спам не утихнет — после тишины показывается реальный статус.";
+"lng_extremegram_anti_slowmode" = "Анти-таймер (слоумод)";
+"lng_extremegram_anti_slowmode_about" = "Сообщения в слоумоде визуально отправляются сразу (со значком таймера) и автоматически уходят, как только слоумод отпустит — в порядке очереди.";
+"lng_extremegram_nickname_gradient" = "Градиентный ник";
+"lng_extremegram_nickname_gradient_about" = "Два цвета и анимация переливания на твоём нике — видят все ExtremeGram-клиенты: в чатах и в списке диалогов. Настройка хранится в описании профиля.";
+"lng_extremegram_nickname_gradient_color1" = "Цвет 1";
+"lng_extremegram_nickname_gradient_color2" = "Цвет 2";
+"lng_extremegram_nickname_gradient_speed" = "Скорость";
+"lng_extremegram_nickname_gradient_slow" = "Медленно";
+"lng_extremegram_nickname_gradient_medium" = "Средне";
+"lng_extremegram_nickname_gradient_fast" = "Быстро";
+"lng_extremegram_nickname_gradient_off" = "Выключить градиент";
 

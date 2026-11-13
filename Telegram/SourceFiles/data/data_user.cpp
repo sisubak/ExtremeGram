@@ -14,6 +14,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_statistics.h"
 #include "api/api_text_entities.h"
 #include "base/timer_rpl.h"
+#include "base/unixtime.h"
+#include "custom/online_spam_filter.h"
 #include "core/application.h"
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
@@ -191,6 +193,11 @@ bool UserData::updateLastseen(Data::LastseenStatus value) {
 	if (_lastseen == value) {
 		return false;
 	}
+	const auto now = base::unixtime::now();
+	Custom::NoteOnlineFlip(
+		this,
+		_lastseen.isOnline(now),
+		value.isOnline(now));
 	_lastseen = value;
 	owner().maybeStopWatchForOffline(this);
 	return true;

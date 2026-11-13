@@ -10329,6 +10329,9 @@ void HistoryWidget::confirmDiscardEdit(Fn<void()> proceed) {
 }
 
 bool HistoryWidget::showSlowmodeError() {
+	if (EnhancedSettings::Get(EnhancedSettings::Option::AntiSlowmode)) {
+		return false;
+	}
 	const auto text = [&] {
 		if (const auto left = _peer->slowmodeSecondsLeft()) {
 			return tr::lng_slowmode_enabled(

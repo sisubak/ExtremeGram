@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/autistic/autistic_orig.h"
 #include "custom/client_badge_detector.h"
 #include "custom/client_badge_popup.h"
+#include "custom/nickname_gradient.h"
 #include "custom/slowmode_tracker.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history_item_components.h"
@@ -2803,11 +2804,19 @@ void Message::paintFromName(
 			nameFg);
 	}
 	p.setFont(st::msgNameFont);
-	p.setPen(nameFg);
-	const auto nameLinkHandler = fromLink();
 	const auto nameWidth = std::min(
 		nameText->maxWidth(),
 		nameAvailableWidth);
+	const auto nameGradient = from
+		? Custom::NicknameGradientFor(&history()->session()).configFor(from)
+		: std::nullopt;
+	if (nameGradient) {
+		p.setPen(Custom::NicknameGradientFor(&history()->session())
+			.penFor(*nameGradient, nameWidth));
+	} else {
+		p.setPen(nameFg);
+	}
+	const auto nameLinkHandler = fromLink();
 	if (!from) {
 		if (const auto tooltip = Get<HiddenSenderTooltip>()) {
 			tooltip->linkRect = QRect(

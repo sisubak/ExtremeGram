@@ -9,6 +9,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom/client_badge_detector.h"
 #include "custom/eternal_tags.h"
+#include "custom/online_spam_filter.h"
+#include "custom/slowmode_queue.h"
+#include "custom/nickname_gradient.h"
 #include "apiwrap.h"
 #include "api/api_peer_colors.h"
 #include "api/api_updates.h"
@@ -286,6 +289,9 @@ Session::Session(
 
 	(void)Custom::ClientBadgeFor(this);
 	(void)Custom::EternalTagsFor(this);
+	(void)Custom::OnlineSpamFor(this);
+	(void)Custom::SlowmodeQueueFor(this);
+	(void)Custom::NicknameGradientFor(this);
 }
 
 void Session::appConfigRefreshed() {

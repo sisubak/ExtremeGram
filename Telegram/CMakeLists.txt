@@ -627,6 +627,12 @@ PRIVATE
     custom/redesign.h
     custom/slowmode_tracker.cpp
     custom/slowmode_tracker.h
+    custom/online_spam_filter.cpp
+    custom/online_spam_filter.h
+    custom/slowmode_queue.cpp
+    custom/slowmode_queue.h
+    custom/nickname_gradient.cpp
+    custom/nickname_gradient.h
     custom/smooth_animations.cpp
     custom/smooth_animations.h
     custom/typing_indicator.cpp
@@ -2033,6 +2039,7 @@ PRIVATE
     settings/sections/settings_enhanced.cpp
     settings/sections/settings_enhanced.h
     settings/sections/settings_extremegram.cpp
+    settings/sections/settings_autistic.cpp
     settings/sections/settings_extremegram.h
     settings/sections/settings_bot_use.cpp
     settings/sections/settings_bot_use.h

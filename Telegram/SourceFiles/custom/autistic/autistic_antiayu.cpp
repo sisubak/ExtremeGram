@@ -8,7 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/autistic/autistic_antiayu.h"
 
 #include "api/api_editing.h"
-#include "api/api_send_options.h"
+#include "api/api_common.h"
 #include "base/flat_map.h"
 #include "base/timer.h"
 #include "base/weak_ptr.h"
@@ -107,7 +107,7 @@ bool Qualifies(not_null<HistoryItem*> item) {
 } // namespace
 
 bool Enabled() {
-	return on(EnhancedSettings::Option::AutisticAntiAyu);
+	return EnhancedSettings::Get(EnhancedSettings::Option::AutisticAntiAyu);
 }
 
 bool ShouldTaunt(not_null<HistoryItem*> item) {

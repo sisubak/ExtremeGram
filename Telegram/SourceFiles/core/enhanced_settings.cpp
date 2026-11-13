@@ -443,6 +443,20 @@ const DescriptorList &DescriptorData() {
 			{},
 			false,
 			true),
+		Bool(OptionId::AntiOnlineSpam,
+			"extremegram_anti_online_spam",
+			&tr::lng_extremegram_anti_online_spam,
+			"enhanced/extremegram-anti-online-spam",
+			{},
+			false,
+			true),
+		Bool(OptionId::AntiSlowmode,
+			"extremegram_anti_slowmode",
+			&tr::lng_extremegram_anti_slowmode,
+			"enhanced/extremegram-anti-slowmode",
+			{},
+			false,
+			true),
 	};
 	return result;
 }

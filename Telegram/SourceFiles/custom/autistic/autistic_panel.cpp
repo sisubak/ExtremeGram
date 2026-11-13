@@ -134,9 +134,6 @@ Panel::Panel(not_null<Window::SessionController*> controller)
 		tr::lng_extremegram_autistic_show_orig(),
 		Option::AutisticShowOrig);
 	addToggle(
-		tr::lng_extremegram_autistic_anti_ayu(),
-		Option::AutisticAntiAyu);
-	addToggle(
 		tr::lng_extremegram_autistic_layout_fix(),
 		Option::AutisticLayoutFix);
 	addToggle(

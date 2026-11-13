@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
 #include "custom/client_badge_detector.h"
+#include "custom/nickname_gradient.h"
 #include "custom/redesign.h"
 #include "data/data_channel.h"
 #include "data/data_drafts.h"
@@ -990,11 +991,18 @@ void PaintRow(
 			paintPeerBadge(rowName.maxWidth());
 			badgeWidth = widthBefore - rectForName.width();
 		}
-		p.setPen(context.active
-			? st::dialogsNameFgActive
-			: context.selected
-			? st::dialogsNameFgOver
-			: st::dialogsNameFg);
+		const auto nameGradient = Custom::NicknameGradientFor(
+			&from->owner().session()).configFor(from);
+		if (nameGradient) {
+			p.setPen(Custom::NicknameGradientFor(&from->owner().session())
+				.penFor(*nameGradient, rectForName.width()));
+		} else {
+			p.setPen(context.active
+				? st::dialogsNameFgActive
+				: context.selected
+				? st::dialogsNameFgOver
+				: st::dialogsNameFg);
+		}
 		rowName.draw(p, {
 			.position = rectForName.topLeft(),
 			.availableWidth = rectForName.width(),

@@ -2309,6 +2309,9 @@ bool ChatWidget::confirmSendingFiles(
 }
 
 bool ChatWidget::showSlowmodeError() {
+	if (EnhancedSettings::Get(EnhancedSettings::Option::AntiSlowmode)) {
+		return false;
+	}
 	const auto text = [&] {
 		if (const auto left = _peer->slowmodeSecondsLeft()) {
 			return tr::lng_slowmode_enabled(

@@ -85,6 +85,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_privacy_security.h"
 #include "settings/sections/settings_enhanced.h"
 #include "settings/sections/settings_extremegram.h"
+#include "settings/sections/settings_autistic.h"
 #include "settings/sections/settings_bot_use.h"
 #include "settings/settings_scale_preview.h"
 #include "storage/localstorage.h"
@@ -520,6 +521,12 @@ void BuildEnhancedSection(SectionBuilder &builder) {
 		.targetSection = ExtremeGramId(),
 		.icon = { &st::menuIconManage },
 		.keywords = { u"extremegram"_q, u"bot"_q, u"mute"_q, u"stats"_q },
+	});
+	builder.addSectionButton({
+		.title = tr::lng_extremegram_autistic_title(),
+		.targetSection = AutisticId(),
+		.icon = { &st::menuIconManage },
+		.keywords = { u"autisticgramm"_q, u"autistic"_q, u"режим"_q },
 	});
 	builder.addSectionButton({
 		.title = tr::lng_bot_use_settings(),

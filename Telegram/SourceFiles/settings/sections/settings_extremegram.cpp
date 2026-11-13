@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/enhanced_settings.h"
 #include "custom/autistic/autistic_mode.h"
+#include "custom/nickname_gradient.h"
 #include "lang/lang_keys.h"
 #include "settings/settings_builder.h"
 #include "settings/sections/settings_main.h"
@@ -199,6 +200,41 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		EnhancedSettings::Option::MentionAsName,
 		{ u"mention"_q, u"username"_q, u"name"_q });
 	builder.addDividerText(tr::lng_extremegram_mention_as_name_about());
+	builder.addButton({
+		.id = u"extremegram/nickname-gradient"_q,
+		.title = tr::lng_extremegram_nickname_gradient(),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			Custom::ShowNicknameGradientBox(
+				not_null<Window::SessionController*>(controller));
+		},
+		.keywords = { u"gradient"_q, u"ник"_q, u"цвет"_q },
+	});
+	builder.addDividerText(tr::lng_extremegram_nickname_gradient_about());
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/anti-online-spam"_q,
+		tr::lng_extremegram_anti_online_spam(),
+		EnhancedSettings::Option::AntiOnlineSpam,
+		{ u"online"_q, u"spam"_q, u"ayu"_q });
+	builder.addDividerText(tr::lng_extremegram_anti_online_spam_about());
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/anti-slowmode"_q,
+		tr::lng_extremegram_anti_slowmode(),
+		EnhancedSettings::Option::AntiSlowmode,
+		{ u"slowmode"_q, u"timer"_q, u"ayu"_q });
+	builder.addDividerText(tr::lng_extremegram_anti_slowmode_about());
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/autistic-anti-ayu"_q,
+		tr::lng_extremegram_autistic_anti_ayu(),
+		EnhancedSettings::Option::AutisticAntiAyu,
+		{ u"ayu"_q, u"extremegram"_q, u"taunt"_q });
+	builder.addDividerText(tr::lng_extremegram_autistic_anti_ayu_about());
 
 	builder.addButton({
 		.id = u"extremegram/redesign"_q,
@@ -334,14 +370,6 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		EnhancedSettings::Option::AutisticShowOrig,
 		{ u"edit"_q, u"orig"_q, u"autistic"_q });
 	builder.addDividerText(tr::lng_extremegram_autistic_show_orig_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-anti-ayu"_q,
-		tr::lng_extremegram_autistic_anti_ayu(),
-		EnhancedSettings::Option::AutisticAntiAyu,
-		{ u"ayu"_q, u"taunt"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_anti_ayu_about());
 	BuildExtremeGramToggle(
 		builder,
 		controller,

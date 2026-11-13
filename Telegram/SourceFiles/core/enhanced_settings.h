@@ -118,6 +118,8 @@ enum class OptionId {
 	AutisticHeart,
 	AutisticHideForeign,
 	AutisticAntiAyu,
+	AntiOnlineSpam,
+	AntiSlowmode,
 	Count,
 };
 
@@ -244,6 +246,10 @@ inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
 		= Key<int>{ OptionId::AutisticHideForeign };
 	inline constexpr auto AutisticAntiAyu
 		= Key<bool>{ OptionId::AutisticAntiAyu };
+	inline constexpr auto AntiOnlineSpam
+		= Key<bool>{ OptionId::AntiOnlineSpam };
+	inline constexpr auto AntiSlowmode
+		= Key<bool>{ OptionId::AntiSlowmode };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel

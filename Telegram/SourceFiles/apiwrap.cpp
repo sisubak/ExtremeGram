@@ -104,6 +104,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/chat_enhanced_settings.h"
 #include "ui/item_text_options.h"
 #include "ui/text/text_utilities.h"
+#include "custom/slowmode_queue.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/toast/toast.h"
 #include "support/support_helper.h"
@@ -5178,6 +5179,9 @@ void ApiWrap::sendMessage(
 		return;
 	}
 	if (Api::SendDice(message)) {
+		return;
+	}
+	if (Custom::SlowmodeQueueFor(_session).Intercept(message)) {
 		return;
 	}
 	local().saveRecentSentHashtags(textWithTags.text);
