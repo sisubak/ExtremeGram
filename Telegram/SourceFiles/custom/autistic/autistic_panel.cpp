@@ -18,7 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
-#include "window/main_window.h"
+#include "mainwindow.h"
 #include "window/window_session_controller.h"
 
 #include <QtCore/QEvent>
@@ -58,7 +58,7 @@ Panel::Panel(not_null<Window::SessionController*> controller)
 	const auto body = Ui::CreateChild<Ui::RpWidget>(this);
 	body->paintRequest(
 	) | rpl::on_next([=](const QRect &r) {
-		QPainter p(body.get());
+		QPainter p(body);
 		p.fillRect(r, st::boxBg);
 	}, body->lifetime());
 
