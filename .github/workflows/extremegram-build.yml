@@ -249,11 +249,13 @@ jobs:
           set -eu
           tag="build-${GITHUB_RUN_ID}"
           gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "ExtremeGram build ${GITHUB_RUN_ID}" \
             --notes "Automated builds of ${GITHUB_REF_NAME} at ${GITHUB_SHA}." \
             || true
           gh release upload "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
             ExtremeGram-win64.zip \
             ExtremeGram-win64.zip.sha256 \
             --clobber
