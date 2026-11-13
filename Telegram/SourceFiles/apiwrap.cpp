@@ -5181,7 +5181,7 @@ void ApiWrap::sendMessage(
 	if (Api::SendDice(message)) {
 		return;
 	}
-	if (Custom::SlowmodeQueueFor(_session).Intercept(message)) {
+	if (Custom::SlowmodeQueueFor(_session).intercept(message)) {
 		return;
 	}
 	local().saveRecentSentHashtags(textWithTags.text);

@@ -23,7 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Settings {
 namespace {
 
-using EnhancedSettings::Option;
+using namespace Builder;
 
 void BuildAutisticSection(SectionBuilder &builder) {
 	const auto controller = builder.controller();
