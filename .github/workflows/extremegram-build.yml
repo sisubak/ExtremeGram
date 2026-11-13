@@ -224,12 +224,12 @@ jobs:
         shell: pwsh
         run: |
           $out = "TBuild/ExtremeGram/out/Release"
-          $exe = Join-Path $out "Telegram.exe"
-          if (-not (Test-Path $exe)) {
-            Get-ChildItem -Path TBuild/ExtremeGram/out -Recurse -Filter Telegram.exe | Select-Object FullName | Out-String
-            throw "Telegram.exe not found under out/"
+          $exe = Get-ChildItem -Path $out -Filter *.exe | Select-Object -First 1
+          if (-not $exe) {
+            Get-ChildItem -Path TBuild/ExtremeGram/out -Recurse -Filter *.exe | Select-Object FullName | Out-String
+            throw "no .exe found under out/"
           }
-          Compress-Archive -Path $exe -DestinationPath ExtremeGram-win64.zip -Force
+          Compress-Archive -Path $exe.FullName -DestinationPath ExtremeGram-win64.zip -Force
           (Get-FileHash ExtremeGram-win64.zip -Algorithm SHA256).Hash | Out-File -Encoding ascii ExtremeGram-win64.zip.sha256
       - name: Upload artifact
         uses: actions/upload-artifact@v4
