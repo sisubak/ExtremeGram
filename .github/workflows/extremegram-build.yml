@@ -122,6 +122,9 @@ jobs:
         shell: bash
         run: |
           HASH=$(sha256sum "$GITHUB_WORKSPACE/TBuild/ExtremeGram/Telegram/build/prepare/prepare.py" | awk '{ print $1 }')
+          CPPTDIR=$(find "/c/Program Files (x86)/Windows Kits/10/Include" -maxdepth 2 -type d -name cppwinrt 2>/dev/null | sort -V | tail -1)
+          WINRT=$(find "$CPPTDIR" -type f -name '*.h' -exec sha256sum {} + 2>/dev/null | LC_ALL=C sort | sha256sum | awk '{ print $1 }')
+          HASH=$(printf '%s-%s' "$HASH" "$WINRT" | sha256sum | awk '{ print $1 }')
           echo "third=win-thirdparty-${HASH}" >> "$GITHUB_OUTPUT"
           echo "libs=win-libs-${HASH}" >> "$GITHUB_OUTPUT"
           echo "qt=win-qt-${HASH}" >> "$GITHUB_OUTPUT"
@@ -142,8 +145,6 @@ jobs:
             TBuild/Libraries/win64/cache_keys/*
             !TBuild/Libraries/win64/cache_keys/[qQ]t[_-]*
           key: ${{ steps.keys.outputs.libs }}
-          restore-keys: |
-            win-libs-
       - name: Restore Qt cache
         uses: actions/cache/restore@v4
         with:
@@ -151,8 +152,6 @@ jobs:
             TBuild/Libraries/win64/[qQ]t[_-]*
             TBuild/Libraries/win64/cache_keys/[qQ]t[_-]*
           key: ${{ steps.keys.outputs.qt }}
-          restore-keys: |
-            win-qt-
       - name: Prepare dependencies
         shell: cmd
         run: |
