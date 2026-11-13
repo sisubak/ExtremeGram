@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "rpl/rpl.h"
 
 class QString;
+class HistoryItem;
 
 namespace Window {
 class SessionController;
@@ -25,8 +26,6 @@ enum class HideForeign : int {
 	Invisible = 2,
 	Collapsed = 3,
 };
-
-class HistoryItem;
 
 [[nodiscard]] bool masterOn();
 
