@@ -8,10 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/nickname_gradient.h"
 
 #include "apiwrap.h"
-#include "base/flat_map.h"
-#include "base/unixtime.h"
-#include "core/enhanced_settings.h"
-#include "custom/client_badge_detector.h"
 #include "data/data_changes.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -20,15 +16,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
 #include "ui/layers/box_content.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
+#include "ui/qt_object_factory.h"
 #include "ui/rp_widget.h"
-#include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/color_editor.h"
@@ -40,17 +35,211 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <memory>
 #include <vector>
 
 namespace Custom {
 namespace {
 
-constexpr auto kMarker = "\xE2\x80\x8B" "EG";
-constexpr int kMarkerEncodedLength = 13;
 constexpr int kMinColors = 2;
 constexpr int kMaxColors = 6;
+constexpr int kMagic = 0xE7;
+constexpr int kVersion = 1;
+constexpr int kBitsPerSymbol = 3;
+constexpr int kSymbolsInAlphabet = 8;
+constexpr auto kInvisibleSymbols = std::array<ushort, kSymbolsInAlphabet>{
+	0x200B,
+	0x200C,
+	0x200D,
+	0x2060,
+	0x2061,
+	0x2062,
+	0x2063,
+	0x2064,
+};
+constexpr auto kLegacyMarker = "\xE2\x80\x8B" "EG";
+constexpr int kLegacyEncodedLength = 13;
 constexpr std::array<float64, 3> kSpeedPeriods = { 14.0, 8.0, 4.0 };
+
+[[nodiscard]] int ToNibble(int channel) {
+	return std::clamp((channel + 8) / 17, 0, 15);
+}
+
+[[nodiscard]] int FromNibble(int value) {
+	return value * 17;
+}
+
+[[nodiscard]] uint8 Crc8(const std::vector<uint8> &bytes) {
+	auto crc = uint8(0);
+	for (const auto byte : bytes) {
+		crc ^= byte;
+		for (auto i = 0; i != 8; ++i) {
+			crc = (crc & 0x80)
+				? uint8((crc << 1) ^ 0x07)
+				: uint8(crc << 1);
+		}
+	}
+	return crc;
+}
+
+[[nodiscard]] std::vector<uint8> PackBits(
+		const std::vector<bool> &bits) {
+	auto result = std::vector<uint8>();
+	result.reserve((bits.size() + 7) / 8);
+	auto value = uint8(0);
+	auto count = 0;
+	for (const auto bit : bits) {
+		value = uint8((value << 1) | (bit ? 1 : 0));
+		if (++count == 8) {
+			result.push_back(value);
+			value = 0;
+			count = 0;
+		}
+	}
+	if (count) {
+		result.push_back(uint8(value << (8 - count)));
+	}
+	return result;
+}
+
+[[nodiscard]] int SymbolLength(int count) {
+	return (24 + count * 12) / kBitsPerSymbol;
+}
+
+struct BitWriter {
+	std::vector<bool> bits;
+
+	void write(uint32 value, int count) {
+		for (auto i = count - 1; i >= 0; --i) {
+			bits.push_back(((value >> i) & 1) != 0);
+		}
+	}
+};
+
+struct BitReader {
+	const std::vector<bool> &bits;
+	int position = 0;
+
+	[[nodiscard]] bool read(uint32 &value, int count) {
+		if (position + count > int(bits.size())) {
+			return false;
+		}
+		value = 0;
+		for (auto i = 0; i != count; ++i) {
+			value = (value << 1) | (bits[position++] ? 1 : 0);
+		}
+		return true;
+	}
+};
+
+[[nodiscard]] std::optional<NicknameGradientConfig> DecodeSymbols(
+		const QString &symbols,
+		int count) {
+	if (symbols.size() != SymbolLength(count)) {
+		return std::nullopt;
+	}
+	auto bits = std::vector<bool>();
+	bits.reserve(symbols.size() * kBitsPerSymbol);
+	for (const auto ch : symbols) {
+		auto value = -1;
+		for (auto i = 0; i != kSymbolsInAlphabet; ++i) {
+			if (ch.unicode() == kInvisibleSymbols[i]) {
+				value = i;
+				break;
+			}
+		}
+		if (value < 0) {
+			return std::nullopt;
+		}
+		for (auto i = kBitsPerSymbol - 1; i >= 0; --i) {
+			bits.push_back(((value >> i) & 1) != 0);
+		}
+	}
+	auto reader = BitReader{ bits };
+	auto magic = uint32(0);
+	auto version = uint32(0);
+	auto storedCount = uint32(0);
+	auto speed = uint32(0);
+	if (!reader.read(magic, 8)
+		|| !reader.read(version, 3)
+		|| !reader.read(storedCount, 3)
+		|| !reader.read(speed, 2)
+		|| magic != kMagic
+		|| version != kVersion
+		|| int(storedCount) != count
+		|| speed > 2) {
+		return std::nullopt;
+	}
+	auto colors = std::vector<QColor>();
+	colors.reserve(count);
+	for (auto i = 0; i != count; ++i) {
+		auto r = uint32(0);
+		auto g = uint32(0);
+		auto b = uint32(0);
+		if (!reader.read(r, 4)
+			|| !reader.read(g, 4)
+			|| !reader.read(b, 4)) {
+			return std::nullopt;
+		}
+		colors.push_back(QColor(FromNibble(r), FromNibble(g), FromNibble(b)));
+	}
+	const auto crcPosition = reader.position;
+	auto crc = uint32(0);
+	if (!reader.read(crc, 8)) {
+		return std::nullopt;
+	}
+	const auto payload = std::vector<bool>(
+		bits.begin(),
+		bits.begin() + crcPosition);
+	if (Crc8(PackBits(payload)) != crc) {
+		return std::nullopt;
+	}
+	return NicknameGradientConfig{ std::move(colors), int(speed) };
+}
+
+[[nodiscard]] bool IsInvisibleSymbol(QChar ch) {
+	for (auto i = 0; i != kSymbolsInAlphabet; ++i) {
+		if (ch.unicode() == kInvisibleSymbols[i]) {
+			return true;
+		}
+	}
+	return false;
+}
+
+struct InvisibleMarker {
+	int position = 0;
+	int length = 0;
+	NicknameGradientConfig config;
+};
+
+[[nodiscard]] std::optional<InvisibleMarker> FindInvisible(
+		const QString &about) {
+	for (auto i = 0; i != about.size();) {
+		if (!IsInvisibleSymbol(about[i])) {
+			++i;
+			continue;
+		}
+		auto j = i + 1;
+		while (j != about.size() && IsInvisibleSymbol(about[j])) {
+			++j;
+		}
+		const auto run = about.mid(i, j - i);
+		for (auto count = kMaxColors; count >= kMinColors; --count) {
+			const auto length = SymbolLength(count);
+			if (run.size() < length) {
+				continue;
+			}
+			if (auto config = DecodeSymbols(run.right(length), count)) {
+				return InvisibleMarker{
+					int(i + run.size() - length),
+					length,
+					std::move(*config),
+				};
+			}
+		}
+		i = j;
+	}
+	return std::nullopt;
+}
 
 [[nodiscard]] bool IsHexChar(QChar ch) {
 	return ch.isDigit()
@@ -75,67 +264,96 @@ constexpr std::array<float64, 3> kSpeedPeriods = { 14.0, 8.0, 4.0 };
 	return QColor::fromRgb(value & 0xFFFFFFu);
 }
 
-[[nodiscard]] QString ColorToHex(const QColor &color) {
-	return QString::number(
-		(static_cast<uint>(color.red()) << 16)
-		| (static_cast<uint>(color.green()) << 8)
-		| static_cast<uint>(color.blue()),
-		16).rightJustified(6, '0');
+[[nodiscard]] std::optional<NicknameGradientConfig> ParseLegacy(
+		const QString &about) {
+	const auto marker = QString::fromUtf8(kLegacyMarker);
+	const auto index = about.indexOf(marker);
+	if (index < 0) {
+		return std::nullopt;
+	}
+	const auto rest = about.mid(index + marker.size());
+	if (rest.size() < kLegacyEncodedLength) {
+		return std::nullopt;
+	}
+	const auto c1 = HexToColor(rest.left(6));
+	const auto c2 = HexToColor(rest.mid(6, 6));
+	const auto speedChar = rest.mid(12, 1);
+	if (!c1 || !c2) {
+		return std::nullopt;
+	}
+	const auto speed = (speedChar == u"0"_q)
+		? 0
+		: (speedChar == u"1"_q)
+		? 1
+		: (speedChar == u"2"_q)
+		? 2
+		: -1;
+	if (speed < 0) {
+		return std::nullopt;
+	}
+	return NicknameGradientConfig{ { *c1, *c2 }, speed };
+}
+
+[[nodiscard]] QString EncodeSymbols(
+		const NicknameGradientConfig &config) {
+	auto writer = BitWriter();
+	writer.write(kMagic, 8);
+	writer.write(kVersion, 3);
+	writer.write(uint32(config.colors.size()), 3);
+	writer.write(uint32(std::clamp(config.speed, 0, 2)), 2);
+	for (const auto &color : config.colors) {
+		writer.write(uint32(ToNibble(color.red())), 4);
+		writer.write(uint32(ToNibble(color.green())), 4);
+		writer.write(uint32(ToNibble(color.blue())), 4);
+	}
+	const auto crc = Crc8(PackBits(writer.bits));
+	writer.write(crc, 8);
+	auto result = QString();
+	result.reserve(writer.bits.size() / kBitsPerSymbol);
+	for (auto i = 0; i != int(writer.bits.size()); i += kBitsPerSymbol) {
+		auto value = 0;
+		for (auto j = 0; j != kBitsPerSymbol; ++j) {
+			value = (value << 1) | (writer.bits[i + j] ? 1 : 0);
+		}
+		result.append(QChar(kInvisibleSymbols[value]));
+	}
+	return result;
 }
 
 [[nodiscard]] const std::vector<QColor> &PresetColors() {
 	static const auto value = std::vector<QColor>{
 		QColor(0xFF, 0x3B, 0x30),
 		QColor(0xFF, 0x95, 0x00),
-		QColor(0xFF, 0xCC, 0x00),
+		QColor(0xFF, 0xD6, 0x00),
 		QColor(0x34, 0xC7, 0x59),
 		QColor(0x00, 0xC7, 0xBE),
-		QColor(0x0A, 0x84, 0xFF),
-		QColor(0x5E, 0x5C, 0xE6),
-		QColor(0xBF, 0x5A, 0xF2),
+		QColor(0x00, 0x9C, 0xFF),
+		QColor(0x58, 0x5B, 0xFF),
+		QColor(0xAF, 0x52, 0xDE),
 		QColor(0xFF, 0x2D, 0x55),
-		QColor(0x8E, 0x8E, 0x93),
+		QColor(0xFF, 0x64, 0x95),
+		QColor(0x8B, 0x5C, 0xF6),
+		QColor(0x2E, 0xCC, 0x71),
+		QColor(0xF2, 0x9B, 0x30),
+		QColor(0xE0, 0xE0, 0xE0),
+		QColor(0x8A, 0x8A, 0x8A),
+		QColor(0x3A, 0x3A, 0x3A),
 	};
 	return value;
 }
 
-[[nodiscard]] QLinearGradient BuildGradient(
-		const std::vector<QColor> &colors,
-		int width) {
-	const auto w = std::max(1, width);
-	const auto phase = std::fmod(crl::now() / 4000.0, 1.0);
-	auto gradient = QLinearGradient(
-		QPointF(-phase * w, 0.0),
-		QPointF((2.0 - phase) * w, 0.0));
-	gradient.setSpread(QGradient::RepeatSpread);
-	if (colors.empty()) {
-		gradient.setColorAt(0.0, QColor(0x44, 0x44, 0x44));
-		gradient.setColorAt(1.0, QColor(0x44, 0x44, 0x44));
-		return gradient;
-	}
-	const auto count = int(colors.size());
-	for (auto i = 0; i != count; ++i) {
-		gradient.setColorAt(double(i) / count, colors[i]);
-	}
-	gradient.setColorAt(1.0, colors[0]);
-	return gradient;
-}
-
 class Swatch final : public Ui::RpWidget {
 public:
-	Swatch(
-		QWidget *parent,
-		QColor color,
-		int size,
-		Fn<void()> clicked)
+	Swatch(QWidget *parent, QColor color, int size, Fn<void()> clicked)
 	: Ui::RpWidget(parent)
-	, _color(std::move(color))
+	, _color(color)
 	, _clicked(std::move(clicked)) {
 		resize(size, size);
 		paintRequest(
 		) | rpl::on_next([=] {
 			auto p = Painter(this);
-			p.setPen(Qt::NoPen);
+			p.setRenderHint(QPainter::Antialiasing, true);
+			p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
 			p.setBrush(_color);
 			p.drawRoundedRect(rect(), 5, 5);
 		}, lifetime());
@@ -197,72 +415,62 @@ private:
 
 std::optional<NicknameGradientConfig> ParseBioGradient(
 		const QString &about) {
-	const auto marker = QString::fromUtf8(kMarker);
-	const auto index = about.indexOf(marker);
-	if (index < 0) {
-		return std::nullopt;
+	if (auto marker = FindInvisible(about)) {
+		return std::move(marker->config);
 	}
-	const auto rest = about.mid(index + marker.size());
-	if (rest.size() < kMarkerEncodedLength) {
-		return std::nullopt;
-	}
-	const auto hexPart = rest.left(12);
-	const auto speedChar = rest.mid(12, 1);
-	const auto c1 = HexToColor(hexPart.left(6));
-	const auto c2 = HexToColor(hexPart.mid(6, 6));
-	if (!c1 || !c2) {
-		return std::nullopt;
-	}
-	auto speed = -1;
-	if (speedChar == u"0"_q) {
-		speed = 0;
-	} else if (speedChar == u"1"_q) {
-		speed = 1;
-	} else if (speedChar == u"2"_q) {
-		speed = 2;
-	}
-	if (speed < 0) {
-		return std::nullopt;
-	}
-	return NicknameGradientConfig{ { *c1, *c2 }, speed };
+	return ParseLegacy(about);
 }
 
 QString EncodeBioGradient(const NicknameGradientConfig &config) {
-	if (config.colors.size() != 2) {
-		return {};
+	if (config.colors.size() < kMinColors) {
+		return QString();
 	}
-	return QString::fromUtf8(kMarker)
-		+ ColorToHex(config.colors[0])
-		+ ColorToHex(config.colors[1])
-		+ QString::number(std::clamp(config.speed, 0, 2));
+	auto copy = config;
+	if (copy.colors.size() > kMaxColors) {
+		copy.colors.resize(kMaxColors);
+	}
+	return EncodeSymbols(copy);
 }
 
 QString StripBioGradient(const QString &about) {
-	const auto marker = QString::fromUtf8(kMarker);
-	const auto index = about.lastIndexOf(marker);
-	if (index < 0) {
-		return about;
+	auto result = about;
+	const auto marker = QString::fromUtf8(kLegacyMarker);
+	while (true) {
+		auto changed = false;
+		if (const auto found = FindInvisible(result)) {
+			result.remove(found->position, found->length);
+			changed = true;
+		}
+		const auto index = result.lastIndexOf(marker);
+		if (index >= 0) {
+			result = result.left(index);
+			changed = true;
+		}
+		while (result.endsWith(' ')) {
+			result.chop(1);
+		}
+		if (!changed) {
+			break;
+		}
 	}
-	auto stripped = about.left(index);
-	while (stripped.endsWith(' ')) {
-		stripped.chop(1);
-	}
-	return stripped;
+	return result;
 }
 
 NicknameGradient::NicknameGradient(not_null<Main::Session*> session)
 : _session(session)
 , _tickTimer([=] { onTick(); }) {
-	ClientBadgeFor(_session).gradientChanges(
-	) | rpl::on_next([=](PeerId peerId) {
-		repaintPeer(peerId);
-		fireChanged();
-	}, _lifetime);
-
 	_session->changes().peerUpdates(
 		Data::PeerUpdate::Flag::About
 	) | rpl::on_next([=](const Data::PeerUpdate &update) {
-		repaintPeer(update.peer->id);
+		const auto user = update.peer->asUser();
+		if (!user) {
+			return;
+		}
+		auto &entry = _cache[user->id];
+		entry.about = user->about();
+		entry.config = ParseBioGradient(entry.about);
+		repaintPeer(user->id);
+		fireChanged();
 	}, _lifetime);
 }
 
@@ -272,23 +480,27 @@ std::optional<NicknameGradientConfig> NicknameGradient::configFor(
 	if (!user || user->isBot() || user->isServiceUser()) {
 		return std::nullopt;
 	}
-	if (auto gradient = ClientBadgeFor(_session).nicknameGradientFor(peer)) {
-		_animated.emplace(user->id);
-		ensureTimer();
-		return gradient;
+	auto &entry = _cache[user->id];
+	const auto &about = user->about();
+	if (entry.about != about) {
+		entry.about = about;
+		entry.config = ParseBioGradient(about);
 	}
-	if (const auto bio = ParseBioGradient(user->about())) {
-		_animated.emplace(user->id);
+	if (entry.config) {
 		ensureTimer();
-		return bio;
+	} else if (about.isEmpty()
+		&& crl::now() - entry.lastFullRequest > 30 * crl::time(1000)) {
+		entry.lastFullRequest = crl::now();
+		user->updateFull();
 	}
-	return std::nullopt;
+	return entry.config;
 }
 
 QPen NicknameGradient::penFor(
 		const NicknameGradientConfig &config,
 		float64 width) const {
-	if (config.colors.empty()) {
+	const auto count = int(config.colors.size());
+	if (count < kMinColors) {
 		return QPen();
 	}
 	const auto period = kSpeedPeriods[std::clamp(config.speed, 0, 2)];
@@ -301,7 +513,6 @@ QPen NicknameGradient::penFor(
 		QPointF(-offset, 0.0),
 		QPointF(width * 2.0 - offset, 0.0));
 	gradient.setSpread(QGradient::RepeatSpread);
-	const auto count = int(config.colors.size());
 	for (auto i = 0; i != count; ++i) {
 		gradient.setColorAt(double(i) / count, config.colors[i]);
 	}
@@ -328,27 +539,15 @@ void NicknameGradient::repaintPeer(PeerId peerId) {
 }
 
 void NicknameGradient::ensureTimer() {
+	_lastRequest = crl::now();
 	if (!_tickTimer.isActive()) {
-		_tickTimer.callEach(120);
+		_tickTimer.callEach(50);
 	}
 }
 
 void NicknameGradient::onTick() {
-	const auto ids = _animated;
-	for (const auto peerId : ids) {
-		const auto peer = _session->data().peerLoaded(peerId);
-		const auto user = peer ? peer->asUser() : nullptr;
-		const auto has = user
-			&& (ClientBadgeFor(_session).nicknameGradientFor(peer)
-				|| ParseBioGradient(user->about()));
-		if (has) {
-			repaintPeer(peerId);
-		} else {
-			_animated.erase(peerId);
-		}
-	}
 	fireChanged();
-	if (_animated.empty()) {
+	if (crl::now() - _lastRequest > 500) {
 		_tickTimer.cancel();
 	}
 }
@@ -366,20 +565,29 @@ void ApplyNicknameGradient(
 		not_null<Main::Session*> session,
 		std::optional<NicknameGradientConfig> config,
 		Fn<void(bool ok, QString message)> done) {
-	ClientBadgeFor(session).applySelfAvatarGradient(
-		std::move(config),
-		[=](bool ok, QString message) {
-			if (ok) {
-				const auto about = session->user()->about();
-				const auto stripped = StripBioGradient(about);
-				if (stripped != about) {
-					session->api().saveSelfBio(stripped);
-				}
-			}
-			if (done) {
-				done(ok, std::move(message));
-			}
-		});
+	const auto user = session->user();
+	auto updated = StripBioGradient(user->about());
+	if (config && config->colors.size() >= kMinColors) {
+		if (!updated.isEmpty()) {
+			updated += ' ';
+		}
+		updated += EncodeBioGradient(*config);
+	}
+	const auto limit = user->isPremium() ? 140 : 70;
+	if (updated.size() > limit) {
+		if (done) {
+			done(
+				false,
+				tr::lng_extremegram_nickname_gradient_too_long(tr::now));
+		}
+		return;
+	}
+	if (updated != user->about()) {
+		session->api().saveSelfBio(updated);
+	}
+	if (done) {
+		done(true, tr::lng_box_done(tr::now));
+	}
 }
 
 NicknameGradient &NicknameGradientFor(not_null<Main::Session*> session) {
@@ -399,10 +607,8 @@ NicknameGradient &NicknameGradientFor(not_null<Main::Session*> session) {
 void ShowNicknameGradientBox(
 		not_null<Window::SessionController*> controller) {
 	const auto session = &controller->session();
-	auto current = NicknameGradientFor(session).configFor(session->user());
-	if (!current) {
-		current = ParseBioGradient(session->user()->about());
-	}
+	const auto user = session->user();
+	auto current = ParseBioGradient(user->about());
 	const auto colors = std::make_shared<std::vector<QColor>>(
 		(current && current->colors.size() >= kMinColors)
 			? current->colors
@@ -426,23 +632,40 @@ void ShowNicknameGradientBox(
 		preview->setFixedHeight(18);
 		preview->paintRequest(
 		) | rpl::on_next([=] {
+			const auto count = int(colors->size());
+			if (count < kMinColors) {
+				return;
+			}
 			auto p = Painter(preview);
 			p.setPen(Qt::NoPen);
-			p.setBrush(BuildGradient(*colors, preview->width()));
+			const auto width = preview->width();
+			const auto ms = int(
+				kSpeedPeriods[std::clamp(*speed, 0, 2)] * 1000.0);
+			const auto phase = std::fmod(
+				(crl::now() % ms) / float64(ms),
+				1.0);
+			const auto offset = phase * width * 2.0;
+			auto gradient = QLinearGradient(
+				QPointF(-offset, 0.0),
+				QPointF(width * 2.0 - offset, 0.0));
+			gradient.setSpread(QGradient::RepeatSpread);
+			for (auto i = 0; i != count; ++i) {
+				gradient.setColorAt(
+					double(i) / count,
+					(*colors)[i]);
+			}
+			gradient.setColorAt(1.0, (*colors)[0]);
+			p.setBrush(gradient);
 			p.drawRoundedRect(preview->rect(), 6, 6);
 		}, preview->lifetime());
 
 		const auto previewTimer = std::make_shared<base::Timer>([=] {
 			preview->update();
 		});
-		previewTimer->callEach(60);
+		previewTimer->callEach(50);
 		preview->lifetime().add([previewTimer] {
 			previewTimer->cancel();
 		});
-
-		const auto refreshPreview = [=] {
-			preview->update();
-		};
 
 		auto colorsWrap = object_ptr<Ui::VerticalLayout>(layout);
 		const auto colorsList = colorsWrap.data();
@@ -470,7 +693,6 @@ void ShowNicknameGradientBox(
 					colors->at(index)));
 				editorBox->addButton(tr::lng_box_ok(), [=] {
 					(*colors)[index] = editor->color();
-					refreshPreview();
 					(*rebuild)();
 					editorBox->closeBox();
 				});
@@ -487,36 +709,36 @@ void ShowNicknameGradientBox(
 			colorsList->clear();
 			for (auto i = 0; i != int(colors->size()); ++i) {
 				const auto row = Ui::CreateChild<Ui::RpWidget>(colorsList);
-				row->resize(360, 44);
+				row->resize(320, 76);
 				const auto currentSwatch = Ui::CreateChild<Swatch>(
 					row,
 					(*colors)[i],
 					44,
 					[=] { openEditor(i); });
-				currentSwatch->moveToLeft(0, 0);
-				auto x = 52;
-				for (const auto &preset : PresetColors()) {
+				currentSwatch->moveToLeft(0, 16);
+				const auto &presets = PresetColors();
+				for (auto j = 0; j != int(presets.size()); ++j) {
+					const auto column = j % 8;
+					const auto line = j / 8;
 					const auto swatch = Ui::CreateChild<Swatch>(
 						row,
-						preset,
+						presets[j],
 						24,
-						[=, color = preset] {
+						[=, color = presets[j]] {
 							(*colors)[i] = color;
 							currentSwatch->setColor(color);
-							refreshPreview();
+							preview->update();
 						});
-					swatch->moveToLeft(x, 10);
-					x += 28;
+					swatch->moveToLeft(52 + column * 28, 6 + line * 28);
 				}
 				if (colors->size() > kMinColors) {
 					const auto remove = Ui::CreateChild<RemoveButton>(
 						row,
 						[=] {
 							colors->erase(colors->begin() + i);
-							refreshPreview();
 							(*rebuild)();
 						});
-					remove->moveToLeft(x + 4, 10);
+					remove->moveToLeft(280, 26);
 				}
 				colorsList->add(
 					object_ptr<Ui::RpWidget>::fromRaw(row),
@@ -536,7 +758,6 @@ void ShowNicknameGradientBox(
 			}
 			colors->push_back(
 				PresetColors()[colors->size() % PresetColors().size()]);
-			refreshPreview();
 			(*rebuild)();
 		});
 
@@ -568,7 +789,7 @@ void ShowNicknameGradientBox(
 					st::boxPadding.left() + st::boxOptionListPadding.left(),
 					0,
 					st::boxPadding.right(),
-					st::boxOptionListSkip));
+					0));
 		}
 
 		const auto off = layout->add(
@@ -578,36 +799,32 @@ void ShowNicknameGradientBox(
 				st::settingsButtonNoIcon),
 			QMargins(
 				st::boxPadding.left(),
-				4,
+				12,
 				st::boxPadding.right(),
 				4));
 		off->setClickedCallback([=] {
-			controller->showToast(
-				tr::lng_extremegram_nickname_gradient_applying(tr::now));
 			ApplyNicknameGradient(
 				session,
 				std::nullopt,
-				[=](bool ok, QString message) {
+				[=](bool, QString message) {
 					controller->showToast(std::move(message));
 				});
 			box->closeBox();
 		});
 
-		box->addButton(tr::lng_cancel(), [=] {
-			box->closeBox();
-		});
 		box->addButton(tr::lng_box_ok(), [=] {
 			if (colors->size() < kMinColors) {
 				return;
 			}
-			controller->showToast(
-				tr::lng_extremegram_nickname_gradient_applying(tr::now));
 			ApplyNicknameGradient(
 				session,
 				NicknameGradientConfig{ *colors, *speed },
-				[=](bool ok, QString message) {
+				[=](bool, QString message) {
 					controller->showToast(std::move(message));
 				});
+			box->closeBox();
+		});
+		box->addButton(tr::lng_cancel(), [=] {
 			box->closeBox();
 		});
 	}));

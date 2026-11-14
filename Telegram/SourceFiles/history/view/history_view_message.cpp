@@ -3359,17 +3359,51 @@ void Message::paintText(
 	// Autistic "orig": the pre-edit text snapshot as a small line below.
 	if (Autistic::ShowOrigFor(data())) {
 		if (const auto original = Autistic::OriginalFor(data()->fullId())) {
-			const auto line = QString::fromUtf8("orig: ") + original->text;
+			const auto label = tr::lng_extremegram_orig_before(tr::now);
+			const auto padding = 6;
+			const auto gap = 6;
+			const auto pillHeight = Autistic::OrigPillHeight();
+			const auto top = trect.y()
+				+ textHeightFor(trect.width())
+				+ Autistic::OrigTopSkip();
+			const auto left = trect.x();
+			const auto available = trect.width();
 			p.setFont(st::msgServiceFont);
+			const auto labelWidth = st::msgServiceFont->width(label);
+			const auto textWidth = std::max(
+				0,
+				available - 2 * padding - labelWidth - gap);
+			const auto text = st::msgServiceFont->elided(
+				original->text,
+				textWidth);
+			const auto pillWidth = std::min(
+				available,
+				2 * padding
+					+ labelWidth
+					+ gap
+					+ st::msgServiceFont->width(text));
+			auto background = stm->msgServiceFg->c;
+			background.setAlphaF(0.10);
+			p.setPen(Qt::NoPen);
+			p.setBrush(background);
+			p.drawRoundedRect(
+				QRect(left, top, pillWidth, pillHeight),
+				4,
+				4);
 			p.setPen(stm->msgServiceFg);
-			const auto y = trect.y() + textHeightFor(trect.width())
-				+ (Autistic::OrigExtraHeight()
-					- st::msgServiceFont->height) / 2;
 			p.drawTextLeft(
-				trect.x(),
-				y,
+				left + padding,
+				top + 4,
 				width(),
-				st::msgServiceFont->elided(line, trect.width()));
+				label);
+			auto textColor = stm->msgServiceFg->c;
+			textColor.setAlphaF(0.85);
+			p.setPen(textColor);
+			p.drawTextLeft(
+				left + padding + labelWidth + gap,
+				top + 4,
+				width(),
+				text);
 		}
 	}
 	if (needRippleMask && !ripplePath.isEmpty()) {

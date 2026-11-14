@@ -17,15 +17,12 @@ class HistoryItem;
 
 namespace Autistic {
 
-// "Orig before edit": when the AutisticShowOrig feature is on, every
-// message edition first snapshots the current text; the view renders it
-// as a small "orig: ..." line under the message text. In-memory only,
-// cleaned by the app restart.
 void RememberOriginal(FullMsgId id, TextWithEntities text);
 [[nodiscard]] std::optional<TextWithEntities> OriginalFor(FullMsgId id);
 [[nodiscard]] bool ShowOrigFor(not_null<HistoryItem*> item);
 
-// Extra bubble height taken by the "orig: ..." line (drawn under text).
+[[nodiscard]] int OrigPillHeight();
+[[nodiscard]] int OrigTopSkip();
 [[nodiscard]] int OrigExtraHeight();
 
 } // namespace Autistic

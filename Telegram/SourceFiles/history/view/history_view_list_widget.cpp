@@ -57,6 +57,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_who_reacted.h"
 #include "api/api_views.h"
 #include "custom/autistic/autistic_mode.h"
+#include "custom/nickname_gradient.h"
 #include "layout/layout_selection.h"
 #include "payments/payments_reaction_process.h"
 #include "history/view/history_view_reaction_preview.h"
@@ -651,6 +652,11 @@ ListWidget::ListWidget(
 	}
 
 	_scrollDateHideTimer.setCallback([this] { scrollDateHideByTimer(); });
+
+	Custom::NicknameGradientFor(_session).ticks(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
 
 	if (const auto window = controllerOrNull()) {
 		using PlayRequest = ChatHelpers::EmojiInteractionPlayRequest;

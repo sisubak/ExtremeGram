@@ -7,7 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/flat_set.h"
+#include "base/basic_types.h"
+#include "base/flat_map.h"
 #include "base/timer.h"
 #include "data/data_peer_id.h"
 
@@ -63,15 +64,22 @@ public:
 	void repaintPeer(PeerId peerId);
 
 private:
+	struct Entry {
+		QString about;
+		std::optional<NicknameGradientConfig> config;
+		crl::time lastFullRequest = 0;
+	};
+
 	void ensureTimer();
 	void onTick();
 	void fireChanged();
 
 	const not_null<Main::Session*> _session;
-	base::flat_set<PeerId> _animated;
+	base::flat_map<PeerId, Entry> _cache;
 	base::Timer _tickTimer;
 	rpl::event_stream<> _tickEvents;
 	rpl::lifetime _lifetime;
+	crl::time _lastRequest = 0;
 	bool _firing = false;
 };
 

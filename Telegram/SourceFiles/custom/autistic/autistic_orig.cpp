@@ -48,8 +48,16 @@ bool ShowOrigFor(not_null<HistoryItem*> item) {
 	return original.has_value() && !original->text.isEmpty();
 }
 
+int OrigPillHeight() {
+	return st::msgServiceFont->height + 8;
+}
+
+int OrigTopSkip() {
+	return 4;
+}
+
 int OrigExtraHeight() {
-	return st::msgServiceFont->height * 5 / 4;
+	return OrigPillHeight() + OrigTopSkip();
 }
 
 } // namespace Autistic
