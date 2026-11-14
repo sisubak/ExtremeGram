@@ -91,6 +91,14 @@ void OnlineSpamFilter::onTick() {
 	}
 }
 
+bool OnlineSpamFilter::fakingOnline(not_null<UserData*> user) const {
+	const auto i = _entries.find(user->id);
+	if (i == _entries.end()) {
+		return false;
+	}
+	return i->second.active && (i->second.activeUntil > base::unixtime::now());
+}
+
 void NoteOnlineFlip(
 		not_null<UserData*> user,
 		bool wasOnline,
