@@ -352,7 +352,7 @@ void ShowNicknameGradientBox(
 			const auto swatches = std::make_shared<std::vector<Swatch*>>();
 			auto x = 0;
 			for (const auto &color : colors) {
-				const auto swatch = Ui::CreateChild<Swatch>(row, color, [=] {
+				const auto swatch = Ui::CreateChild<Swatch>(row, color, [=](QColor chosen) {
 					*target = chosen;
 					for (const auto &s : *swatches) {
 						s->setSelected(s->color() == chosen);
