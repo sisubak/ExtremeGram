@@ -1,126 +1,57 @@
-﻿# Yurigram — Yet another 3rd-party [tdesktop](https://github.com/telegramdesktop/tdesktop) client
+﻿# ExtremeGram
 
-Yurigram was formerly forked from [64Gram](https://github.com/TDesktop-x64/tdesktop) and [Yukigram](https://github.com/yukigram/yukigram-legacy), but now it is a standalone client with some exclusive new features and directly follows official Telegram Desktop updates.
+[![Build ExtremeGram](https://github.com/sisubak/ExtremeGram/actions/workflows/extremegram-build.yml/badge.svg)](https://github.com/sisubak/ExtremeGram/actions/workflows/extremegram-build.yml)
 
-The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
+Модифицированный форк [Yurigram](https://github.com/Revincx/Yurigram) (а тот — из 64Gram / tdesktop) под это всё дело. Всё локально, никаких своих серверов, ничего не уходит с твоей машины кроме того, что и так уходит в телегу. Исходники — GPLv3 с OpenSSL-исключением ([LICENSE](LICENSE)).
 
-## Features
+## Функционал
 
-Yurigram includes [most features from 64Gram](https://github.com/TDesktop-x64/tdesktop/blob/dev/features.md), as it was originally forked from 64Gram. It also adds the following features.
+1. Анти аюграмм
+2. Анти спам онлайном
+3. Анти таймер
+4. Бот команды по типу: `!stats` / `!whois` и т.д.
+5. Кастомизация цвета никнейма (градиентом двух цветов)
+6. Автоматическое применение маркдауна ебанного
+7. Изменение тэга юзера в чате на его никнейм
+8. Скрытие групп/каналов/людей (визуально)
+9. Спам онлайном с определенным интервалом
+10. Плавные анимки интерфейса
+11. Редизайн
+12. Спизженный функционал AutisticGram'а с последующим функционалом:
+   1. Игнор лист
+   2. Анти пинг
+   3. Режим призрака (только на прочтение)
+   4. Показ удаленных сообщений
+   5. Показ исходных сообщений после делита
+   6. Исправление раскладки
+   7. Сердечко по двойному клику
+   8. Какое-то скрытие сообщений которое ч вообще не ебу как работает
+13. Значок ExtremeGram рядом с никнеймом после запуска форка
+14. Сам функционал форка на котором базирован ExtremeGram
+15. Скриншот выделенных сообщений
 
-### Chat Enhanced Settings
+By @utf8xx
 
-- Override global enhanced-setting options for an individual chat.
-- Import, export, and share any enhanced-setting value through deep links.
+## Дизайн
 
-### BotUse
+1. Показ таймера над сообщениями типов тех, которые отписали в группу и у них ограничение в виде таймера
+2. Показ значков наказанных типочков у которых мут и т.д. с сроком когда их авто размутит
+3. Более улучшенное контекстное меню позволяющая ставить собственные сроки и причину к муту типа
+4. Улучшенная анимка печатанья
+5. Сам дизайн форка на котором базирован ExtremeGram
 
-Log in with a bot account and send messages as that bot. See the [BotUse wiki](https://github.com/Revincx/Yurigram/wiki/BotUse-Description) for details.
+By @utf8xx
 
-### More features
+## Сборки
 
-<details>
-<summary><b>Messages and chats</b></summary>
+- **Linux x86_64** — AppImage собирается в CI, артефакт и релиз `build-<run_id>` с `.sha256`.
+- **Windows x64** — `.zip` с exe собирается в CI, релиз `build-<run_id>` с `.sha256`.
+- Билд из исходников: [docs/building-linux.md](docs/building-linux.md), [docs/building-win.md](docs/building-win.md), нужны `TDESKTOP_API_ID` / `TDESKTOP_API_HASH` ([docs/api_credentials.md](docs/api_credentials.md)).
 
-- Send a message directly in a group linked to a channel.
-- Temporarily hide messages and restore them easily.
-- Create or edit inline user mentions with Ctrl/Ctrl+Shift-click.
-- Set a custom render limit for rich message blocks.
-- Open the same chat in multiple new windows.
-- Quickly edit self-editable messages with Alt+Shift+Up/Down.
-- Disable syncing local message drafts to the cloud.
-- Show forward counts below channel messages.
+По багам / идеям писать в чат ниже.
 
-</details>
+---
 
-<details>
-<summary><b>Forwarding</b></summary>
+GPLv3 с OpenSSL-исключением. Telegram — торговая марка Telegram Messenger Inc., этот проект с ним никак не связан.
 
-- Remember message-forwarding targets in the forward dialog.
-- Force regrouping or separating photos when forwarding media groups.
-- Add spoilers to forwarded media.
-- Send a comment after forwarding messages.
-
-</details>
-
-<details>
-<summary><b>Media and emoji</b></summary>
-
-- Use additional Fluent Emoji packs (Flat and Color).
-- Save custom emoji sets without Premium.
-- Adjust sticker size in chats.
-- View detailed media metadata in the media viewer.
-- Show controls for silent GIF videos.
-
-</details>
-
-<details>
-<summary><b>Translation and link previews</b></summary>
-
-- Translate messages with Google Translate or an LLM translation provider.
-- Add or edit webpage previews with custom URLs using Ctrl+Shift+K.
-- Force generation of webpage previews for incoming messages.
-- Disable automatic webpage-preview fetching for outgoing messages.
-- Replace link-preview domains with custom regular-expression rules.
-
-</details>
-
-<details>
-<summary><b>People and groups</b></summary>
-
-- Show mutual-contact labels and online indicators in group chats.
-- Hide user Stars ratings.
-- Search group messages with both user and message-type filters.
-- Approve or decline all join requests at once.
-
-</details>
-
-And more new features will ~~(may)~~ be added in the future.
-
-## Supported systems
-
-Windows 7 and above
-
-Linux 64 bit
-
-macOS > 10.12 and above
-
-The latest version is available on the [Release](https://github.com/Revincx/Yurigram/releases) page.
-
-## Localization
-
-If you want to translate this project, **Just Do It!**
-
-Create a Pull Request: [Localization Repo](https://github.com/RuaGram/Localization).
-
-**Here is a project [translation template](https://github.com/RuaGram/Localization/blob/master/en.json).**
-
-You can find a language ID on Telegram's log.txt
-
-For example: `[2022.04.23 10:37:45] Current Language pack ID: de, Base ID: `
-
-Then your language translation filename is `de.json` or something like that.
-
-***Note: Ignore base ID(base ID translation - Work in progress)***
-
-## Build instructions
-
-* [Windows (32-bit and 64-bit)][win]
-* [macOS][mac]
-* [GNU/Linux using Docker][linux]
-
-## Links
-
-* [Yurigram Dev Channel (Simplified Chinese)](https://t.me/ruadevs)
-
-## Feedback
-
-The project doesn't accept new feature requests for now. But if you have something else to report, please send a message to me on Telegram with this link: https://t.me/ruadevs?direct
-
-[//]: # (LINKS)
-[license]: LICENSE
-[win]: docs/building-win.md
-[mac]: docs/building-mac.md
-[linux]: docs/building-linux.md
-[preview_image]: https://github.com/TDesktop-x64/tdesktop/blob/dev/docs/assets/preview.png "Preview of 64Gram Desktop"
-[preview_image_url]: https://raw.githubusercontent.com/TDesktop-x64/tdesktop/dev/docs/assets/preview.png
+By @utf8xx
