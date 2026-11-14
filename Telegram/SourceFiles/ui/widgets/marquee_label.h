@@ -13,6 +13,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/text/text.h"
 
+#include <QtGui/QPen>
+
 class Painter;
 
 namespace style {
@@ -35,6 +37,7 @@ public:
 	}
 
 	void setTextColorOverride(std::optional<QColor> color);
+	void setPenOverride(std::optional<QPen> pen);
 	void setContextCopyText(const QString &copyText);
 	void setSelectable(bool selectable);
 
@@ -87,6 +90,7 @@ private:
 	const style::FlatLabel &_st;
 	Text::String _text;
 	std::optional<QColor> _textColorOverride;
+	std::optional<QPen> _penOverride;
 	QString _contextCopyText;
 	base::unique_qptr<PopupMenu> _menu;
 

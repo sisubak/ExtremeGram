@@ -9687,9 +9687,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_anti_slowmode" = "Анти-таймер (слоумод)";
 "lng_extremegram_anti_slowmode_about" = "Сообщения в слоумоде визуально отправляются сразу (со значком таймера) и автоматически уходят, как только слоумод отпустит — в порядке очереди.";
 "lng_extremegram_nickname_gradient" = "Градиентный ник";
-"lng_extremegram_nickname_gradient_about" = "Два цвета и анимация переливания на твоём нике — видят все ExtremeGram-клиенты: в чатах и в списке диалогов. Настройка хранится в описании профиля.";
+"lng_extremegram_nickname_gradient_about" = "До шести цветов и анимация переливания на твоём нике — видят все ExtremeGram-клиенты: в чатах, списке диалогов, профиле и списках участников. Настройка хранится в углах аватарки и не видна на самом фото.";
 "lng_extremegram_nickname_gradient_color1" = "Цвет 1";
 "lng_extremegram_nickname_gradient_color2" = "Цвет 2";
+"lng_extremegram_nickname_gradient_add_color" = "Добавить цвет";
+"lng_extremegram_nickname_gradient_custom_color" = "Свой цвет";
+"lng_extremegram_nickname_gradient_applying" = "Обновляю аватарку...";
 "lng_extremegram_nickname_gradient_speed" = "Скорость";
 "lng_extremegram_nickname_gradient_slow" = "Медленно";
 "lng_extremegram_nickname_gradient_medium" = "Средне";

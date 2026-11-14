@@ -10,7 +10,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common_session.h"
 
 #include "core/enhanced_settings.h"
-#include "custom/autistic/autistic_mode.h"
 #include "custom/nickname_gradient.h"
 #include "lang/lang_keys.h"
 #include "settings/settings_builder.h"
@@ -296,112 +295,6 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		},
 		.keywords = { u"hidden"_q, u"chats"_q, u"reveal"_q },
 	});
-
-	builder.addSkip();
-	builder.addSubsectionTitle({
-		.id = u"extremegram/autistic"_q,
-		.title = tr::lng_extremegram_autistic_telegram(),
-		.keywords = { u"autistic"_q, u"режим"_q },
-	});
-	const auto autisticMasterButton = builder.addButton({
-		.id = u"extremegram/autistic-telegram"_q,
-		.title = tr::lng_extremegram_autistic_telegram(),
-		.st = &st::settingsButtonNoIcon,
-		.toggled = EnhancedSettings::Watch(
-			EnhancedSettings::Option::AutisticTelegram),
-		.keywords = { u"autistic"_q, u"режим"_q },
-	});
-	if (autisticMasterButton && controller) {
-		autisticMasterButton->toggledValue(
-		) | rpl::filter([=](bool value) {
-			return value != EnhancedSettings::Get(
-				EnhancedSettings::Option::AutisticTelegram);
-		}) | rpl::on_next([=](bool) {
-			Autistic::ToggleMaster(
-				not_null<Window::SessionController*>(controller));
-		}, autisticMasterButton->lifetime());
-	}
-	builder.addDividerText(tr::lng_extremegram_autistic_telegram_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-commands"_q,
-		tr::lng_extremegram_autistic_commands(),
-		EnhancedSettings::Option::AutisticCommands,
-		{ u"commands"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_commands_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-ignore"_q,
-		tr::lng_extremegram_autistic_ignore(),
-		EnhancedSettings::Option::AutisticIgnore,
-		{ u"ignore"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_ignore_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-anti-ping"_q,
-		tr::lng_extremegram_autistic_anti_ping(),
-		EnhancedSettings::Option::AutisticAntiPing,
-		{ u"ping"_q, u"mention"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_anti_ping_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-read-invisible"_q,
-		tr::lng_extremegram_autistic_read_invisible(),
-		EnhancedSettings::Option::AutisticReadInvisible,
-		{ u"read"_q, u"invisible"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_read_invisible_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-ghosts"_q,
-		tr::lng_extremegram_autistic_ghosts(),
-		EnhancedSettings::Option::AutisticGhosts,
-		{ u"ghost"_q, u"deleted"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_ghosts_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-show-orig"_q,
-		tr::lng_extremegram_autistic_show_orig(),
-		EnhancedSettings::Option::AutisticShowOrig,
-		{ u"edit"_q, u"orig"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_show_orig_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-layout-fix"_q,
-		tr::lng_extremegram_autistic_layout_fix(),
-		EnhancedSettings::Option::AutisticLayoutFix,
-		{ u"layout"_q, u"keyboard"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_layout_fix_about());
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/autistic-heart"_q,
-		tr::lng_extremegram_autistic_heart(),
-		EnhancedSettings::Option::AutisticHeart,
-		{ u"heart"_q, u"reaction"_q, u"autistic"_q });
-	builder.addDividerText(tr::lng_extremegram_autistic_heart_about());
-	builder.addButton({
-		.id = u"extremegram/autistic-hide-foreign"_q,
-		.title = tr::lng_extremegram_autistic_hide_foreign(),
-		.st = &st::settingsButtonNoIcon,
-		.onClick = [=] {
-			if (!controller) {
-				return;
-			}
-			Autistic::CycleHideForeign();
-			controller->showToast(
-				QString::fromUtf8("Скрытие чужих: ")
-				+ Autistic::HideForeignLabel(Autistic::hideForeign()));
-		},
-		.keywords = { u"hide"_q, u"foreign"_q, u"autistic"_q },
-	});
-	builder.addDividerText(tr::lng_extremegram_autistic_hide_foreign_about());
 }
 
 class ExtremeGram : public Section<ExtremeGram> {

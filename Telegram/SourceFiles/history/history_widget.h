@@ -893,6 +893,8 @@ private:
 	bool _sentFromScheduledTip = false;
 
 	mtpRequestId _saveEditMsgRequestId = 0;
+	uint64 _editRequestGeneration = 0;
+	bool _editRequestPending = false;
 	uint64 _saveEditBotOperation = 0;
 
 	std::unique_ptr<HistoryView::Controls::WebpageProcessor> _preview;

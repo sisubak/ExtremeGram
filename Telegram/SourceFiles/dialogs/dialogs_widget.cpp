@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/autistic/autistic_panel.h"
 #include "custom/autistic/autistic_mode.h"
 #include "custom/client_badge_popup.h"
+#include "custom/nickname_gradient.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/history_view_chat_section.h"
@@ -510,6 +511,11 @@ Widget::Widget(
 	_inner->updated(
 	) | rpl::on_next([=] {
 		listScrollUpdated();
+	}, lifetime());
+
+	Custom::NicknameGradientFor(&controller->session()).ticks(
+	) | rpl::on_next([=] {
+		_inner->update();
 	}, lifetime());
 
 	rpl::combine(

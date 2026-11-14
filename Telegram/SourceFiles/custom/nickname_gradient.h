@@ -7,13 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/flat_set.h"
 #include "base/timer.h"
-#include "base/flat_map.h"
 #include "data/data_peer_id.h"
+
+#include <rpl/event_stream.h>
 
 #include <QColor>
 #include <QPen>
 #include <optional>
+#include <vector>
 
 class PeerData;
 
@@ -28,11 +31,10 @@ class SessionController;
 namespace Custom {
 
 struct NicknameGradientConfig {
-	QColor c1;
-	QColor c2;
+	std::vector<QColor> colors;
 	int speed = 1;
 
-	friend inline constexpr bool operator==(
+	friend inline bool operator==(
 		const NicknameGradientConfig &,
 		const NicknameGradientConfig &) = default;
 };
@@ -56,27 +58,27 @@ public:
 		const NicknameGradientConfig &config,
 		float64 width) const;
 
+	[[nodiscard]] rpl::producer<> ticks() const;
+
 	void repaintPeer(PeerId peerId);
 
 private:
-	struct Entry {
-		QString about;
-		std::optional<NicknameGradientConfig> config;
-		crl::time lastFullRequest = 0;
-	};
-
 	void ensureTimer();
 	void onTick();
+	void fireChanged();
 
 	const not_null<Main::Session*> _session;
-	base::flat_map<PeerId, Entry> _cache;
+	base::flat_set<PeerId> _animated;
 	base::Timer _tickTimer;
+	rpl::event_stream<> _tickEvents;
 	rpl::lifetime _lifetime;
+	bool _firing = false;
 };
 
 void ApplyNicknameGradient(
 	not_null<Main::Session*> session,
-	const NicknameGradientConfig &config);
+	std::optional<NicknameGradientConfig> config,
+	Fn<void(bool ok, QString message)> done = nullptr);
 
 [[nodiscard]] NicknameGradient &NicknameGradientFor(
 	not_null<Main::Session*> session);

@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_helper.h"
 #include "apiwrap.h"
 #include "api/api_chat_participants.h"
+#include "custom/nickname_gradient.h"
 #include "styles/style_window.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_chat.h"
@@ -144,6 +145,16 @@ TopBarWidget::TopBarWidget(
 , _titlePeerText(st::windowMinWidth / 3)
 , _onlineUpdater([=] { updateOnlineDisplay(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent);
+
+	Custom::NicknameGradientFor(&controller->session()).ticks(
+	) | rpl::on_next([=] {
+		if (const auto peer = titleNamePeer()) {
+			if (Custom::NicknameGradientFor(&controller->session())
+					.configFor(peer)) {
+				update();
+			}
+		}
+	}, lifetime());
 
 	_clear->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	_forward->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
@@ -737,7 +748,14 @@ void TopBarWidget::paintTopBar(Painter &p) {
 		});
 		namewidth -= badgeWidth;
 
-		p.setPen(st::dialogsNameFg);
+		const auto gradient = Custom::NicknameGradientFor(
+			&_controller->session()).configFor(namePeer);
+		if (gradient) {
+			p.setPen(Custom::NicknameGradientFor(
+				&_controller->session()).penFor(*gradient, namewidth));
+		} else {
+			p.setPen(st::dialogsNameFg);
+		}
 		_title.draw(p, {
 			.position = { nameleft, nametop },
 			.availableWidth = namewidth,

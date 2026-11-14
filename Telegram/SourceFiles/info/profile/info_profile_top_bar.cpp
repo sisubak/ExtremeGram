@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/shortcuts.h"
 #include "custom/client_badge_detector.h"
 #include "custom/client_badge_popup.h"
+#include "custom/nickname_gradient.h"
 #include "custom/redesign.h"
 #include "data/components/recent_shared_media_gifts.h"
 #include "data/data_birthday.h"
@@ -631,6 +632,10 @@ TopBar::TopBar(
 	_title->naturalWidthValue() | rpl::on_next([=](int w) {
 		_title->resizeToWidth(w);
 	}, _title->lifetime());
+	Custom::NicknameGradientFor(&_peer->session()).ticks(
+	) | rpl::on_next([=] {
+		refreshTitleGradient();
+	}, lifetime());
 	badgeUpdates = rpl::merge(
 		std::move(badgeUpdates),
 		nameValue() | rpl::to_empty,
@@ -753,6 +758,17 @@ void TopBar::setupBirthdayEffect() {
 		_gifPausedChecker);
 }
 
+void TopBar::refreshTitleGradient() {
+	auto &gradient = Custom::NicknameGradientFor(&_peer->session());
+	if (const auto config = gradient.configFor(_peer)) {
+		_title->setPenOverride(gradient.penFor(
+			*config,
+			std::max(1, _title->width())));
+	} else {
+		_title->setPenOverride(std::nullopt);
+	}
+}
+
 void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 	constexpr auto kMinContrast = 5.5;
 	const auto shouldOverride = [&](const style::color &color) {
@@ -768,6 +784,7 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 		: shouldOverrideTitle
 		? std::optional<QColor>(st::groupCallMembersFg->c)
 		: std::nullopt);
+	refreshTitleGradient();
 	_tabSubtitleOverride = collectible
 		? collectible->textColor
 		: shouldOverrideStatus
@@ -2834,6 +2851,7 @@ void TopBar::resizeEvent(QResizeEvent *e) {
 		_cachedGradient = QImage();
 	}
 	updateLabelsPosition();
+	refreshTitleGradient();
 	RpWidget::resizeEvent(e);
 }
 

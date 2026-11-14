@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flat_map.h"
 #include "base/flat_set.h"
 #include "base/timer.h"
+#include "custom/nickname_gradient.h"
 #include "data/data_peer_id.h"
 #include "mtproto/sender.h"
 #include "ui/userpic_view.h"
@@ -47,8 +48,16 @@ public:
 		int scale,
 		std::optional<QColor> tint = std::nullopt);
 	[[nodiscard]] rpl::producer<PeerId> badgeDetectedChanges() const;
+	[[nodiscard]] rpl::producer<PeerId> gradientChanges() const;
+
+	[[nodiscard]] std::optional<NicknameGradientConfig> nicknameGradientFor(
+		not_null<PeerData*> peer);
 
 	void stampSelfAvatar(
+		Fn<void(bool ok, QString message)> done = nullptr);
+
+	void applySelfAvatarGradient(
+		std::optional<NicknameGradientConfig> gradient,
 		Fn<void(bool ok, QString message)> done = nullptr);
 
 	void stampUploadImage(QImage &image);
@@ -65,7 +74,10 @@ public:
 	void reloadBadgeSourceImage();
 
 	[[nodiscard]] static QImage StampAvatarWithClientMarker(
-		const QImage &source);
+		const QImage &source,
+		const std::optional<NicknameGradientConfig> &gradient);
+	[[nodiscard]] static std::optional<NicknameGradientConfig>
+	DetectGradientInAvatarImage(const QImage &avatarSquare);
 	[[nodiscard]] static bool DetectMarkerInAvatarImage(
 		const QImage &avatarSquare);
 	[[nodiscard]] static QImage CropAndCleanBadgeImage(const QImage &rawBadge);
@@ -82,8 +94,16 @@ private:
 		Ui::PeerUserpicView view;
 		bool evaluated = false;
 		bool detected = false;
+		std::optional<NicknameGradientConfig> gradient;
 	};
 
+	[[nodiscard]] bool ensurePeerEvaluated(
+		not_null<UserData*> user,
+		PeerCacheEntry &entry);
+	[[nodiscard]] std::optional<NicknameGradientConfig> currentSelfGradient();
+	void stampSelfAvatarWithGradient(
+		std::optional<NicknameGradientConfig> gradient,
+		Fn<void(bool ok, QString message)> done);
 	void pollPendingPeers();
 	void scheduleStamp(crl::time delayMs);
 	void tryStamp();
@@ -97,10 +117,12 @@ private:
 	base::flat_map<PeerId, PeerCacheEntry> _cache;
 	base::flat_set<PeerId> _pendingDownloadPeers;
 	rpl::event_stream<PeerId> _detectionChanges;
+	rpl::event_stream<PeerId> _gradientChanges;
 
 	QImage _cleanLightStrokeBadge;
 	QImage _cleanDarkStrokeBadge;
 	base::flat_map<uint64, QImage> _tintedIconCache;
+	std::optional<NicknameGradientConfig> _selfGradient;
 	int _cachedPixelSize = 0;
 	bool _stampInProgress = false;
 	bool _waitingForVideo = false;
@@ -112,6 +134,7 @@ private:
 	int _autoStampAttempts = 0;
 	int _videoWaitChecks = 0;
 	Fn<void(bool, QString)> _waitingDone;
+	std::optional<NicknameGradientConfig> _waitingGradient;
 	rpl::lifetime _lifetime;
 };
 

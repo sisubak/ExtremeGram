@@ -164,6 +164,7 @@ private:
 		const QBrush &brush) const;
 	void paintEdges(QPainter &p, const QRect &clip) const;
 	void updateLabelsPosition();
+	void refreshTitleGradient();
 	[[nodiscard]] int titleMostLeft() const;
 	[[nodiscard]] int statusMostLeft() const;
 	[[nodiscard]] QRect userpicGeometry() const;

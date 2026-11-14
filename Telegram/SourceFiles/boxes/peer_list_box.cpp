@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peer_list_section_headers.h"
 #include "boxes/peer_list_section_index.h"
 #include "custom/client_badge_popup.h"
+#include "custom/nickname_gradient.h"
 #include "history/history.h" // chatListNameSortKey.
 #include "main/session/session_show.h"
 #include "main/main_session.h"
@@ -1226,6 +1227,11 @@ PeerListContent::PeerListContent(
 		invalidatePixmapsCache();
 	}, lifetime());
 
+	Custom::NicknameGradientFor(&_controller->session()).ticks(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
 	_repaintByStatus.setCallback([this] { update(); });
 }
 
@@ -2194,7 +2200,15 @@ void PeerListContent::paintRowContent(
 		width(),
 		selected);
 	auto nameCheckedRatio = row->disabled() ? 0. : row->checkedRatio();
-	p.setPen(anim::pen(st.nameFg, st.nameFgChecked, nameCheckedRatio));
+	const auto gradient = (peer && !nameCheckedRatio)
+		? Custom::NicknameGradientFor(&_controller->session()).configFor(peer)
+		: std::nullopt;
+	if (gradient) {
+		p.setPen(Custom::NicknameGradientFor(
+			&_controller->session()).penFor(*gradient, namew));
+	} else {
+		p.setPen(anim::pen(st.nameFg, st.nameFgChecked, nameCheckedRatio));
+	}
 	name.drawLeftElided(p, namex + leading, namey, namew, width());
 
 	p.setFont(st::contactsStatusFont);

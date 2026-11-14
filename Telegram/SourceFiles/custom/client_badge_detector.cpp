@@ -32,6 +32,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtGui/QPainterPath>
+#include <array>
+#include <limits>
 #include <queue>
 #include <algorithm>
 #include <cmath>
@@ -72,6 +74,218 @@ constexpr auto kPartSize = 128 * 1024;
 	return img;
 }
 
+constexpr auto kGradientMagic = 0xEA7;
+constexpr auto kGradientVersion = 1;
+constexpr auto kGradientMaxColors = 6;
+constexpr auto kGradientPayloadBytes = 23;
+constexpr auto kGradientPayloadNibbles = kGradientPayloadBytes * 2;
+constexpr auto kGradientDataTiles = 92;
+constexpr auto kGradientCornerTiles = 5;
+constexpr auto kGradientCornerSize = kUploadAvatarDim / 8;
+constexpr auto kGradientTileSize = kGradientCornerSize / kGradientCornerTiles;
+constexpr auto kGradientCopies = kGradientPayloadNibbles;
+
+constexpr std::array<QRgb, 16> kGradientPalette = {
+	0xFF000000u, 0xFFFFFFFFu, 0xFFFF0000u, 0xFF00FF00u,
+	0xFF0000FFu, 0xFF00FFFFu, 0xFFFF00FFu, 0xFFFFFF00u,
+	0xFFFF8000u, 0xFF8000FFu, 0xFF0080FFu, 0xFF00FF80u,
+	0xFF80FF00u, 0xFFFF0080u, 0xFF808080u, 0xFF404040u,
+};
+
+struct GradientTile {
+	int corner = 0;
+	int x = 0;
+	int y = 0;
+};
+
+[[nodiscard]] const std::array<GradientTile, kGradientDataTiles>
+&GradientTiles() {
+	static const auto value = [] {
+		auto result = std::array<GradientTile, kGradientDataTiles>{};
+		auto index = 0;
+		const auto appendCorner = [&](int corner, bool skipMarker) {
+			for (auto y = 0; y != kGradientCornerTiles; ++y) {
+				for (auto x = 0; x != kGradientCornerTiles; ++x) {
+					const auto marker = (corner == 0 && x < 2 && y < 2)
+						|| (corner == 3 && x >= 3 && y >= 3);
+					if (skipMarker && marker) {
+						continue;
+					}
+					result[index++] = GradientTile{ corner, x, y };
+				}
+			}
+		};
+		appendCorner(0, true);
+		appendCorner(1, false);
+		appendCorner(2, false);
+		appendCorner(3, true);
+		return result;
+	}();
+	return value;
+}
+
+class GradientBitWriter final {
+public:
+	void write(uint32 value, int bits) {
+		for (auto i = bits - 1; i >= 0; --i) {
+			if ((value >> i) & 1) {
+				_data[_bit / 8] |= uint8(1 << (7 - (_bit % 8)));
+			}
+			++_bit;
+		}
+	}
+
+	[[nodiscard]] std::array<uint8, kGradientPayloadBytes> data() const {
+		return _data;
+	}
+
+private:
+	std::array<uint8, kGradientPayloadBytes> _data = {};
+	int _bit = 0;
+};
+
+class GradientBitReader final {
+public:
+	explicit GradientBitReader(
+		const std::array<uint8, kGradientPayloadBytes> &data)
+	: _data(data) {
+	}
+
+	[[nodiscard]] uint32 read(int bits) {
+		auto result = uint32(0);
+		for (auto i = 0; i != bits; ++i) {
+			result = (result << 1)
+				| ((_data[_bit / 8] >> (7 - (_bit % 8))) & 1);
+			++_bit;
+		}
+		return result;
+	}
+
+private:
+	const std::array<uint8, kGradientPayloadBytes> &_data;
+	int _bit = 0;
+};
+
+[[nodiscard]] uint8 GradientCrc8(const uint8 *data, int size) {
+	auto crc = uint8(0);
+	for (auto i = 0; i != size; ++i) {
+		crc ^= data[i];
+		for (auto bit = 0; bit != 8; ++bit) {
+			crc = (crc & 0x80)
+				? uint8((crc << 1) ^ 0x07)
+				: uint8(crc << 1);
+		}
+	}
+	return crc;
+}
+
+[[nodiscard]] std::array<uint8, kGradientPayloadBytes>
+EncodeGradientPayload(const NicknameGradientConfig &config) {
+	auto writer = GradientBitWriter();
+	writer.write(kGradientMagic, 12);
+	writer.write(kGradientVersion, 4);
+	const auto count = int(std::min<std::size_t>(
+		config.colors.size(),
+		kGradientMaxColors));
+	writer.write(count, 3);
+	writer.write(std::clamp(config.speed, 0, 2), 2);
+	for (auto i = 0; i != count; ++i) {
+		const auto &color = config.colors[i];
+		writer.write(
+			(uint32(color.red()) << 16)
+			| (uint32(color.green()) << 8)
+			| uint32(color.blue()),
+			24);
+	}
+	auto data = writer.data();
+	data[kGradientPayloadBytes - 1] = GradientCrc8(
+		data.data(),
+		kGradientPayloadBytes - 1);
+	return data;
+}
+
+[[nodiscard]] std::optional<NicknameGradientConfig> DecodeGradientPayload(
+		const std::array<uint8, kGradientPayloadBytes> &data) {
+	if (GradientCrc8(data.data(), kGradientPayloadBytes - 1)
+		!= data[kGradientPayloadBytes - 1]) {
+		return std::nullopt;
+	}
+	auto reader = GradientBitReader(data);
+	if (reader.read(12) != kGradientMagic
+		|| reader.read(4) != kGradientVersion) {
+		return std::nullopt;
+	}
+	const auto count = int(reader.read(3));
+	const auto speed = int(reader.read(2));
+	if (count > kGradientMaxColors || speed > 2) {
+		return std::nullopt;
+	}
+	auto result = NicknameGradientConfig{ .colors = {}, .speed = speed };
+	result.colors.reserve(count);
+	for (auto i = 0; i != count; ++i) {
+		result.colors.push_back(QColor::fromRgb(reader.read(24)));
+	}
+	return result;
+}
+
+[[nodiscard]] QColor SampleGradientTile(
+		const QImage &image,
+		const GradientTile &tile) {
+	const auto side = std::min(image.width(), image.height());
+	const auto cornerSize = side / 8;
+	const auto tileSize = cornerSize / kGradientCornerTiles;
+	if (tileSize < 2) {
+		return QColor();
+	}
+	const auto originX = (tile.corner == 1 || tile.corner == 3)
+		? (side - cornerSize)
+		: 0;
+	const auto originY = (tile.corner >= 2)
+		? (side - cornerSize)
+		: 0;
+	const auto x0 = originX + tile.x * tileSize;
+	const auto y0 = originY + tile.y * tileSize;
+	const auto inset = std::max(1, tileSize / 4);
+	const auto x1 = x0 + inset;
+	const auto y1 = y0 + inset;
+	const auto x2 = x0 + tileSize - inset;
+	const auto y2 = y0 + tileSize - inset;
+	auto sumR = 0;
+	auto sumG = 0;
+	auto sumB = 0;
+	auto count = 0;
+	for (auto y = y1; y < y2; ++y) {
+		for (auto x = x1; x < x2; ++x) {
+			const auto pixel = image.pixel(x, y);
+			sumR += qRed(pixel);
+			sumG += qGreen(pixel);
+			sumB += qBlue(pixel);
+			++count;
+		}
+	}
+	if (!count) {
+		return QColor();
+	}
+	return QColor(sumR / count, sumG / count, sumB / count);
+}
+
+[[nodiscard]] int NearestGradientPaletteIndex(const QColor &color) {
+	auto result = 0;
+	auto best = std::numeric_limits<int>::max();
+	for (auto i = 0; i != int(kGradientPalette.size()); ++i) {
+		const auto rgb = kGradientPalette[i];
+		const auto dr = color.red() - int(qRed(rgb));
+		const auto dg = color.green() - int(qGreen(rgb));
+		const auto db = color.blue() - int(qBlue(rgb));
+		const auto distance = dr * dr + dg * dg + db * db;
+		if (distance < best) {
+			best = distance;
+			result = i;
+		}
+	}
+	return result;
+}
+
 } // namespace
 
 ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
@@ -108,8 +322,11 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 				_waitingForVideo = false;
 				_videoWaitChecks = 0;
 				auto done = base::take(_waitingDone);
+				auto gradient = base::take(_waitingGradient);
 				if (ready) {
-					stampSelfAvatar(std::move(done));
+					stampSelfAvatarWithGradient(
+						std::move(gradient),
+						std::move(done));
 				} else {
 					_videoMedia = nullptr;
 					if (done) {
@@ -171,9 +388,15 @@ void ClientBadgeDetector::tryStamp() {
 		return;
 	}
 	if (DetectMarkerInAvatarImage(*cloud)) {
-		_lastVerifiedSelfPhotoId = photoId;
-		_autoStampPending = false;
-		return;
+		const auto existing = DetectGradientInAvatarImage(*cloud);
+		const auto existingConfig = (existing && !existing->colors.empty())
+			? existing
+			: std::optional<NicknameGradientConfig>();
+		if (existingConfig == currentSelfGradient()) {
+			_lastVerifiedSelfPhotoId = photoId;
+			_autoStampPending = false;
+			return;
+		}
 	}
 	++_autoStampAttempts;
 	_autoStampPending = false;
@@ -375,7 +598,9 @@ QImage ClientBadgeDetector::AdaptBadgeForSurface(
 	return scaled.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 }
 
-QImage ClientBadgeDetector::StampAvatarWithClientMarker(const QImage &source) {
+QImage ClientBadgeDetector::StampAvatarWithClientMarker(
+		const QImage &source,
+		const std::optional<NicknameGradientConfig> &gradient) {
 	if (source.isNull()) {
 		return {};
 	}
@@ -393,13 +618,15 @@ QImage ClientBadgeDetector::StampAvatarWithClientMarker(const QImage &source) {
 		Qt::IgnoreAspectRatio,
 		Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB32);
 
-	for (int y = 0; y < out.height(); ++y) {
-		auto *row = reinterpret_cast<QRgb*>(out.scanLine(y));
-		for (int x = 0; x < out.width(); ++x) {
-			const int r = std::max(0, qRed(row[x]) - 1);
-			const int g = std::max(0, qGreen(row[x]) - 1);
-			const int b = std::max(0, qBlue(row[x]) - 1);
-			row[x] = qRgb(r, g, b);
+	if (!DetectMarkerInAvatarImage(out)) {
+		for (int y = 0; y < out.height(); ++y) {
+			auto *row = reinterpret_cast<QRgb*>(out.scanLine(y));
+			for (int x = 0; x < out.width(); ++x) {
+				const int r = std::max(0, qRed(row[x]) - 1);
+				const int g = std::max(0, qGreen(row[x]) - 1);
+				const int b = std::max(0, qBlue(row[x]) - 1);
+				row[x] = qRgb(r, g, b);
+			}
 		}
 	}
 
@@ -415,7 +642,89 @@ QImage ClientBadgeDetector::StampAvatarWithClientMarker(const QImage &source) {
 		}
 	}
 
+	const auto payload = EncodeGradientPayload(
+		gradient.value_or(NicknameGradientConfig{}));
+	const auto &tiles = GradientTiles();
+	for (int i = 0; i != kGradientDataTiles; ++i) {
+		const auto &tile = tiles[i];
+		const auto nibbleIndex = i % kGradientCopies;
+		const auto nibble = (payload[nibbleIndex / 2]
+			>> ((nibbleIndex % 2) ? 0 : 4)) & 0xF;
+		const auto rgb = kGradientPalette[nibble];
+		const auto originX = (tile.corner == 1 || tile.corner == 3)
+			? (kUploadAvatarDim - kGradientCornerSize)
+			: 0;
+		const auto originY = (tile.corner >= 2)
+			? (kUploadAvatarDim - kGradientCornerSize)
+			: 0;
+		const auto x0 = originX + tile.x * kGradientTileSize;
+		const auto y0 = originY + tile.y * kGradientTileSize;
+		for (int y = 0; y != kGradientTileSize; ++y) {
+			auto *row = reinterpret_cast<QRgb*>(out.scanLine(y0 + y));
+			for (int x = 0; x != kGradientTileSize; ++x) {
+				row[x0 + x] = rgb;
+			}
+		}
+	}
+
 	return out;
+}
+
+std::optional<NicknameGradientConfig>
+ClientBadgeDetector::DetectGradientInAvatarImage(
+		const QImage &avatarSquare) {
+	if (avatarSquare.isNull()
+		|| avatarSquare.width() < 80
+		|| avatarSquare.height() < 80
+		|| !DetectMarkerInAvatarImage(avatarSquare)) {
+		return std::nullopt;
+	}
+
+	const auto &tiles = GradientTiles();
+	auto first = std::array<uint8, kGradientCopies>{};
+	auto second = std::array<uint8, kGradientCopies>{};
+	for (int i = 0; i != kGradientCopies; ++i) {
+		first[i] = uint8(NearestGradientPaletteIndex(
+			SampleGradientTile(avatarSquare, tiles[i])));
+		second[i] = uint8(NearestGradientPaletteIndex(
+			SampleGradientTile(avatarSquare, tiles[i + kGradientCopies])));
+	}
+
+	const auto build = [&](
+			const std::array<uint8, kGradientCopies> &nibbles) {
+		auto payload = std::array<uint8, kGradientPayloadBytes>{};
+		for (int i = 0; i != kGradientCopies; ++i) {
+			payload[i / 2] |= uint8(nibbles[i]
+				<< ((i % 2) ? 0 : 4));
+		}
+		return payload;
+	};
+
+	auto nibbles = first;
+	auto ambiguous = std::vector<int>();
+	for (int i = 0; i != kGradientCopies; ++i) {
+		if (first[i] != second[i]) {
+			ambiguous.push_back(i);
+		}
+	}
+	if (const auto decoded = DecodeGradientPayload(build(nibbles))) {
+		return decoded;
+	}
+	if (ambiguous.empty() || ambiguous.size() > 12) {
+		return std::nullopt;
+	}
+	for (auto mask = 1u; mask != (1u << ambiguous.size()); ++mask) {
+		auto candidate = nibbles;
+		for (auto bit = 0; bit != int(ambiguous.size()); ++bit) {
+			if (mask & (1u << bit)) {
+				candidate[ambiguous[bit]] = second[ambiguous[bit]];
+			}
+		}
+		if (const auto decoded = DecodeGradientPayload(build(candidate))) {
+			return decoded;
+		}
+	}
+	return std::nullopt;
 }
 
 bool ClientBadgeDetector::DetectMarkerInAvatarImage(
@@ -452,6 +761,36 @@ bool ClientBadgeDetector::DetectMarkerInAvatarImage(
 	return checkCorner(0, 0) && checkCorner(w - sampleSide, h - sampleSide);
 }
 
+bool ClientBadgeDetector::ensurePeerEvaluated(
+		not_null<UserData*> user,
+		PeerCacheEntry &entry) {
+	if (entry.evaluated) {
+		return true;
+	}
+	const auto *cloudImg = user->userpicCloudImage(entry.view);
+	if (!cloudImg || cloudImg->isNull()) {
+		_pendingDownloadPeers.emplace(user->id);
+		user->loadUserpic();
+		return false;
+	}
+	_pendingDownloadPeers.remove(user->id);
+	entry.detected = DetectMarkerInAvatarImage(*cloudImg);
+	const auto decoded = entry.detected
+		? DetectGradientInAvatarImage(*cloudImg)
+		: std::optional<NicknameGradientConfig>();
+	entry.gradient = (decoded && !decoded->colors.empty())
+		? decoded
+		: std::optional<NicknameGradientConfig>();
+	entry.evaluated = true;
+	if (user->isSelf() && decoded) {
+		_selfGradient = decoded->colors.empty()
+			? std::nullopt
+			: decoded;
+	}
+	_gradientChanges.fire_copy(user->id);
+	return true;
+}
+
 bool ClientBadgeDetector::hasCustomClientBadge(not_null<PeerData*> peer) {
 	const auto user = peer->asUser();
 	if (!user) {
@@ -472,28 +811,39 @@ bool ClientBadgeDetector::hasCustomClientBadge(not_null<PeerData*> peer) {
 
 	auto &entry = _cache[user->id];
 	if (entry.checkedPhotoId != currentPhotoId) {
-		entry = PeerCacheEntry{
-			.checkedPhotoId = currentPhotoId,
-			.evaluated = false,
-			.detected = false,
-		};
+		entry = PeerCacheEntry{ .checkedPhotoId = currentPhotoId };
 	}
 
-	if (entry.evaluated) {
-		return entry.detected;
-	}
-
-	const auto *cloudImg = user->userpicCloudImage(entry.view);
-	if (!cloudImg || cloudImg->isNull()) {
-		_pendingDownloadPeers.emplace(user->id);
-		user->loadUserpic();
+	if (!ensurePeerEvaluated(user, entry)) {
 		return false;
 	}
-
-	_pendingDownloadPeers.remove(user->id);
-	entry.detected = DetectMarkerInAvatarImage(*cloudImg);
-	entry.evaluated = true;
 	return entry.detected;
+}
+
+std::optional<NicknameGradientConfig> ClientBadgeDetector::nicknameGradientFor(
+		not_null<PeerData*> peer) {
+	const auto user = peer->asUser();
+	if (!user) {
+		return std::nullopt;
+	}
+	if (user->userpicPhotoUnknown()) {
+		user->updateFull();
+		return std::nullopt;
+	}
+	const auto currentPhotoId = user->userpicPhotoId();
+	if (!currentPhotoId) {
+		_cache.remove(user->id);
+		_pendingDownloadPeers.remove(user->id);
+		return std::nullopt;
+	}
+	auto &entry = _cache[user->id];
+	if (entry.checkedPhotoId != currentPhotoId) {
+		entry = PeerCacheEntry{ .checkedPhotoId = currentPhotoId };
+	}
+	if (!ensurePeerEvaluated(user, entry)) {
+		return std::nullopt;
+	}
+	return entry.gradient;
 }
 
 void ClientBadgeDetector::pollPendingPeers() {
@@ -541,6 +891,10 @@ QImage ClientBadgeDetector::badgePreview(
 
 rpl::producer<PeerId> ClientBadgeDetector::badgeDetectedChanges() const {
 	return _detectionChanges.events();
+}
+
+rpl::producer<PeerId> ClientBadgeDetector::gradientChanges() const {
+	return _gradientChanges.events();
 }
 
 int ClientBadgeDetector::drawBadgeGetWidth(
@@ -607,14 +961,54 @@ void ClientBadgeDetector::stampUploadImage(QImage &image) {
 		return;
 	}
 	const auto side = std::min(image.width(), image.height());
-	if (image.width() == side && image.height() == side
-		&& DetectMarkerInAvatarImage(image)) {
-		return;
+	const auto gradient = currentSelfGradient();
+	if (image.width() == side && image.height() == side) {
+		const auto marker = DetectMarkerInAvatarImage(image);
+		const auto existing = marker
+			? DetectGradientInAvatarImage(image)
+			: std::optional<NicknameGradientConfig>();
+		const auto existingConfig = (existing && !existing->colors.empty())
+			? existing
+			: std::optional<NicknameGradientConfig>();
+		if (marker && existingConfig == gradient) {
+			return;
+		}
 	}
-	image = StampAvatarWithClientMarker(image);
+	image = StampAvatarWithClientMarker(image, gradient);
 }
 
 void ClientBadgeDetector::stampSelfAvatar(
+		Fn<void(bool ok, QString message)> done) {
+	stampSelfAvatarWithGradient(currentSelfGradient(), std::move(done));
+}
+
+void ClientBadgeDetector::applySelfAvatarGradient(
+		std::optional<NicknameGradientConfig> gradient,
+		Fn<void(bool ok, QString message)> done) {
+	_selfGradient = gradient;
+	stampSelfAvatarWithGradient(std::move(gradient), std::move(done));
+}
+
+std::optional<NicknameGradientConfig>
+ClientBadgeDetector::currentSelfGradient() {
+	const auto self = _session->user();
+	Ui::PeerUserpicView view;
+	const auto *cloud = self->userpicCloudImage(view);
+	if (cloud && !cloud->isNull()) {
+		if (const auto decoded = DetectGradientInAvatarImage(*cloud)) {
+			return decoded->colors.empty()
+				? std::nullopt
+				: decoded;
+		}
+	}
+	if (const auto bio = ParseBioGradient(self->about())) {
+		return bio;
+	}
+	return _selfGradient;
+}
+
+void ClientBadgeDetector::stampSelfAvatarWithGradient(
+		std::optional<NicknameGradientConfig> gradient,
 		Fn<void(bool ok, QString message)> done) {
 	if (_stampInProgress) {
 		if (done) {
@@ -639,15 +1033,22 @@ void ClientBadgeDetector::stampSelfAvatar(
 		return;
 	}
 
-	if (DetectMarkerInAvatarImage(*cloudImg)) {
-		_lastVerifiedSelfPhotoId = self->userpicPhotoId();
-		if (done) {
-			done(
-				true,
-				QString::fromUtf8(
-					"На вашей аватарке уже установлен маркер #1a0200!"));
+	const auto marker = DetectMarkerInAvatarImage(*cloudImg);
+	if (marker) {
+		const auto existing = DetectGradientInAvatarImage(*cloudImg);
+		const auto existingConfig = (existing && !existing->colors.empty())
+			? existing
+			: std::optional<NicknameGradientConfig>();
+		if (existingConfig == gradient) {
+			_lastVerifiedSelfPhotoId = self->userpicPhotoId();
+			if (done) {
+				done(
+					true,
+					QString::fromUtf8(
+						"На вашей аватарке уже установлен нужный маркер!"));
+			}
+			return;
 		}
-		return;
 	}
 
 	auto videoBytes = QByteArray();
@@ -665,6 +1066,7 @@ void ClientBadgeDetector::stampSelfAvatar(
 				_waitingForVideo = true;
 				_videoWaitChecks = 0;
 				_waitingDone = std::move(done);
+				_waitingGradient = std::move(gradient);
 				return;
 			}
 		} else {
@@ -676,8 +1078,9 @@ void ClientBadgeDetector::stampSelfAvatar(
 	_waitingForVideo = false;
 	_videoWaitChecks = 0;
 	_waitingDone = nullptr;
+	_waitingGradient = std::nullopt;
 
-	const QImage stamped = StampAvatarWithClientMarker(*cloudImg);
+	const QImage stamped = StampAvatarWithClientMarker(*cloudImg, gradient);
 	QByteArray jpegBytes;
 	{
 		QBuffer buf(&jpegBytes);

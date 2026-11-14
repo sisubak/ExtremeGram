@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/history.h"
+#include "custom/nickname_gradient.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
@@ -1015,14 +1016,25 @@ void Reply::paint(
 			const auto namew = textw - previewSkip - nameIconsSkip();
 			auto firstLineSkip = _nameTwoLines ? 0 : previewSkip;
 			if (namew > 0) {
-				p.setPen(!inBubble
-					? st->msgImgReplyBarColor()->c
-					: (colorCollectible || colorIndexPlusOne)
-					? FromNameFg(
-						context,
-						colorIndexPlusOne - 1,
-						colorCollectible)
-					: stm->msgServiceFg->c);
+				const auto gradient = _colorPeer
+					? Custom::NicknameGradientFor(
+						&view->history()->session()).configFor(_colorPeer)
+					: std::nullopt;
+				if (gradient) {
+					p.setPen(Custom::NicknameGradientFor(
+						&view->history()->session()).penFor(
+							*gradient,
+							namew));
+				} else {
+					p.setPen(!inBubble
+						? st->msgImgReplyBarColor()->c
+						: (colorCollectible || colorIndexPlusOne)
+						? FromNameFg(
+							context,
+							colorIndexPlusOne - 1,
+							colorCollectible)
+						: stm->msgServiceFg->c);
+				}
 				_name.drawLeftElided(
 					p,
 					x + st::historyReplyPadding.left() + previewSkip,

@@ -5984,11 +5984,24 @@ void HistoryWidget::saveEditMessage(Api::SendOptions options) {
 
 	const auto weak = base::make_weak(this);
 	const auto history = _history;
+	const auto editMsgId = _editMsgId;
+	const auto generation = ++_editRequestGeneration;
+	_editRequestPending = true;
 
 	const auto done = [=](mtpRequestId requestId) {
 		crl::guard(weak, [=] {
 			if (requestId == _saveEditMsgRequestId) {
 				_saveEditMsgRequestId = 0;
+			}
+			if (generation != _editRequestGeneration) {
+				return;
+			}
+			if (_editMsgId != editMsgId) {
+				_editRequestPending = false;
+				return;
+			}
+			if (_editRequestPending) {
+				_editRequestPending = false;
 				cancelEdit();
 			}
 		})();
@@ -6010,6 +6023,14 @@ void HistoryWidget::saveEditMessage(Api::SendOptions options) {
 			if (requestId == _saveEditMsgRequestId) {
 				_saveEditMsgRequestId = 0;
 			}
+			if (generation != _editRequestGeneration) {
+				return;
+			}
+			if (_editMsgId != editMsgId) {
+				_editRequestPending = false;
+				return;
+			}
+			_editRequestPending = false;
 			if (ranges::contains(Api::kDefaultEditMessagesErrors, error)) {
 				controller()->showToast(tr::lng_edit_error(tr::now));
 			} else if (error == u"MESSAGE_NOT_MODIFIED"_q) {
@@ -11722,6 +11743,8 @@ void HistoryWidget::cancelEdit() {
 	if (!_editMsgId) {
 		return;
 	}
+	++_editRequestGeneration;
+	_editRequestPending = false;
 	if (_saveEditBotOperation) {
 		session().domain().botUse().cancel(base::take(_saveEditBotOperation));
 	}

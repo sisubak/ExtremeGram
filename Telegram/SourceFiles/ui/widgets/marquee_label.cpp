@@ -67,6 +67,15 @@ void MarqueeLabel::setTextColorOverride(std::optional<QColor> color) {
 	update();
 }
 
+void MarqueeLabel::setPenOverride(std::optional<QPen> pen) {
+	if (_penOverride == pen) {
+		return;
+	}
+	_penOverride = std::move(pen);
+	invalidateCache();
+	update();
+}
+
 void MarqueeLabel::setContextCopyText(const QString &copyText) {
 	_contextCopyText = copyText;
 }
@@ -259,7 +268,9 @@ void MarqueeLabel::paintEvent(QPaintEvent *e) {
 		paintMarquee(p, selection);
 		return;
 	}
-	if (_textColorOverride) {
+	if (_penOverride) {
+		p.setPen(*_penOverride);
+	} else if (_textColorOverride) {
 		p.setPen(*_textColorOverride);
 	} else {
 		p.setPen(_st.textFg);
@@ -293,7 +304,9 @@ void MarqueeLabel::validateTape() {
 	_tape.setDevicePixelRatio(ratio);
 	_tape.fill(Qt::transparent);
 	auto q = Painter(&_tape);
-	if (_textColorOverride) {
+	if (_penOverride) {
+		q.setPen(*_penOverride);
+	} else if (_textColorOverride) {
 		q.setPen(*_textColorOverride);
 	} else {
 		q.setPen(_st.textFg);
@@ -371,7 +384,9 @@ void MarqueeLabel::validateFrame(float64 offset, TextSelection selection) {
 			q.drawImage(QPointF(-offset - total, 0), _tape);
 		}
 	} else {
-		if (_textColorOverride) {
+		if (_penOverride) {
+			q.setPen(*_penOverride);
+		} else if (_textColorOverride) {
 			q.setPen(*_textColorOverride);
 		} else {
 			q.setPen(_st.textFg);
