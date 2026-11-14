@@ -125,14 +125,15 @@ void TauntDelete(not_null<HistoryItem*> item, bool revoke) {
 	auto chain = std::make_unique<TauntChain>();
 	chain->session = base::make_weak(&item->history()->session());
 	chain->steps = TauntSteps();
-	chain->finish = [weak = base::make_weak(&item->history()->session()), revoke, id] {
+	chain->finish = [weak = base::make_weak(&item->history()->session()), revoke, id] -> mtpRequestId {
 		const auto session = weak.get();
 		if (!session) {
-			return;
+			return 0;
 		}
 		session->data().histories().deleteMessages(
 			MessageIdsList{ id },
 			revoke);
+		return 0;
 	};
 	chain->timer.setCallback([=] {
 		Fire(id);
