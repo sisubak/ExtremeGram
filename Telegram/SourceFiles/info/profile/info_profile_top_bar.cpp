@@ -3030,7 +3030,7 @@ void TopBar::paintEvent(QPaintEvent *e) {
 	}
 	const auto nickname = _nicknameGradientBg
 		? Custom::NicknameGradientFor(&_peer->session()).configFor(_peer)
-		: std::nullopt;
+		: std::optional<Custom::NicknameGradientConfig>();
 	if (tokens.minimalProfile) {
 		paintEdges(p, clipBounds, st::windowBg);
 	} else if (nickname && nickname->colors.size() >= 2) {

@@ -172,7 +172,7 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 	builder.addSkip();
 	builder.addSubsectionTitle({
 		.id = u"extremegram/privacy"_q,
-		.title = tr::lng_extremegram_anti_spy(),
+		.title = tr::lng_extremegram_privacy(),
 		.keywords = { u"анти-шпион"_q, u"obs"_q, u"discord"_q, u"скриншот"_q },
 	});
 	BuildExtremeGramToggle(

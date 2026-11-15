@@ -9631,6 +9631,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_smooth_interface_animations" = "Плавные анимации интерфейса";
 "lng_extremegram_smooth_motion_blur" = "Размытие движения (motion blur)";
 "lng_extremegram_anti_spy" = "Анти-шпион";
+"lng_extremegram_privacy" = "Приватность";
 "lng_extremegram_anti_spy_about" = "Скрывает содержимое окна от программ захвата экрана: OBS, Discord, скриншотеров и других. Отмеченные приложения включают защиту, пока они запущены. Пункт «Другие приложения» держит защиту включённой всегда.";
 "lng_extremegram_anti_spy_apps" = "Приложения под наблюдением";
 "lng_extremegram_anti_spy_other" = "Другие приложения (защита всегда включена)";

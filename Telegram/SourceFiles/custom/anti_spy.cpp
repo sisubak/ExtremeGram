@@ -80,13 +80,13 @@ constexpr auto kPollInterval = 900;
 	if (snapshot == INVALID_HANDLE_VALUE) {
 		return result;
 	}
-	auto entry = PROCESSENTRY32{};
+	auto entry = PROCESSENTRY32W{};
 	entry.dwSize = sizeof(entry);
-	if (Process32First(snapshot, &entry)) {
+	if (Process32FirstW(snapshot, &entry)) {
 		do {
 			result.push_back(
 				QString::fromWCharArray(entry.szExeFile).toLower());
-		} while (Process32Next(snapshot, &entry));
+		} while (Process32NextW(snapshot, &entry));
 	}
 	CloseHandle(snapshot);
 #elif defined Q_OS_MAC
