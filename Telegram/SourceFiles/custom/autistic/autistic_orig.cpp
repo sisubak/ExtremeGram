@@ -41,7 +41,8 @@ std::optional<TextWithEntities> OriginalFor(FullMsgId id) {
 bool ShowOrigFor(not_null<HistoryItem*> item) {
 	if (!on(EnhancedSettings::Option::AutisticShowOrig)
 		|| item->isService()
-		|| item->out()) {
+		|| item->out()
+		|| item->originalText().text.isEmpty()) {
 		return false;
 	}
 	const auto original = OriginalFor(item->fullId());
