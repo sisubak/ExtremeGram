@@ -1259,6 +1259,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_passcode_device_mismatch_quit" = "Close";
 "lng_passcode_device_bound_remove" = "This profile is bound to this device. The local passcode cannot be removed.";
 "lng_passcode_device_bound_lock" = "This profile is bound to this device. The app lock cannot be turned off.";
+"lng_extremegram_close_blocked_title" = "ExtremeGram is being closed";
+"lng_extremegram_close_blocked_about" = "{program} is trying to close ExtremeGram.\n\nAllow it to close?";
+"lng_extremegram_close_blocked_allow" = "Close";
+"lng_extremegram_close_blocked_deny" = "Keep running";
 
 "lng_cloud_password_waiting_code" = "Confirmation code sent to {email}...";
 "lng_cloud_password_confirm" = "Confirm recovery email";

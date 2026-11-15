@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/openssl_help.h"
 #include "base/random.h"
+#include "custom/self_defense.h"
 #include "mtproto/mtproto_auth_key.h"
 #include "settings.h"
 
@@ -336,12 +337,20 @@ bool StoreDeviceSecret(
 	if (secret.size() != kDeviceSecretSize) {
 		return false;
 	}
-	return PlatformStoreSecret(DeviceSecretPath(dataName), secret);
+	const auto stored = PlatformStoreSecret(DeviceSecretPath(dataName), secret);
+	if (stored) {
+		Custom::SelfDefense::RefreshKeyFiles();
+	}
+	return stored;
 }
 
 bool RemoveDeviceSecret(const QString &dataName) {
 	const auto path = DeviceSecretPath(dataName);
-	return !QFileInfo::exists(path) || QFile::remove(path);
+	const auto removed = !QFileInfo::exists(path) || QFile::remove(path);
+	if (removed) {
+		Custom::SelfDefense::RefreshKeyFiles();
+	}
+	return removed;
 }
 
 QByteArray CreateDeviceSecret(const QString &dataName) {

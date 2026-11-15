@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/proxy_rotation_manager.h"
 #include "core/ui_integration.h"
 #include "core/version.h"
+#include "custom/self_defense.h"
 #include "chat_helpers/emoji_keywords.h"
 #include "chat_helpers/stickers_emoji_image_loader.h"
 #include "base/platform/base_platform_global_shortcuts.h"
@@ -316,6 +317,7 @@ Application::~Application() {
 }
 
 void Application::run() {
+	Custom::SelfDefense::Start();
 	EnhancedSettings::Start();
 	// Depends on OpenSSL on macOS, so on ThirdParty::start().
 	// Depends on notifications settings.
@@ -554,6 +556,7 @@ void Application::showOpenGLCrashNotification() {
 }
 
 void Application::startDomain() {
+	Custom::SelfDefense::GuardKeyFiles(cDataFile());
 	const auto state = _domain->start(QByteArray());
 	if (state == Storage::StartResult::DeviceMismatch) {
 		crl::on_main(this, [=] { showDeviceMismatch(); });

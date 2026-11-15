@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_domain.h"
 
 #include "core/version.h"
+#include "custom/self_defense.h"
 #include "storage/details/storage_file_utilities.h"
 #include "storage/storage_device_binding.h"
 #include "storage/serialize_common.h"
@@ -600,6 +601,9 @@ Domain::StartModernResult Domain::startModern(
 	if (deviceBound) {
 		clearDeviceSecret();
 		_deviceSecret = LoadDeviceSecret(_dataName);
+		Custom::SelfDefense::LockMemory(
+			_deviceSecret.data(),
+			_deviceSecret.size());
 		if (!DeviceBindingMatches(*_keyData->device, _deviceSecret)) {
 			clearDeviceSecret();
 			LOG(("App Info: the device secret does not open this profile."));
@@ -822,9 +826,17 @@ bool Domain::writeKeyData(const KeyData &data, bool sync) const {
 		QDir().mkpath(path);
 	}
 
+	Custom::SelfDefense::PauseKeyFiles();
+	const auto resume = gsl::finally([] {
+		Custom::SelfDefense::ResumeKeyFiles();
+	});
 	FileWriteDescriptor key(ComputeKeyName(_dataName), path, sync);
 	WriteKeyData(key, data, prepareAccountsInfo());
-	return key.finish();
+	const auto result = key.finish();
+	if (!sync) {
+		details::Sync();
+	}
+	return result;
 }
 
 // Unlike writeAccounts(), which queues the bytes and always reports success,
@@ -1191,6 +1203,9 @@ SetPasscodeResult Domain::installPasscode(
 	if (!freshSecret.isEmpty()) {
 		clearDeviceSecret();
 		_deviceSecret = freshSecret;
+		Custom::SelfDefense::LockMemory(
+			_deviceSecret.data(),
+			_deviceSecret.size());
 		OPENSSL_cleanse(freshSecret.data(), freshSecret.size());
 		freshSecret.clear();
 	}
@@ -1328,6 +1343,9 @@ SetPasscodeResult Domain::enableDeviceBinding(
 	_keyDataDirty = false;
 	clearDeviceSecret();
 	_deviceSecret = secret;
+	Custom::SelfDefense::LockMemory(
+		_deviceSecret.data(),
+		_deviceSecret.size());
 	OPENSSL_cleanse(secret.data(), secret.size());
 	secret.clear();
 	_verificationNonce = 0;
@@ -1345,6 +1363,9 @@ const QString &Domain::dataName() const {
 
 void Domain::clearDeviceSecret() {
 	if (!_deviceSecret.isEmpty()) {
+		Custom::SelfDefense::UnlockMemory(
+			_deviceSecret.data(),
+			_deviceSecret.size());
 		OPENSSL_cleanse(_deviceSecret.data(), _deviceSecret.size());
 		_deviceSecret.clear();
 	}

@@ -625,6 +625,8 @@ PRIVATE
     custom/mention_pins.h
     custom/redesign.cpp
     custom/redesign.h
+    custom/self_defense.cpp
+    custom/self_defense.h
     custom/slowmode_tracker.cpp
     custom/slowmode_tracker.h
     custom/online_spam_filter.cpp

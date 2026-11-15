@@ -32,7 +32,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_domain.h"
 #include "mainwidget.h"
 #include "ui/boxes/confirm_box.h"
+#include "boxes/abstract_box.h"
 #include "boxes/connection_box.h"
+#include "custom/self_defense.h"
+#include "lang/lang_keys.h"
 #include "storage/storage_account.h"
 #include "storage/localstorage.h"
 #include "apiwrap.h"
@@ -729,7 +732,25 @@ void MainWindow::closeEvent(QCloseEvent *e) {
 		e->accept();
 		Core::Quit();
 		return;
-	} else if (Core::App().closeNonLastAsync(&controller())) {
+	}
+#ifdef Q_OS_WIN
+	const auto requester = Custom::SelfDefense::ForeignCloseRequester();
+	if (!requester.isEmpty()) {
+		e->ignore();
+		Ui::show(Ui::MakeConfirmBox({
+			.text = tr::lng_extremegram_close_blocked_about(
+				tr::now,
+				lt_program,
+				requester),
+			.confirmed = [] { Core::Quit(); },
+			.confirmText = tr::lng_extremegram_close_blocked_allow(),
+			.cancelText = tr::lng_extremegram_close_blocked_deny(),
+			.title = tr::lng_extremegram_close_blocked_title(),
+		}));
+		return;
+	}
+#endif // Q_OS_WIN
+	if (Core::App().closeNonLastAsync(&controller())) {
 		e->accept();
 		return;
 	}
