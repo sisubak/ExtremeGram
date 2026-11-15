@@ -328,6 +328,7 @@ private:
 
 	rpl::variable<std::optional<QColor>> _edgeColor;
 	bool _hasGradientBg = false;
+	bool _nicknameGradientBg = false;
 	std::optional<QColor> _solidBg;
 	QImage _cachedGradient;
 	QPainterPath _cachedClipPath;

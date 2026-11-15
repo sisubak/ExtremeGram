@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common_session.h"
 
 #include "core/enhanced_settings.h"
+#include "custom/anti_spy.h"
 #include "custom/nickname_gradient.h"
 #include "lang/lang_keys.h"
 #include "settings/settings_builder.h"
@@ -153,6 +154,13 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 	BuildExtremeGramToggle(
 		builder,
 		controller,
+		u"extremegram/smooth-motion-blur"_q,
+		tr::lng_extremegram_smooth_motion_blur(),
+		EnhancedSettings::Option::SmoothMotionBlur,
+		{ u"animation"_q, u"blur"_q, u"motion"_q });
+	BuildExtremeGramToggle(
+		builder,
+		controller,
 		u"extremegram/online-spam"_q,
 		tr::lng_settings_online_spam(),
 		EnhancedSettings::Option::OnlineSpam,
@@ -160,6 +168,31 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 	BuildOnlineSpamInterval(builder, controller);
 	builder.addDividerText(
 		rpl::single(tr::lng_extremegram_online_spam_about(tr::now)));
+
+	builder.addSkip();
+	builder.addSubsectionTitle({
+		.id = u"extremegram/privacy"_q,
+		.title = tr::lng_extremegram_anti_spy(),
+		.keywords = { u"анти-шпион"_q, u"obs"_q, u"discord"_q, u"скриншот"_q },
+	});
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/anti-spy"_q,
+		tr::lng_extremegram_anti_spy(),
+		EnhancedSettings::Option::AntiSpy,
+		{ u"анти-шпион"_q, u"obs"_q, u"discord"_q });
+	builder.addButton({
+		.id = u"extremegram/anti-spy-apps"_q,
+		.title = tr::lng_extremegram_anti_spy_apps(),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			Custom::AntiSpy::ShowSettingsBox(
+				not_null<Window::SessionController*>(controller));
+		},
+		.keywords = { u"obs"_q, u"discord"_q, u"sharex"_q, u"bandicam"_q },
+	});
+	builder.addDividerText(tr::lng_extremegram_anti_spy_about());
 
 	builder.addSkip();
 	builder.addSubsectionTitle({

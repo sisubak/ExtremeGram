@@ -120,6 +120,10 @@ enum class OptionId {
 	AutisticAntiAyu,
 	AntiOnlineSpam,
 	AntiSlowmode,
+	SmoothMotionBlur,
+	AntiSpy,
+	AntiSpyOtherApps,
+	AntiSpyApps,
 	Count,
 };
 
@@ -250,6 +254,13 @@ inline constexpr auto MarkdownPaste = Key<bool>{ OptionId::MarkdownPaste };
 		= Key<bool>{ OptionId::AntiOnlineSpam };
 	inline constexpr auto AntiSlowmode
 		= Key<bool>{ OptionId::AntiSlowmode };
+	inline constexpr auto SmoothMotionBlur
+		= Key<bool>{ OptionId::SmoothMotionBlur };
+	inline constexpr auto AntiSpy = Key<bool>{ OptionId::AntiSpy };
+	inline constexpr auto AntiSpyOtherApps
+		= Key<bool>{ OptionId::AntiSpyOtherApps };
+	inline constexpr auto AntiSpyApps
+		= Key<QList<int>>{ OptionId::AntiSpyApps };
 inline constexpr auto LlmTranslateEndpoint
 	= Key<QString>{ OptionId::LlmTranslateEndpoint };
 inline constexpr auto LlmTranslateModel

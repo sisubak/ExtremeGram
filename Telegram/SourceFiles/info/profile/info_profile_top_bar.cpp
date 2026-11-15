@@ -762,12 +762,21 @@ void TopBar::setupBirthdayEffect() {
 
 void TopBar::refreshTitleGradient() {
 	auto &gradient = Custom::NicknameGradientFor(&_peer->session());
-	if (const auto config = gradient.configFor(_peer)) {
+	const auto config = gradient.configFor(_peer);
+	if (config) {
 		_title->setPenOverride(gradient.penFor(
 			*config,
 			std::max(1, _title->width())));
 	} else {
 		_title->setPenOverride(std::nullopt);
+	}
+	const auto surfaces = config && config->profileBg;
+	if (_nicknameGradientBg != surfaces) {
+		_nicknameGradientBg = surfaces;
+		updateCollectibleStatus();
+	}
+	if (_nicknameGradientBg) {
+		update();
 	}
 }
 
@@ -892,7 +901,8 @@ void TopBar::updateCollectibleStatus() {
 	const auto collectible = effectiveCollectible();
 	const auto colorProfile = effectiveColorProfile();
 	_hasGradientBg = (collectible != nullptr)
-		|| (colorProfile && colorProfile->bg.size() > 1);
+		|| (colorProfile && colorProfile->bg.size() > 1)
+		|| _nicknameGradientBg;
 	_solidBg = (colorProfile && colorProfile->bg.size() == 1)
 		? std::make_optional(colorProfile->bg.front())
 		: std::nullopt;
@@ -3018,8 +3028,33 @@ void TopBar::paintEvent(QPaintEvent *e) {
 				offset);
 		}
 	}
+	const auto nickname = _nicknameGradientBg
+		? Custom::NicknameGradientFor(&_peer->session()).configFor(_peer)
+		: std::nullopt;
 	if (tokens.minimalProfile) {
 		paintEdges(p, clipBounds, st::windowBg);
+	} else if (nickname && nickname->colors.size() >= 2) {
+		const auto count = int(nickname->colors.size());
+		const auto w = float64(width());
+		const auto offset = Custom::GradientPhase(nickname->speed) * w * 2.0;
+		auto brush = QLinearGradient(
+			QPointF(-offset, 0.),
+			QPointF(w * 2.0 - offset, 0.));
+		brush.setSpread(QGradient::RepeatSpread);
+		const auto base = st::windowBg->c;
+		const auto blend = [&](const QColor &color) {
+			return QColor(
+				(base.red() + color.red()) / 2,
+				(base.green() + color.green()) / 2,
+				(base.blue() + color.blue()) / 2);
+		};
+		for (auto i = 0; i != count; ++i) {
+			brush.setColorAt(
+				double(i) / count,
+				blend(nickname->colors[i]));
+		}
+		brush.setColorAt(1.0, blend(nickname->colors[0]));
+		paintEdges(p, clipBounds, QBrush(brush));
 	} else if (!_hasGradientBg) {
 		paintEdges(p, clipBounds);
 	} else {

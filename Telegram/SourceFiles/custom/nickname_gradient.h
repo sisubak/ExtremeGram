@@ -34,6 +34,8 @@ namespace Custom {
 struct NicknameGradientConfig {
 	std::vector<QColor> colors;
 	int speed = 1;
+	bool profileBg = false;
+	bool messageBg = false;
 
 	friend inline bool operator==(
 		const NicknameGradientConfig &,

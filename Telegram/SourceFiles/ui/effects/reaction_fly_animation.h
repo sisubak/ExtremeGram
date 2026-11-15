@@ -111,6 +111,10 @@ private:
 		QRect target,
 		const QColor &colored,
 		crl::time now) const;
+	void paintBurst(
+		QPainter &p,
+		QRect target,
+		const QColor &colored) const;
 	void paintMiniCopies(
 		QPainter &p,
 		QPoint center,
@@ -128,6 +132,7 @@ private:
 	std::vector<MiniCopy> _miniCopies;
 	Animations::Simple _fly;
 	Animations::Simple _minis;
+	Animations::Simple _burst;
 	QRect _flyFrom;
 	float64 _centerSizeMultiplier = 0.;
 	int _customSize = 0;

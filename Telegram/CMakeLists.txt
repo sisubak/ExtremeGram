@@ -613,6 +613,8 @@ PRIVATE
     custom/autistic/autistic_orig.h
     custom/autistic/autistic_panel.cpp
     custom/autistic/autistic_panel.h
+    custom/anti_spy.cpp
+    custom/anti_spy.h
     custom/bot_mode_manager.cpp
     custom/bot_mode_manager.h
     custom/client_badge_detector.cpp

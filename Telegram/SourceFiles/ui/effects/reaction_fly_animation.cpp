@@ -17,17 +17,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "styles/style_chat.h"
 
+#include <QtGui/QRadialGradient>
+
 namespace Ui {
 namespace {
 
 constexpr auto kFlyDuration = crl::time(300);
-constexpr auto kMiniCopies = 7;
+constexpr auto kMiniCopies = 10;
 constexpr auto kMiniCopiesDurationMax = crl::time(1400);
 constexpr auto kMiniCopiesDurationMin = crl::time(700);
 constexpr auto kMiniCopiesScaleInDuration = crl::time(200);
 constexpr auto kMiniCopiesScaleOutDuration = crl::time(200);
 constexpr auto kMiniCopiesMaxScaleMin = 0.6;
-constexpr auto kMiniCopiesMaxScaleMax = 0.9;
+constexpr auto kMiniCopiesMaxScaleMax = 1.05;
+constexpr auto kBurstDuration = crl::time(700);
 
 } // namespace
 
@@ -196,6 +199,7 @@ QRect ReactionFlyAnimation::paintGetArea(
 				target.topLeft() - QPoint(target.width(), target.height()),
 				target.size() * 3);
 		if (clip.isEmpty() || area.intersects(clip)) {
+			paintBurst(p, target, colored);
 			paintCenterFrame(p, target, colored, now);
 			if (const auto effect = _effect.get()) {
 				if (effect->animating()) {
@@ -236,6 +240,36 @@ QRect ReactionFlyAnimation::paintGetArea(
 		p.setOpacity(1.);
 	}
 	return wide;
+}
+
+void ReactionFlyAnimation::paintBurst(
+		QPainter &p,
+		QRect target,
+		const QColor &colored) const {
+	if (!_burst.animating() || !colored.isValid()) {
+		return;
+	}
+	const auto progress = _burst.value(0.);
+	const auto fade = 1. - progress;
+	const auto center = QRectF(target).center();
+	const auto base = target.width() * 0.5;
+	const auto radius = base * (0.6 + 1.1 * progress);
+	auto hq = PainterHighQualityEnabler(p);
+	auto glow = QRadialGradient(center, radius);
+	auto inner = colored;
+	inner.setAlphaF(0.30 * fade);
+	auto outer = colored;
+	outer.setAlphaF(0.);
+	glow.setColorAt(0., inner);
+	glow.setColorAt(1., outer);
+	p.setPen(Qt::NoPen);
+	p.setBrush(glow);
+	p.drawEllipse(center, radius, radius);
+	auto ring = colored;
+	ring.setAlphaF(0.35 * fade);
+	p.setPen(QPen(ring, 1.5));
+	p.setBrush(Qt::NoBrush);
+	p.drawEllipse(center, radius, radius);
 }
 
 void ReactionFlyAnimation::paintCenterFrame(
@@ -410,6 +444,9 @@ void ReactionFlyAnimation::startAnimations() {
 	}
 	if (!_miniCopies.empty()) {
 		_minis.start(callback(), 0., 1., kMiniCopiesDurationMax);
+	}
+	if (!_effectOnly) {
+		_burst.start(callback(), 0., 1., kBurstDuration);
 	}
 }
 

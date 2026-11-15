@@ -11,11 +11,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/smooth_animations.h"
 #include "styles/style_basic.h"
 
+#include <algorithm>
+#include <cmath>
 
 namespace Window {
 
 void SlideAnimation::paintContents(QPainter &p) const {
 	const auto retina = style::DevicePixelRatio();
+	const auto smoothBlur = EnhancedSettings::Get(
+		EnhancedSettings::Option::SmoothInterfaceAnimations)
+		&& EnhancedSettings::Get(
+			EnhancedSettings::Option::SmoothMotionBlur);
 
 	const auto slideLeft = (_direction == SlideDirection::FromLeft);
 	const auto progress = _animation.value(slideLeft ? 0. : 1.);
@@ -144,6 +150,19 @@ void SlideAnimation::paintContents(QPainter &p) const {
 			QRect(QPoint(coordOver, 0), _cacheOver.size() / retina),
 			_cacheOver,
 			QRect(QPoint(), _cacheOver.size()));
+		if (smoothBlur && coordOver > 0) {
+			const auto trail = std::max(2, int(coordOver * 0.12));
+			for (auto i = 2; i >= 1; --i) {
+				p.setOpacity((i == 2) ? 0.08 : 0.16);
+				p.drawPixmap(
+					QRect(
+						QPoint(coordOver + trail * i, 0),
+						_cacheOver.size() / retina),
+					_cacheOver,
+					QRect(QPoint(), _cacheOver.size()));
+			}
+			p.setOpacity(1.);
+		}
 		p.setOpacity(progress);
 		st::slideShadow.fill(
 			p,
@@ -170,6 +189,20 @@ void SlideAnimation::setPixmaps(
 		const QPixmap &newContentCache) {
 	_cacheUnder = oldContentCache;
 	_cacheOver = newContentCache;
+}
+
+int SlideAnimation::overShift() const {
+	const auto retina = style::DevicePixelRatio();
+	if (_cacheOver.isNull() || _direction == SlideDirection::FromBottom) {
+		return 0;
+	}
+	const auto progress = _animation.value(1.);
+	const auto width = _cacheOver.width() / retina;
+	if (_withFade) {
+		const auto easeOut = anim::easeOutCirc(1., progress);
+		return int(std::lround(anim::interpolate(width, 0, easeOut)));
+	}
+	return int(std::lround(anim::interpolate(width, 0, progress)));
 }
 
 void SlideAnimation::setTopBarShadow(bool enabled) {

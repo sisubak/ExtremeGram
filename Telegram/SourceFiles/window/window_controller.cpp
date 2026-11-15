@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "custom/anti_spy.h"
 #include "export/export_manager.h"
 #include "ui/platform/ui_platform_window.h"
 #include "platform/platform_window_title.h"
@@ -115,6 +116,7 @@ Controller::Controller(CreateArgs &&args)
 , _widget(this)
 , _adaptive(std::make_unique<Adaptive>()) {
 	_widget.init();
+	Custom::AntiSpy::RegisterWindow(&_widget);
 }
 
 Controller::~Controller() {

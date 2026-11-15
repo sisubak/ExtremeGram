@@ -535,6 +535,7 @@ private:
 	[[nodiscard]] auto computeSendButtonType() const;
 
 	void showFinished();
+	void updateShowAnimationLive();
 	void updateOverStates(QPoint pos);
 	void clearOverStates();
 	void chooseAttach(std::optional<bool> overrideSendImagesAsPhotos = {});
@@ -1049,6 +1050,8 @@ private:
 	QString _confirmSource;
 
 	std::unique_ptr<Window::SlideAnimation> _showAnimation;
+	bool _showAnimationLive = false;
+	QPoint _showAnimationScrollBase;
 
 	HistoryView::ElementHighlighter _highlighter;
 

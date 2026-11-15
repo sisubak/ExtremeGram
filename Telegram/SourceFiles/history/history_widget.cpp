@@ -32,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_permissions_box.h" // ShowAboutGigagroup.
 #include "boxes/peers/edit_peer_requests_box.h"
 #include "core/chat_enhanced_settings.h"
+#include "core/enhanced_settings.h"
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
@@ -6800,6 +6801,13 @@ void HistoryWidget::showAnimated(
 		const Window::SectionSlideParams &params) {
 	validateSubsectionTabs();
 
+	if (_showAnimationLive) {
+		_showAnimationLive = false;
+		if (_scroll) {
+			_scroll->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+			_scroll->move(_showAnimationScrollBase);
+		}
+	}
 	_showAnimation = nullptr;
 
 	// If we show pinned bar here, we don't want it to change the
@@ -6830,6 +6838,16 @@ void HistoryWidget::showAnimated(
 	auto newContentCache = Ui::GrabWidget(this);
 
 	hideChildWidgets();
+	const auto liveScroll = _scroll
+		&& (direction == Window::SlideDirection::FromRight)
+		&& EnhancedSettings::Get(
+			EnhancedSettings::Option::SmoothInterfaceAnimations);
+	if (liveScroll) {
+		_showAnimationLive = true;
+		_showAnimationScrollBase = _scroll->pos();
+		_scroll->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+		_scroll->show();
+	}
 	if (params.withTopBarShadow && !fromBottom) {
 		_topShadow->show();
 	}
@@ -6841,7 +6859,10 @@ void HistoryWidget::showAnimated(
 
 	_showAnimation = std::make_unique<Window::SlideAnimation>();
 	_showAnimation->setDirection(direction);
-	_showAnimation->setRepaintCallback([=] { update(); });
+	_showAnimation->setRepaintCallback([=] {
+		updateShowAnimationLive();
+		update();
+	});
 	_showAnimation->setFinishedCallback([=] { showFinished(); });
 	_showAnimation->setPixmaps(params.oldContentCache, newContentCache);
 	_showAnimation->start();
@@ -6868,9 +6889,28 @@ void HistoryWidget::showFinished() {
 	if (_requestsBar) {
 		_requestsBar->finishAnimating();
 	}
+	if (_showAnimationLive) {
+		_showAnimationLive = false;
+		if (_scroll) {
+			_scroll->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+			_scroll->move(_showAnimationScrollBase);
+		}
+	}
 	_showAnimation = nullptr;
 	doneShow();
 	synteticScrollToY(_scroll->scrollTop());
+}
+
+void HistoryWidget::updateShowAnimationLive() {
+	if (!_showAnimationLive || !_showAnimation || !_scroll) {
+		return;
+	}
+	const auto shift = _showAnimation->overShift();
+	const auto position = _showAnimationScrollBase + QPoint(shift, 0);
+	if (_scroll->pos() != position) {
+		_scroll->move(position);
+	}
+	_scroll->update();
 }
 
 void HistoryWidget::doneShow() {

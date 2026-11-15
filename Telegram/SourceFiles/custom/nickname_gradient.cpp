@@ -43,7 +43,8 @@ namespace {
 constexpr int kMinColors = 2;
 constexpr int kMaxColors = 6;
 constexpr int kMagic = 0xE7;
-constexpr int kVersion = 1;
+constexpr int kVersion1 = 1;
+constexpr int kVersion2 = 2;
 constexpr int kBitsPerSymbol = 3;
 constexpr int kSymbolsInAlphabet = 8;
 constexpr auto kInvisibleSymbols = std::array<ushort, kSymbolsInAlphabet>{
@@ -101,8 +102,12 @@ constexpr std::array<float64, 3> kSpeedPeriods = { 14.0, 8.0, 4.0 };
 	return result;
 }
 
-[[nodiscard]] int SymbolLength(int count) {
+[[nodiscard]] int SymbolLengthV1(int count) {
 	return (24 + count * 12) / kBitsPerSymbol;
+}
+
+[[nodiscard]] int SymbolLengthV2(int count) {
+	return (27 + count * 12) / kBitsPerSymbol;
 }
 
 struct BitWriter {
@@ -133,8 +138,12 @@ struct BitReader {
 
 [[nodiscard]] std::optional<NicknameGradientConfig> DecodeSymbols(
 		const QString &symbols,
-		int count) {
-	if (symbols.size() != SymbolLength(count)) {
+		int count,
+		int version) {
+	const auto length = (version == kVersion2)
+		? SymbolLengthV2(count)
+		: SymbolLengthV1(count);
+	if (symbols.size() != length) {
 		return std::nullopt;
 	}
 	auto bits = std::vector<bool>();
@@ -156,17 +165,23 @@ struct BitReader {
 	}
 	auto reader = BitReader{ bits };
 	auto magic = uint32(0);
-	auto version = uint32(0);
+	auto storedVersion = uint32(0);
 	auto storedCount = uint32(0);
 	auto speed = uint32(0);
+	auto flags = uint32(0);
+	auto pad = uint32(0);
 	if (!reader.read(magic, 8)
-		|| !reader.read(version, 3)
+		|| !reader.read(storedVersion, 3)
 		|| !reader.read(storedCount, 3)
 		|| !reader.read(speed, 2)
 		|| magic != kMagic
-		|| version != kVersion
+		|| int(storedVersion) != version
 		|| int(storedCount) != count
 		|| speed > 2) {
+		return std::nullopt;
+	}
+	if (version == kVersion2
+		&& (!reader.read(flags, 2) || !reader.read(pad, 1))) {
 		return std::nullopt;
 	}
 	auto colors = std::vector<QColor>();
@@ -193,7 +208,12 @@ struct BitReader {
 	if (Crc8(PackBits(payload)) != crc) {
 		return std::nullopt;
 	}
-	return NicknameGradientConfig{ std::move(colors), int(speed) };
+	auto result = NicknameGradientConfig{};
+	result.colors = std::move(colors);
+	result.speed = int(speed);
+	result.profileBg = (flags & 1) != 0;
+	result.messageBg = (flags & 2) != 0;
+	return result;
 }
 
 [[nodiscard]] bool IsInvisibleSymbol(QChar ch) {
@@ -224,16 +244,23 @@ struct InvisibleMarker {
 		}
 		const auto run = about.mid(i, j - i);
 		for (auto count = kMaxColors; count >= kMinColors; --count) {
-			const auto length = SymbolLength(count);
-			if (run.size() < length) {
-				continue;
-			}
-			if (auto config = DecodeSymbols(run.right(length), count)) {
-				return InvisibleMarker{
-					int(i + run.size() - length),
-					length,
-					std::move(*config),
-				};
+			for (const auto version : { kVersion2, kVersion1 }) {
+				const auto length = (version == kVersion2)
+					? SymbolLengthV2(count)
+					: SymbolLengthV1(count);
+				if (run.size() < length) {
+					continue;
+				}
+				if (auto config = DecodeSymbols(
+						run.right(length),
+						count,
+						version)) {
+					return InvisibleMarker{
+						int(i + run.size() - length),
+						length,
+						std::move(*config),
+					};
+				}
 			}
 		}
 		i = j;
@@ -296,11 +323,18 @@ struct InvisibleMarker {
 
 [[nodiscard]] QString EncodeSymbols(
 		const NicknameGradientConfig &config) {
+	const auto flags = (config.profileBg ? 1 : 0)
+		| (config.messageBg ? 2 : 0);
+	const auto version = flags ? kVersion2 : kVersion1;
 	auto writer = BitWriter();
 	writer.write(kMagic, 8);
-	writer.write(kVersion, 3);
+	writer.write(version, 3);
 	writer.write(uint32(config.colors.size()), 3);
 	writer.write(uint32(std::clamp(config.speed, 0, 2)), 2);
+	if (version == kVersion2) {
+		writer.write(flags, 2);
+		writer.write(0, 1);
+	}
 	for (const auto &color : config.colors) {
 		writer.write(uint32(ToNibble(color.red())), 4);
 		writer.write(uint32(ToNibble(color.green())), 4);
@@ -621,6 +655,8 @@ void ShowNicknameGradientBox(
 				QColor(0xFF, 0x2D, 0x55) });
 	const auto speed = std::make_shared<int>(
 		current ? current->speed : 1);
+	const auto surfaces = std::make_shared<bool>(
+		current ? (current->profileBg || current->messageBg) : false);
 
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(tr::lng_extremegram_nickname_gradient());
@@ -796,6 +832,21 @@ void ShowNicknameGradientBox(
 					0));
 		}
 
+		const auto surfacesToggle = layout->add(
+			object_ptr<Ui::Checkbox>(
+				layout,
+				tr::lng_extremegram_nickname_gradient_surfaces(tr::now),
+				*surfaces,
+				st::defaultBoxCheckbox),
+			QMargins(
+				st::boxPadding.left(),
+				10,
+				st::boxPadding.right(),
+				0));
+		surfacesToggle->checkedValue() | rpl::on_next([=](bool checked) {
+			*surfaces = checked;
+		}, surfacesToggle->lifetime());
+
 		const auto off = layout->add(
 			object_ptr<Ui::SettingsButton>(
 				layout,
@@ -822,7 +873,11 @@ void ShowNicknameGradientBox(
 			}
 			ApplyNicknameGradient(
 				session,
-				NicknameGradientConfig{ *colors, *speed },
+				NicknameGradientConfig{
+					*colors,
+					*speed,
+					*surfaces,
+					*surfaces },
 				[=](bool, QString message) {
 					controller->showToast(std::move(message));
 				});

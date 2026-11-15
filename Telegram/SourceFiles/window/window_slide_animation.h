@@ -27,6 +27,7 @@ public:
 	void setPixmaps(
 		const QPixmap &oldContentCache,
 		const QPixmap &newContentCache);
+	[[nodiscard]] int overShift() const;
 	void setTopBarShadow(bool enabled);
 	void setTopSkip(int skip);
 	void setTopBarMask(const QPixmap &mask);

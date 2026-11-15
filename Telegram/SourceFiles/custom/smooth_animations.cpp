@@ -107,6 +107,26 @@ void ApplyElementPaintTransform(
 	p.translate(center);
 	p.scale(transform->scale, transform->scale);
 	p.translate(-center);
+
+	const auto blur = (std::abs(transform->translateY) > 2.0)
+		&& EnhancedSettings::Get(
+			EnhancedSettings::Option::SmoothMotionBlur);
+	if (blur) {
+		constexpr auto kTrailSamples = 3;
+		const auto baseOpacity = p.opacity();
+		const auto smear = std::clamp(
+			transform->translateY * 0.55,
+			-14.0,
+			14.0);
+		for (auto i = 0; i != kTrailSamples; ++i) {
+			const auto k = (i + 1) / float64(kTrailSamples);
+			p.setOpacity(baseOpacity * (1.0 - 0.62 * k));
+			p.translate(0.0, smear * k);
+			paintBody();
+			p.translate(0.0, -smear * k);
+		}
+		p.setOpacity(baseOpacity);
+	}
 	paintBody();
 	p.restore();
 }
