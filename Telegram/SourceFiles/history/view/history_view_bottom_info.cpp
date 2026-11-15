@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
 #include "core/ui_integration.h"
+#include "core/msg_extra_state.h"
 #include "lang/lang_keys.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
@@ -156,6 +157,7 @@ int BottomInfo::firstLineWidth() const {
 
 bool BottomInfo::isWide() const {
 	return (_data.flags & Data::Flag::Edited)
+		|| (_data.flags & Data::Flag::Deleted)
 		|| _data.scheduleRepeatPeriod
 		|| !_data.author.isEmpty()
 		|| !_views.isEmpty()
@@ -540,7 +542,10 @@ void BottomInfo::layoutDateText() {
 		: QString();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
-	const auto date = editedPrimary
+	const auto deleted = (_data.flags & Data::Flag::Deleted)
+		? (tr::lng_extremegram_deleted(tr::now) + ' ')
+		: QString();
+	const auto date = deleted + (editedPrimary
 		? FormatEditedDate(_data.date, _data.editedDate)
 		: edited + ((_data.flags
 			& (Data::Flag::ForwardedDate | Data::Flag::FullDate))
@@ -549,7 +554,7 @@ void BottomInfo::layoutDateText() {
 			EnhancedSettings::Get(EnhancedSettings::Option::ShowSeconds))
 		: QLocale().toString(_data.date.time(), EnhancedSettings::Get(EnhancedSettings::Option::ShowSeconds)
 			? QLocale::system().timeFormat(QLocale::LongFormat).remove("t") 
-			: QLocale::system().timeFormat(QLocale::ShortFormat))) + _data.msgId;
+			: QLocale::system().timeFormat(QLocale::ShortFormat))) + _data.msgId);
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 	const auto authorWidth = st::msgDateFont->width(author);
@@ -764,6 +769,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (IsAnchoredEphemeral(item)) {
 		result.flags |= Flag::Updated;
+	}
+	if (MessageExtraState::IsGhosted(item)) {
+		result.flags |= Flag::Deleted;
 	}
 	if (const auto views = item->Get<HistoryMessageViews>()) {
 		if (views->views.count >= 0) {

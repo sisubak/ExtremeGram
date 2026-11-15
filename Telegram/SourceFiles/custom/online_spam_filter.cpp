@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "main/main_account.h"
 #include "main/main_session.h"
 
 namespace Custom {
@@ -103,7 +104,11 @@ void NoteOnlineFlip(
 		not_null<UserData*> user,
 		bool wasOnline,
 		bool nowOnline) {
-	OnlineSpamFor(&user->session()).noteLastseen(
+	auto &session = user->session();
+	if (!user->account().sessionExists()) {
+		return;
+	}
+	OnlineSpamFor(&session).noteLastseen(
 		user,
 		wasOnline,
 		nowOnline);

@@ -16,7 +16,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "core/ui_integration.h"
 #include "core/update_checker.h"
-#include "core/msg_extra_state.h"
 
 #include "custom/autistic/autistic_mode.h"
 #include "custom/autistic/autistic_orig.h"
@@ -1958,13 +1957,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		return;
 	}
 
-	// Autistic ghosts render at reduced opacity; reset before the only
-	// function exit below (early returns are all above this point).
-	const auto ghosted = MessageExtraState::IsGhosted(item);
-	if (ghosted) {
-		p.setOpacity(0.55);
-	}
-
 	const auto entry = logEntryOriginal();
 	const auto check = factcheckBlock();
 	auto mediaDisplayed = media && media->isDisplayed();
@@ -2339,33 +2331,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 				Ui::DefaultImageSpoiler().frame(
 					_spoilerOverlay->index(context.now, paused)));
 		}
-		if (ghosted) {
-			const auto font = st::msgServiceFont;
-			const auto label = QString::fromUtf8("удалено");
-			const auto pad = style::ConvertScale(3);
-			const auto chipHeight = font->height + 2 * pad;
-			const auto chipWidth = font->width(label) + 4 * pad;
-			const auto chip = QRect(
-				inner.x() + (inner.width() - chipWidth) / 2,
-				inner.y() - chipHeight / 2,
-				chipWidth,
-				chipHeight);
-			const auto previousOpacity = p.opacity();
-			p.setOpacity(1.0);
-			{
-				PainterHighQualityEnabler hq(p);
-				p.setPen(Qt::NoPen);
-				p.setBrush(st::msgServiceBg);
-				p.drawRoundedRect(
-					chip,
-					chipHeight / 2.0,
-					chipHeight / 2.0);
-			}
-			p.setFont(font);
-			p.setPen(st::msgServiceFg);
-			p.drawText(chip, Qt::AlignCenter, label);
-			p.setOpacity(previousOpacity);
-		}
 		if (displayInfo) {
 			const auto bottomSelected = context.selected()
 				|| (!mediaSelectionIntervals.empty()
@@ -2555,9 +2520,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		}
 	} else if (!context.skipSelectionCheck) {
 		_selectionRoundCheckbox = nullptr;
-	}
-	if (ghosted) {
-		p.setOpacity(1.);
 	}
 }
 
@@ -3356,13 +3318,13 @@ void Message::paintText(
 		.useFullWidth = true,
 		.linePostprocess = linePostprocess ? &*linePostprocess : nullptr,
 	});
-	// Autistic "orig": the pre-edit text snapshot as a small line below.
+	// Autistic "orig": the pre-edit text snapshot as a quote line below.
 	if (Autistic::ShowOrigFor(data())) {
 		if (const auto original = Autistic::OriginalFor(data()->fullId())) {
 			const auto label = tr::lng_extremegram_orig_before(tr::now);
-			const auto padding = 6;
-			const auto gap = 6;
-			const auto pillHeight = Autistic::OrigPillHeight();
+			const auto barWidth = st::msgReplyBarSize.width();
+			const auto barSkip = st::msgReplyBarSkip;
+			const auto labelGap = 5;
 			const auto top = trect.y()
 				+ textHeightFor(trect.width())
 				+ Autistic::OrigTopSkip();
@@ -3370,29 +3332,24 @@ void Message::paintText(
 			const auto available = trect.width();
 			p.setFont(st::msgServiceFont);
 			const auto labelWidth = st::msgServiceFont->width(label);
+			const auto textLeft = left + barWidth + barSkip;
 			const auto textWidth = std::max(
 				0,
-				available - 2 * padding - labelWidth - gap);
+				left + available - textLeft - labelWidth - labelGap);
 			const auto text = st::msgServiceFont->elided(
 				original->text,
 				textWidth);
-			const auto pillWidth = std::min(
-				available,
-				2 * padding
-					+ labelWidth
-					+ gap
-					+ st::msgServiceFont->width(text));
-			auto background = stm->msgServiceFg->c;
-			background.setAlphaF(0.10);
-			p.setPen(Qt::NoPen);
-			p.setBrush(background);
-			p.drawRoundedRect(
-				QRect(left, top, pillWidth, pillHeight),
-				4,
-				4);
-			p.setPen(stm->msgServiceFg);
+			const auto barColor = stm->msgReplyBarColor->c;
+			p.fillRect(
+				QRect(
+					left,
+					top + 4,
+					barWidth,
+					st::msgServiceFont->height),
+				barColor);
+			p.setPen(barColor);
 			p.drawTextLeft(
-				left + padding,
+				textLeft,
 				top + 4,
 				width(),
 				label);
@@ -3400,7 +3357,7 @@ void Message::paintText(
 			textColor.setAlphaF(0.85);
 			p.setPen(textColor);
 			p.drawTextLeft(
-				left + padding + labelWidth + gap,
+				textLeft + labelWidth + labelGap,
 				top + 4,
 				width(),
 				text);
