@@ -1247,6 +1247,11 @@ void LocalPasscodeManage::removeVerifiedAndLeave() {
 		if (result == Storage::SetPasscodeResult::NeedsVerification) {
 			writeRefused();
 			return;
+		} else if (result == Storage::SetPasscodeResult::DeviceBound) {
+			weakController->showToast(
+				tr::lng_passcode_device_bound_remove(tr::now));
+			setBusy(false);
+			return;
 		} else if (result != Storage::SetPasscodeResult::Success) {
 			weakController->showToast(Lang::Hard::SecureSaveError());
 			setBusy(false);
@@ -1460,6 +1465,12 @@ void BuildManageContent(
 					verification);
 				if (result == Storage::SetPasscodeResult::NeedsVerification) {
 					section->writeRefused();
+					return;
+				} else if (result == Storage::SetPasscodeResult::DeviceBound) {
+					state->appLockToggles.fire_copy(true);
+					controller->showToast(
+						tr::lng_passcode_device_bound_lock(tr::now));
+					section->setBusy(false);
 					return;
 				} else if (result != Storage::SetPasscodeResult::Success) {
 					state->appLockToggles.fire_copy(true);

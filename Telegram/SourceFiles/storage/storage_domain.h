@@ -88,11 +88,13 @@ enum class StartResult : uchar {
 	Success,
 	IncorrectPasscode,
 	IncorrectPasscodeLegacy,
+	DeviceMismatch,
 };
 
 enum class SetPasscodeResult : uchar {
 	Success,
 	NeedsVerification,
+	DeviceBound,
 	Failed,
 };
 
@@ -176,6 +178,20 @@ public:
 		PasscodeVerification verification);
 	void clearPasscodeAfterReset();
 
+	// Mode B. While a device binding is present the only working passcode
+	// wrap is mixed with a secret stored by the operating system, so a copy
+	// of tdata opens neither in this build on another machine nor in any
+	// build that ignores the binding. Enabling proves the current passcode
+	// and rewrites that wrap; removal of the passcode or of the app lock is
+	// refused while the binding lives, and no path installs an open wrap
+	// over a bound profile. There is no disable: a portable wrap would be
+	// re-bound on the next start anyway, and the point of the mode is that
+	// the profile cannot leave the device that made it.
+	[[nodiscard]] SetPasscodeResult enableDeviceBinding(
+		PasscodeDerivation derived);
+	[[nodiscard]] bool deviceBound() const;
+	[[nodiscard]] const QString &dataName() const;
+
 	[[nodiscard]] int oldVersion() const;
 	void clearOldVersion();
 
@@ -188,6 +204,7 @@ private:
 	enum class StartModernResult {
 		Success,
 		IncorrectPasscode,
+		DeviceMismatch,
 		Failed,
 		Empty,
 	};
@@ -203,7 +220,8 @@ private:
 	[[nodiscard]] MTP::AuthKeyPtr installPasscodeWrap(
 		KeyData &data,
 		PasscodeDerivation &derived,
-		quint32 generation) const;
+		quint32 generation,
+		const QByteArray &deviceSecret) const;
 	void migrateFromLegacy(const QByteArray &passcode);
 	[[nodiscard]] QByteArray prepareAccountsInfo() const;
 	bool writeKeyData(const KeyData &data, bool sync) const;
@@ -219,12 +237,14 @@ private:
 	[[nodiscard]] SetPasscodeResult installPasscode(
 		PasscodeDerivation &derived,
 		bool keepOpenWrap);
+	void clearDeviceSecret();
 
 	const not_null<Main::Domain*> _owner;
 	const QString _dataName;
 
 	MTP::AuthKeyPtr _localKey;
 	std::unique_ptr<KeyData> _keyData;
+	QByteArray _deviceSecret;
 	quint64 _verificationNonce = 0;
 	int _oldVersion = 0;
 	bool _keyDataDirty = false;

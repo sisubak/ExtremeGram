@@ -2119,6 +2119,8 @@ PRIVATE
     storage/storage_account.h
     storage/storage_cloud_blob.cpp
     storage/storage_cloud_blob.h
+    storage/storage_device_binding.cpp
+    storage/storage_device_binding.h
     storage/storage_domain.cpp
     storage/storage_domain.h
     storage/storage_facade.cpp
@@ -2668,6 +2670,7 @@ if (APPLE AND NOT build_macstore)
 endif()
 
 if (WIN32)
+    target_link_libraries(Telegram PRIVATE crypt32)
     # message(${CMAKE_GENERATOR})
     # mt.exe -manifest "${res_loc}/winrc/Telegram.manifest" "-inputresource:\"$<TARGET_FILE:Telegram>\";#1" "-outputresource:\"$<TARGET_FILE:Telegram>\";#1" >NUL
     # set(hash_symbol "#")

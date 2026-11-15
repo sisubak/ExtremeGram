@@ -852,7 +852,7 @@ void PasscodeBox::save(bool force) {
 		if (result == Storage::SetPasscodeResult::NeedsVerification) {
 			badOldPasscode();
 			return;
-		} else if (result == Storage::SetPasscodeResult::Failed) {
+		} else if (result != Storage::SetPasscodeResult::Success) {
 			if (_oldPasscode->isHidden()) {
 				_newError = Lang::Hard::SecureSaveError();
 			} else {

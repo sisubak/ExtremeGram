@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_last_input.h"
 #include "base/platform/base_platform_info.h"
 #include "base/platform/base_platform_process.h"
+#include "base/platform/base_platform_file_utilities.h"
 #include "platform/platform_specific.h"
 #include "platform/platform_integration.h"
 #include "history/history.h"
@@ -85,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "ui/screen_reader_mode.h"
 #include "storage/storage_domain.h"
+#include "storage/storage_device_binding.h"
 #include "storage/storage_databases.h"
 #include "storage/storage_folder_archive.h"
 #include "storage/localstorage.h"
@@ -104,11 +106,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/premium_limits_box.h"
 #include "ui/accessible/ui_accessible_factory.h"
 #include "ui/boxes/confirm_box.h"
+#include "styles/style_layers.h"
 #include "core/cached_webview_availability.h"
 #include "test/test_agent.h"
 
 #include <QtCore/QStandardPaths>
 #include <QtCore/QMimeDatabase>
+#include <QtCore/QFileInfo>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QScreen>
 
@@ -551,6 +555,10 @@ void Application::showOpenGLCrashNotification() {
 
 void Application::startDomain() {
 	const auto state = _domain->start(QByteArray());
+	if (state == Storage::StartResult::DeviceMismatch) {
+		crl::on_main(this, [=] { showDeviceMismatch(); });
+		return;
+	}
 	if (state != Storage::StartResult::IncorrectPasscodeLegacy) {
 		// In case of non-legacy passcoded app all global settings are ready.
 		startSettingsAndBackground();
@@ -558,6 +566,42 @@ void Application::startDomain() {
 	if (state != Storage::StartResult::Success) {
 		lockByPasscode();
 		DEBUG_LOG(("Application Info: passcode needed..."));
+	}
+}
+
+// A profile whose only wrap is mixed with a device secret that is not here
+// cannot be opened by any passcode, so the lock screen would only invite
+// guesses that can never succeed. The box says so once and offers the only
+// two honest outcomes: keep the files and close, or delete this local
+// profile and log in again. Nothing is deleted without that explicit click.
+void Application::showDeviceMismatch() {
+	if (Core::Quitting()) {
+		return;
+	}
+	_lastActivePrimaryWindow->show(Ui::MakeConfirmBox({
+		.text = tr::lng_passcode_device_mismatch_about(),
+		.confirmed = crl::guard(this, [=](Fn<void()> close) {
+			close();
+			deleteDeviceBoundData();
+			Core::Quit();
+		}),
+		.cancelled = crl::guard(this, [=](Fn<void()> close) {
+			close();
+			Core::Quit();
+		}),
+		.confirmText = tr::lng_passcode_device_mismatch_delete(),
+		.cancelText = tr::lng_passcode_device_mismatch_quit(),
+		.confirmStyle = &st::attentionBoxButton,
+		.title = tr::lng_passcode_device_mismatch_title(),
+	}));
+}
+
+void Application::deleteDeviceBoundData() {
+	Storage::RemoveDeviceSecret(_domain->local().dataName());
+	const auto folder = cWorkingDir() + u"tdata"_q;
+	base::Platform::DeleteDirectory(folder);
+	if (QFileInfo::exists(folder)) {
+		LOG(("App Error: could not delete the device-bound local data."));
 	}
 }
 

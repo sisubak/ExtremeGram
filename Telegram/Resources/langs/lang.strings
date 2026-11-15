@@ -1253,6 +1253,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_passcode_check_title" = "Enter Passcode";
 "lng_passcode_change_title" = "Enter Passcode";
 "lng_passcode_unlock_about" = "Unlock Telegram to continue.";
+"lng_passcode_device_mismatch_title" = "Profile is bound to another device";
+"lng_passcode_device_mismatch_about" = "This local profile was protected on another device, so its passcode cannot open it here.\n\nTo use ExtremeGram on this computer, delete the local data and log in again. Local chats and cache will be lost.";
+"lng_passcode_device_mismatch_delete" = "Delete local data";
+"lng_passcode_device_mismatch_quit" = "Close";
+"lng_passcode_device_bound_remove" = "This profile is bound to this device. The local passcode cannot be removed.";
+"lng_passcode_device_bound_lock" = "This profile is bound to this device. The app lock cannot be turned off.";
 
 "lng_cloud_password_waiting_code" = "Confirmation code sent to {email}...";
 "lng_cloud_password_confirm" = "Confirm recovery email";

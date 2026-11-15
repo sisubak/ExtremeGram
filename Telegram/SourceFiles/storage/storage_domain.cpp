@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/version.h"
 #include "storage/details/storage_file_utilities.h"
+#include "storage/storage_device_binding.h"
 #include "storage/serialize_common.h"
 #include "mtproto/mtproto_config.h"
 #include "main/main_domain.h"
@@ -37,6 +38,7 @@ struct KeyData final {
 	QByteArray openSalt;
 	QByteArray openKeyEncrypted;
 	std::vector<PasscodeWrap> passcodeWraps;
+	std::optional<DeviceBinding> device;
 	quint32 committed = 0;
 	bool legacy = false;
 	bool legacyPasscode = false;
@@ -207,6 +209,19 @@ constexpr auto kMaxWrapCount = quint32(2);
 		}
 		data.passcodeWraps.push_back(std::move(wrap));
 	}
+	if (!stream.atEnd()) {
+		auto deviceBlob = QByteArray();
+		stream >> deviceBlob;
+		if (!CheckStreamStatus(stream)) {
+			return ReadKeyDataResult::Failed;
+		}
+		auto device = ParseDeviceBinding(deviceBlob);
+		if (!device) {
+			LOG(("App Error: bad device binding blob in the key file."));
+			return ReadKeyDataResult::Failed;
+		}
+		data.device = std::move(device);
+	}
 	return unsupportedCost
 		? ReadKeyDataResult::UnsupportedKdf
 		: ReadKeyDataResult::Success;
@@ -245,6 +260,9 @@ void WriteKeyData(
 	}
 	buffer.close();
 	file.writeData(trailer);
+	if (data.device) {
+		file.writeData(SerializeDeviceBinding(*data.device));
+	}
 }
 
 } // namespace
@@ -326,7 +344,9 @@ Domain::Domain(not_null<Main::Domain*> owner, const QString &dataName)
 , _keyData(std::make_unique<KeyData>()) {
 }
 
-Domain::~Domain() = default;
+Domain::~Domain() {
+	clearDeviceSecret();
+}
 
 std::optional<QByteArray> Domain::readBotUseData() const {
 	Expects(_localKey != nullptr);
@@ -376,9 +396,21 @@ StartResult Domain::start(PasscodeDerivation derived) {
 		if (_keyData->legacy || _keyDataDirty || _oldVersion < AppVersion) {
 			writeAccounts();
 		}
+		if (!_keyData->device
+			&& _keyData->passcodeWraps.size() == 1
+			&& _keyData->openKeyEncrypted.isEmpty()
+			&& !derived.empty()) {
+			const auto bound = enableDeviceBinding(std::move(derived));
+			if (bound != SetPasscodeResult::Success) {
+				LOG(("App Info: could not bind the profile to this device, "
+					"result: %1").arg(int(bound)));
+			}
+		}
 		return StartResult::Success;
 	} else if (modern == StartModernResult::IncorrectPasscode) {
 		return StartResult::IncorrectPasscode;
+	} else if (modern == StartModernResult::DeviceMismatch) {
+		return StartResult::DeviceMismatch;
 	} else if (modern == StartModernResult::Failed) {
 		// startFromScratch() drops a local key startModern() already read.
 		startFromScratch();
@@ -477,18 +509,26 @@ void Domain::installLegacyWrap(
 MTP::AuthKeyPtr Domain::installPasscodeWrap(
 		KeyData &data,
 		PasscodeDerivation &derived,
-		quint32 generation) const {
+		quint32 generation,
+		const QByteArray &deviceSecret) const {
 	Expects(_localKey != nullptr);
 	Expects(!derived.empty());
 	Expects(derived._wrap && derived._wrap->keyEncrypted.isEmpty());
 
 	auto wrap = *derived._wrap;
 	wrap.generation = generation;
-	const auto wrapKey = derived.keyFor(wrap);
+	auto wrapKey = derived.keyFor(wrap);
 	if (!wrapKey) {
 		LOG(("App Error: could not derive the passcode key, family: %1"
 			).arg(wrap.kdf.kind));
 		return nullptr;
+	} else if (!deviceSecret.isEmpty()) {
+		wrapKey = MixDeviceWrapKey(wrapKey, deviceSecret);
+		if (!wrapKey) {
+			LOG(("App Error: could not mix the device secret into "
+				"a fresh passcode wrap."));
+			return nullptr;
+		}
 	}
 	wrap.keyEncrypted = WrapLocalKey(_localKey, wrapKey);
 	if (!WrapOpensLocalKey(wrap.keyEncrypted, wrapKey, _localKey)) {
@@ -518,7 +558,7 @@ void Domain::migrateFromLegacy(const QByteArray &passcode) {
 		_keyData->committed = 0;
 	} else {
 		auto fresh = prepareNewWrap(passcode);
-		if (!installPasscodeWrap(*_keyData, fresh, 1)) {
+		if (!installPasscodeWrap(*_keyData, fresh, 1, QByteArray())) {
 			return;
 		}
 		dropOpenWrap(*_keyData);
@@ -550,6 +590,27 @@ Domain::StartModernResult Domain::startModern(
 	}
 	*_keyData = std::move(parsed);
 
+	// The device secret is loaded before anything is decrypted, because a
+	// profile bound to another machine has no passcode that could open it:
+	// the verifier tells that case apart from a wrong passcode without
+	// running the memory-hard derivation, and without ever falling back to
+	// a reset. A missing or foreign secret is a hard stop with its own
+	// answer, never a reason to discard the data.
+	const auto deviceBound = _keyData->device.has_value();
+	if (deviceBound) {
+		clearDeviceSecret();
+		_deviceSecret = LoadDeviceSecret(_dataName);
+		if (!DeviceBindingMatches(*_keyData->device, _deviceSecret)) {
+			clearDeviceSecret();
+			LOG(("App Info: the device secret does not open this profile."));
+			return StartModernResult::DeviceMismatch;
+		} else if (_keyData->legacy) {
+			LOG(("App Error: a legacy key file carries a device binding."));
+			clearDeviceSecret();
+			return StartModernResult::Failed;
+		}
+	}
+
 	// Probe the stored open wrap independently of the typed passcode result.
 	// PrepareEncrypted adds a 16-byte prefix to the padded length and key.
 	// Only this ciphertext size can hold the fixed-size local key. Bound
@@ -557,7 +618,8 @@ Domain::StartModernResult Domain::startModern(
 	// and startup results intact. Compare once that unwrap gives a key.
 	constexpr auto kOpenWrapSize = 16
 		+ ((sizeof(uint32) + MTP::AuthKey::kSize + 15) / 16) * 16;
-	auto openKey = (_keyData->openKeyEncrypted.size() == kOpenWrapSize)
+	auto openKey = (!deviceBound
+		&& _keyData->openKeyEncrypted.size() == kOpenWrapSize)
 		? UnwrapLocalKey(
 			_keyData->openKeyEncrypted,
 			CreateLocalKey(QByteArray(), _keyData->openSalt))
@@ -593,7 +655,10 @@ Domain::StartModernResult Domain::startModern(
 		_keyData->passcodeWraps = std::move(live);
 
 		if (derived.empty()) {
-			if (_keyData->openKeyEncrypted.isEmpty()) {
+			if (deviceBound) {
+				LOG(("App Info: a device-bound profile needs a passcode."));
+				return StartModernResult::IncorrectPasscode;
+			} else if (_keyData->openKeyEncrypted.isEmpty()) {
 				LOG(("App Info: the app lock is on, a passcode is needed."));
 				return StartModernResult::IncorrectPasscode;
 			}
@@ -609,6 +674,13 @@ Domain::StartModernResult Domain::startModern(
 				LOG(("App Error: passcode KDF family %1 is unavailable."
 					).arg(wrap.kdf.kind));
 				return StartModernResult::IncorrectPasscode;
+			} else if (deviceBound) {
+				wrapKey = MixDeviceWrapKey(wrapKey, _deviceSecret);
+				if (!wrapKey) {
+					LOG(("App Error: could not mix the device secret into "
+						"the passcode key."));
+					return StartModernResult::IncorrectPasscode;
+				}
 			}
 			localKeyEncrypted = wrap.keyEncrypted;
 		}
@@ -871,6 +943,8 @@ void Domain::startFromScratch() {
 	if (!removeWalletKeyring()) {
 		LOG(("Wallet Error: could not remove the discarded device keyring."));
 	}
+	RemoveDeviceSecret(_dataName);
+	clearDeviceSecret();
 	*_keyData = KeyData();
 	_keyDataDirty = false;
 	_verificationNonce = 0;
@@ -925,7 +999,10 @@ bool Domain::checkPasscode(PasscodeDerivation derived) const {
 	if (!wrap) {
 		return false;
 	}
-	const auto key = derived.keyFor(*wrap);
+	auto key = derived.keyFor(*wrap);
+	if (_keyData->device) {
+		key = MixDeviceWrapKey(key, _deviceSecret);
+	}
 	return key && WrapOpensLocalKey(wrap->keyEncrypted, key, _localKey);
 }
 
@@ -1003,6 +1080,10 @@ SetPasscodeResult Domain::changePasscode(
 	if (_keyData->legacy) {
 		LOG(("App Error: refusing a passcode change before the migration."));
 		return SetPasscodeResult::Failed;
+	} else if (!derived && _keyData->device) {
+		LOG(("App Error: refusing to remove the passcode of a device-bound "
+			"profile."));
+		return SetPasscodeResult::DeviceBound;
 	} else if (!_keyData->passcodeWraps.empty() && !accepts(verification)) {
 		return SetPasscodeResult::NeedsVerification;
 	} else if (derived) {
@@ -1029,11 +1110,52 @@ SetPasscodeResult Domain::installPasscode(
 		PasscodeDerivation &derived,
 		bool keepOpenWrap) {
 	const auto generation = _keyData->committed + 1;
+	const auto alreadyBound = _keyData->device.has_value();
+	const auto lockOn = !keepOpenWrap || _keyData->openKeyEncrypted.isEmpty();
+	if (alreadyBound && _deviceSecret.isEmpty()) {
+		LOG(("App Error: a bound profile has no device secret in memory."));
+		return SetPasscodeResult::Failed;
+	}
+	// A passcode that leaves the profile without an open wrap becomes the
+	// only secret that opens it, so that is the point where mode B starts.
+	// The secret is stored before the key file names it, and the staged
+	// write stays without the binding: if the final write fails, the old
+	// wrap still opens the file and the next start drops the staged one.
+	// Nothing removes the stored secret once a key write has been attempted,
+	// because a failed write may still have reached the disk and a secret
+	// taken away then would leave a file nobody can open.
+	auto freshSecret = QByteArray();
+	if (!alreadyBound && lockOn) {
+		freshSecret = CreateDeviceSecret(_dataName);
+		if (freshSecret.isEmpty()) {
+			return SetPasscodeResult::Failed;
+		}
+	}
+	const auto cleanseFresh = gsl::finally([&] {
+		if (!freshSecret.isEmpty()) {
+			OPENSSL_cleanse(freshSecret.data(), freshSecret.size());
+			freshSecret.clear();
+		}
+	});
+	const auto deviceSecret = [&]() -> const QByteArray& {
+		return freshSecret.isEmpty() ? _deviceSecret : freshSecret;
+	};
+
 	auto staged = *_keyData;
-	const auto wrapKey = installPasscodeWrap(staged, derived, generation);
+	const auto wrapKey = installPasscodeWrap(
+		staged,
+		derived,
+		generation,
+		deviceSecret());
 	if (!wrapKey) {
+		if (!freshSecret.isEmpty()) {
+			RemoveDeviceSecret(_dataName);
+		}
 		return SetPasscodeResult::Failed;
 	} else if (!writeKeyDataChecked(staged)) {
+		if (!freshSecret.isEmpty()) {
+			RemoveDeviceSecret(_dataName);
+		}
 		return SetPasscodeResult::Failed;
 	} else if (!wrapOnDiskOpensLocalKey(
 			staged.passcodeWraps.back(),
@@ -1041,12 +1163,21 @@ SetPasscodeResult Domain::installPasscode(
 		if (!writeKeyDataChecked(*_keyData)) {
 			LOG(("App Error: could not drop the staged passcode wrap."));
 		}
+		if (!freshSecret.isEmpty()) {
+			RemoveDeviceSecret(_dataName);
+		}
 		return SetPasscodeResult::Failed;
 	}
 	auto updated = *_keyData;
 	updated.passcodeWraps.clear();
 	updated.passcodeWraps.push_back(staged.passcodeWraps.back());
 	updated.committed = generation;
+	if (!alreadyBound && lockOn) {
+		updated.device = MakeDeviceBinding(deviceSecret());
+		if (!updated.device || updated.device->verifier.isEmpty()) {
+			return SetPasscodeResult::Failed;
+		}
+	}
 	if (!keepOpenWrap) {
 		dropOpenWrap(updated);
 	}
@@ -1057,6 +1188,12 @@ SetPasscodeResult Domain::installPasscode(
 	}
 	*_keyData = std::move(updated);
 	_keyDataDirty = false;
+	if (!freshSecret.isEmpty()) {
+		clearDeviceSecret();
+		_deviceSecret = freshSecret;
+		OPENSSL_cleanse(freshSecret.data(), freshSecret.size());
+		freshSecret.clear();
+	}
 
 	_verificationNonce = 0;
 	_passcodeKeyChanged.fire({});
@@ -1101,6 +1238,10 @@ SetPasscodeResult Domain::setAppLockEnabled(
 	if (_keyData->legacy) {
 		LOG(("App Error: refusing an app lock change before the migration."));
 		return SetPasscodeResult::Failed;
+	} else if (!enabled && _keyData->device) {
+		LOG(("App Error: refusing to turn off the app lock of a "
+			"device-bound profile."));
+		return SetPasscodeResult::DeviceBound;
 	} else if ((enabled && !hasWrap)
 		|| (!enabled && hasWrap && !accepts(verification))) {
 		return SetPasscodeResult::NeedsVerification;
@@ -1122,6 +1263,93 @@ SetPasscodeResult Domain::setAppLockEnabled(
 	return SetPasscodeResult::Success;
 }
 
+SetPasscodeResult Domain::enableDeviceBinding(
+		PasscodeDerivation derived) {
+	Expects(_localKey != nullptr);
+
+	const auto singleUse = gsl::finally([&] { _verificationNonce = 0; });
+
+	if (_keyData->legacy || _keyData->legacyPasscode) {
+		LOG(("App Error: refusing a device binding before the migration."));
+		return SetPasscodeResult::Failed;
+	} else if (_keyData->device) {
+		return SetPasscodeResult::Success;
+	} else if (_keyData->passcodeWraps.size() != 1
+		|| derived.empty()
+		|| !_keyData->openKeyEncrypted.isEmpty()) {
+		return SetPasscodeResult::NeedsVerification;
+	}
+	const auto &wrap = _keyData->passcodeWraps.front();
+	const auto passcodeKey = derived.keyFor(wrap);
+	if (!passcodeKey
+		|| !WrapOpensLocalKey(wrap.keyEncrypted, passcodeKey, _localKey)) {
+		return SetPasscodeResult::NeedsVerification;
+	}
+	auto secret = CreateDeviceSecret(_dataName);
+	if (secret.isEmpty()) {
+		return SetPasscodeResult::Failed;
+	}
+	const auto cleanseSecret = gsl::finally([&] {
+		if (!secret.isEmpty()) {
+			OPENSSL_cleanse(secret.data(), secret.size());
+			secret.clear();
+		}
+	});
+	auto binding = MakeDeviceBinding(secret);
+	auto mixed = MixDeviceWrapKey(passcodeKey, secret);
+	if (!mixed || binding.verifier.isEmpty()) {
+		return SetPasscodeResult::Failed;
+	}
+	auto rewrapped = wrap;
+	rewrapped.generation = _keyData->committed + 1;
+	rewrapped.keyEncrypted = WrapLocalKey(_localKey, mixed);
+	if (!WrapOpensLocalKey(rewrapped.keyEncrypted, mixed, _localKey)) {
+		LOG(("App Error: a device-mixed wrap does not open the local key."));
+		return SetPasscodeResult::Failed;
+	}
+	auto updated = *_keyData;
+	updated.device = std::move(binding);
+	updated.committed = rewrapped.generation;
+	updated.passcodeWraps.clear();
+	updated.passcodeWraps.push_back(std::move(rewrapped));
+	updated.openSalt = RandomSalt();
+	updated.openKeyEncrypted = QByteArray();
+	updated.openKeyVerified = false;
+
+	// The secret stays on disk even when this write reports failure: the
+	// report can come from a flush after the rename already happened, and a
+	// removed secret would then leave a file nothing can open. An orphaned
+	// secret over an unbound file is unused and is replaced by the next
+	// successful binding.
+	if (!writeKeyDataChecked(updated)) {
+		return SetPasscodeResult::Failed;
+	}
+	*_keyData = std::move(updated);
+	_keyDataDirty = false;
+	clearDeviceSecret();
+	_deviceSecret = secret;
+	OPENSSL_cleanse(secret.data(), secret.size());
+	secret.clear();
+	_verificationNonce = 0;
+	_passcodeKeyChanged.fire({});
+	return SetPasscodeResult::Success;
+}
+
+bool Domain::deviceBound() const {
+	return _keyData->device.has_value();
+}
+
+const QString &Domain::dataName() const {
+	return _dataName;
+}
+
+void Domain::clearDeviceSecret() {
+	if (!_deviceSecret.isEmpty()) {
+		OPENSSL_cleanse(_deviceSecret.data(), _deviceSecret.size());
+		_deviceSecret.clear();
+	}
+}
+
 // Main::Domain::removePasscodeIfEmpty() calls this after Local::reset() has
 // destroyed every store the local key protected. Nothing remains for the old
 // passcode to guard or to ask for it - the account it belonged to is gone.
@@ -1140,6 +1368,7 @@ void Domain::clearPasscodeAfterReset() {
 	updated.legacy = false;
 	updated.legacyPasscode = false;
 	updated.passcodeWraps.clear();
+	updated.device.reset();
 	updated.committed = _keyData->committed + 1;
 	installOpenWrap(updated);
 
@@ -1150,6 +1379,8 @@ void Domain::clearPasscodeAfterReset() {
 	*_keyData = std::move(updated);
 	_keyDataDirty = false;
 	_verificationNonce = 0;
+	RemoveDeviceSecret(_dataName);
+	clearDeviceSecret();
 
 	_passcodeKeyChanged.fire({});
 }

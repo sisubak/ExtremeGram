@@ -383,6 +383,8 @@ private:
 	void startLocalStorage();
 	void startShortcuts();
 	void startDomain();
+	void showDeviceMismatch();
+	void deleteDeviceBoundData();
 	void startEmojiImageLoader();
 	void startSystemDarkModeViewer();
 	void startMediaView();
