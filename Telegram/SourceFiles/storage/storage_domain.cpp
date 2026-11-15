@@ -1336,7 +1336,11 @@ SetPasscodeResult Domain::enableDeviceBinding(
 	// removed secret would then leave a file nothing can open. An orphaned
 	// secret over an unbound file is unused and is replaced by the next
 	// successful binding.
-	if (!writeKeyDataChecked(updated)) {
+	if (!writeKeyDataChecked(updated)
+		|| !wrapOnDiskOpensLocalKey(updated.passcodeWraps.front(), mixed)) {
+		if (!writeKeyDataChecked(*_keyData)) {
+			LOG(("App Error: could not restore the unbound key file."));
+		}
 		return SetPasscodeResult::Failed;
 	}
 	*_keyData = std::move(updated);

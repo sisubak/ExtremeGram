@@ -61,10 +61,10 @@ bool SessionEndFilter::nativeEventFilter(
 		void *message,
 		qintptr *) {
 	const auto msg = static_cast<MSG*>(message);
-	if (msg
-		&& (msg->message == WM_QUERYENDSESSION
-			|| msg->message == WM_ENDSESSION)) {
+	if (msg && msg->message == WM_QUERYENDSESSION) {
 		_sessionEnding = true;
+	} else if (msg && msg->message == WM_ENDSESSION) {
+		_sessionEnding = (msg->wParam != FALSE);
 	}
 	return false;
 }
