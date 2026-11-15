@@ -174,7 +174,17 @@ constexpr auto kDeviceFileInfo = "eg-device-file-v1";
 		OPENSSL_cleanse(result.data(), result.size());
 		return QByteArray();
 	}
-	return result;
+	const auto machine = QSysInfo::machineUniqueId();
+	if (machine.isEmpty()) {
+		return result;
+	}
+	auto mixed = HkdfSha256(
+		result,
+		machine,
+		kDeviceFileInfo,
+		kDeviceSecretSize);
+	OPENSSL_cleanse(result.data(), result.size());
+	return mixed;
 #else // Q_OS_WIN
 	const auto raw = ReadSecretFile(path);
 	if (raw.size() != kDeviceSecretSize) {
