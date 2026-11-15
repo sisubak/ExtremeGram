@@ -145,11 +145,11 @@ private:
 	void scheduleRetry(PeerId peerId, int seconds, Fn<void()> retryFn);
 	void finishScan(PeerId peerId);
 	void sendChunk(PeerId peerId);
+	void scheduleChunk(PeerId peerId, int seconds);
 	void sendWithRetry(
 		not_null<PeerData*> peer,
 		const QString &text,
-		FullMsgId replyTo,
-		Fn<void()> onDone = nullptr);
+		FullMsgId replyTo);
 
 	void onItemAdded(not_null<HistoryItem*> item);
 	void loadStats(not_null<PeerData*> peer);

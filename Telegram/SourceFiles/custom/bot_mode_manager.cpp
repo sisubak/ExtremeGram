@@ -734,8 +734,7 @@ bool BotModeManager::handleWhoisCommand(
 		sendWithRetry(
 			peer,
 			QString::fromUtf8("!whois возвращает данные только по людям."),
-			replyToId,
-			nullptr);
+			replyToId);
 		return true;
 	}
 
@@ -757,7 +756,7 @@ bool BotModeManager::handleWhoisCommand(
 	}
 
 	if (style == WhoisStyle::Account) {
-		sendWithRetry(peer, base, replyToId, nullptr);
+		sendWithRetry(peer, base, replyToId);
 		return true;
 	}
 	const auto channel = peer->asChannel();
@@ -765,8 +764,7 @@ bool BotModeManager::handleWhoisCommand(
 		sendWithRetry(
 			peer,
 			QString::fromUtf8("!vxod: дата входа видна только в супергруппах."),
-			replyToId,
-			nullptr);
+			replyToId);
 		return true;
 	}
 	if (channel && channel->isMegagroup()) {
@@ -796,16 +794,16 @@ bool BotModeManager::handleWhoisCommand(
 				.arg(
 					(style == WhoisStyle::Vxod) ? user->name() : base,
 					joinedLine);
-			sendWithRetry(lower, report, FullMsgId(), nullptr);
+			sendWithRetry(lower, report, FullMsgId());
 		}).fail([=, lower = history->peer](const MTP::Error &) {
 			const auto report = ((style == WhoisStyle::Vxod)
 				? user->name()
 				: base) + QString::fromUtf8(
 				"\nВход в группу: участник не найден");
-			sendWithRetry(lower, report, FullMsgId(), nullptr);
+			sendWithRetry(lower, report, FullMsgId());
 		}).send();
 	} else {
-		sendWithRetry(peer, base, replyToId, nullptr);
+		sendWithRetry(peer, base, replyToId);
 	}
 	return true;
 }
@@ -837,8 +835,7 @@ bool BotModeManager::handleIgnoreCommand(
 			sendWithRetry(
 				history->peer,
 				Autistic::IgnoredListText(_session),
-				FullMsgId(),
-				nullptr);
+				FullMsgId());
 			return true;
 		}
 		if (controller) {
@@ -853,8 +850,7 @@ bool BotModeManager::handleIgnoreCommand(
 		sendWithRetry(
 			history->peer,
 			QString::fromUtf8("!ignore работает только с людьми."),
-			replyToId,
-			nullptr);
+			replyToId);
 		return true;
 	}
 	if (unignore) {
@@ -862,15 +858,13 @@ bool BotModeManager::handleIgnoreCommand(
 		sendWithRetry(
 			history->peer,
 			QString::fromUtf8("%1 убран из игнор-листа.").arg(user->name()),
-			replyToId,
-			nullptr);
+			replyToId);
 	} else {
 		Autistic::IgnorePeer(user);
 		sendWithRetry(
 			history->peer,
 			QString::fromUtf8("%1 добавлен в игнор-лист.").arg(user->name()),
-			replyToId,
-			nullptr);
+			replyToId);
 	}
 	return true;
 }
@@ -1158,81 +1152,31 @@ void BotModeManager::sendChunk(PeerId peerId) {
 	}
 
 	const auto nextText = job.pendingOutgoingChunks.front();
-	sendWithRetry(job.peer, nextText, FullMsgId(), [=] {
-		const auto innerIt = _jobs.find(peerId);
-		if (innerIt == _jobs.end() || !innerIt->second) {
-			return;
-		}
-		auto &st = *innerIt->second;
-		if (!st.pendingOutgoingChunks.empty()) {
-			st.pendingOutgoingChunks.erase(st.pendingOutgoingChunks.begin());
-		}
-		if (st.pendingOutgoingChunks.empty()) {
-			sendChunk(peerId);
-		} else {
-			scheduleRetry(peerId, 1, [=] {
-				sendChunk(peerId);
-			});
-		}
+	job.pendingOutgoingChunks.erase(job.pendingOutgoingChunks.begin());
+	sendWithRetry(job.peer, nextText, FullMsgId());
+	scheduleChunk(peerId, 1);
+}
+
+void BotModeManager::scheduleChunk(PeerId peerId, int seconds) {
+	auto &timer = _jobTimers[peerId];
+	timer = std::make_unique<base::Timer>([=] {
+		sendChunk(peerId);
 	});
+	timer->callOnce(seconds * crl::time(1000));
 }
 
 void BotModeManager::sendWithRetry(
 		not_null<PeerData*> peer,
 		const QString &text,
-		FullMsgId replyTo,
-		Fn<void()> onDone) {
-	using SendFlag = MTPmessages_SendMessage::Flag;
-	auto flags = MTPmessages_SendMessage::Flags(0);
-	auto replyHeader = MTPInputReplyTo();
-	if (replyTo.msg) {
-		flags |= SendFlag::f_reply_to;
-		replyHeader = MTP_inputReplyToMessage(
-			MTP_flags(0),
-			MTP_int(replyTo.msg.bare),
-			MTPint(),
-			MTPInputPeer(),
-			MTPstring(),
-			MTPVector<MTPMessageEntity>(),
-			MTPint(),
-			MTPInputPeer(),
-			MTPint(),
-			MTPbytes(),
-			MTPVector<MTPRichText>());
+		FullMsgId replyTo) {
+	auto message = Api::MessageToSend(Api::SendAction(
+		_session->data().history(peer)));
+	message.textWithTags = TextWithTags{ text, {} };
+	message.action.clearDraft = false;
+	if (replyTo) {
+		message.action.replyTo = FullReplyTo{ .messageId = replyTo };
 	}
-
-	const auto randomId = base::RandomValue<uint64>();
-	_api.request(MTPmessages_SendMessage(
-		MTP_flags(flags),
-		peer->input(),
-		replyHeader,
-		MTP_string(text),
-		MTP_long(randomId),
-		MTPReplyMarkup(),
-		MTPVector<MTPMessageEntity>(),
-		MTPint(),
-		MTPint(),
-		MTPInputPeer(),
-		MTPInputQuickReplyShortcut(),
-		MTPlong(),
-		MTPlong(),
-		MTPSuggestedPost(),
-		MTPInputRichMessage()
-	)).done([=](const MTPUpdates &updates) {
-		_session->updates().applyUpdates(updates);
-		if (onDone) {
-			onDone();
-		}
-	}).fail([=](const MTP::Error &error) {
-		const auto waitSec = ExtractWaitSeconds(error.type());
-		if (waitSec > 0) {
-			scheduleRetry(peer->id, waitSec, [=] {
-				sendWithRetry(peer, text, replyTo, onDone);
-			});
-		} else if (onDone) {
-			onDone();
-		}
-	}).send();
+	_session->api().sendMessage(std::move(message));
 }
 
 void BotModeManager::loadStats(not_null<PeerData*> peer) {
