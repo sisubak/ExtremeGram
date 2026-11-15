@@ -85,7 +85,7 @@ void OpenHandleValue(HANDLE &handle, const QString &path) {
 	handle = CreateFileW(
 		reinterpret_cast<const wchar_t*>(native.utf16()),
 		GENERIC_READ,
-		FILE_SHARE_READ | FILE_SHARE_DELETE,
+		FILE_SHARE_READ,
 		nullptr,
 		OPEN_EXISTING,
 		FILE_ATTRIBUTE_NORMAL,
@@ -173,14 +173,6 @@ void Start() {
 
 void GuardKeyFiles(const QString &dataName) {
 	_dataName = dataName;
-	OpenKeyFiles();
-}
-
-void RefreshKeyFiles() {
-	if (_pauseDepth > 0) {
-		return;
-	}
-	CloseKeyFiles();
 	OpenKeyFiles();
 }
 

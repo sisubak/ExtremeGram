@@ -602,7 +602,9 @@ void Application::showDeviceMismatch() {
 void Application::deleteDeviceBoundData() {
 	Storage::RemoveDeviceSecret(_domain->local().dataName());
 	const auto folder = cWorkingDir() + u"tdata"_q;
+	Custom::SelfDefense::PauseKeyFiles();
 	base::Platform::DeleteDirectory(folder);
+	Custom::SelfDefense::ResumeKeyFiles();
 	if (QFileInfo::exists(folder)) {
 		LOG(("App Error: could not delete the device-bound local data."));
 	}

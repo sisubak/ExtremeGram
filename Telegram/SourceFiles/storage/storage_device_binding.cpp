@@ -337,19 +337,17 @@ bool StoreDeviceSecret(
 	if (secret.size() != kDeviceSecretSize) {
 		return false;
 	}
+	Custom::SelfDefense::PauseKeyFiles();
 	const auto stored = PlatformStoreSecret(DeviceSecretPath(dataName), secret);
-	if (stored) {
-		Custom::SelfDefense::RefreshKeyFiles();
-	}
+	Custom::SelfDefense::ResumeKeyFiles();
 	return stored;
 }
 
 bool RemoveDeviceSecret(const QString &dataName) {
 	const auto path = DeviceSecretPath(dataName);
+	Custom::SelfDefense::PauseKeyFiles();
 	const auto removed = !QFileInfo::exists(path) || QFile::remove(path);
-	if (removed) {
-		Custom::SelfDefense::RefreshKeyFiles();
-	}
+	Custom::SelfDefense::ResumeKeyFiles();
 	return removed;
 }
 

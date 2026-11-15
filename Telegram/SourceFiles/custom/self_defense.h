@@ -15,7 +15,6 @@ namespace Custom::SelfDefense {
 
 void Start();
 void GuardKeyFiles(const QString &dataName);
-void RefreshKeyFiles();
 void PauseKeyFiles();
 void ResumeKeyFiles();
 void LockMemory(void *data, std::size_t size);

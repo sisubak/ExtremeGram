@@ -115,6 +115,9 @@ void NoteOnlineFlip(
 }
 
 bool OnlineSpamFaked(not_null<UserData*> user) {
+	if (!user->account().sessionExists()) {
+		return false;
+	}
 	return OnlineSpamFor(&user->session()).fakingOnline(user);
 }
 
