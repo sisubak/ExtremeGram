@@ -614,7 +614,9 @@ TopBar::TopBar(
 				_extremeBadge->height(),
 				_peer,
 				bg,
-				tint);
+				tint,
+				Custom::NicknameGradientFor(
+					&_peer->session()).configFor(_peer));
 		}, _extremeBadge->lifetime());
 		Custom::ClientBadgeFor(
 			&_peer->session()

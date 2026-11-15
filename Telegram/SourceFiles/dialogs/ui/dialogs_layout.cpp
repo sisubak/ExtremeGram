@@ -1030,7 +1030,8 @@ void PaintRow(
 					? st::dialogsNameFgActive
 					: context.selected
 					? st::dialogsNameFgOver
-					: st::dialogsNameFg)->c);
+					: st::dialogsNameFg)->c,
+				nameGradient);
 			row->setClientBadgeRect(QRect(
 				badgeLeft,
 				rectForName.top(),

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom/client_badge_detector.h"
 #include "custom/mention_pins.h"
+#include "custom/nickname_gradient.h"
 #include "dialogs/dialogs_three_state_icon.h"
 #include "dialogs/ui/dialogs_layout.h"
 
@@ -1542,7 +1543,9 @@ void FieldAutocomplete::Inner::paintMentionRowAt(
 			nameFontHeight,
 			user,
 			surfaceBg,
-			badgeTint);
+			badgeTint,
+			Custom::NicknameGradientFor(
+				&user->session()).configFor(user));
 	}
 
 	if (!first.isEmpty() || !second.isEmpty()) {

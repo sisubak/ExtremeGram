@@ -2133,7 +2133,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		if (_editAnimation.animating()) {
 			const auto progress = _editAnimation.value(0.);
 			auto wash = stm->msgReplyBarColor->c;
-			wash.setAlphaF(wash.alphaF() * 0.22 * (1. - progress));
+			wash.setAlphaF(wash.alphaF() * 0.30 * (1. - progress));
 			p.setPen(Qt::NoPen);
 			p.setBrush(wash);
 			p.drawPath(BubbleWashPath(simple.geometry, simple.rounding));
@@ -2752,7 +2752,9 @@ void Message::paintFromName(
 			st::msgNameFont->height,
 			from,
 			stm->msgBg->c,
-			nameFg);
+			nameFg,
+			Custom::NicknameGradientFor(
+				&history()->session()).configFor(from));
 		customX += drawnCustomWidth;
 		drawnCustomWidth += Custom::SlowmodeFor(
 			&history()->session()
@@ -3324,41 +3326,68 @@ void Message::paintText(
 			const auto label = tr::lng_extremegram_orig_before(tr::now);
 			const auto barWidth = st::msgReplyBarSize.width();
 			const auto barSkip = st::msgReplyBarSkip;
-			const auto labelGap = 5;
+			const auto labelGap = 6;
+			const auto chipPad = 5;
+			const auto pillHeight = Autistic::OrigPillHeight();
 			const auto top = trect.y()
 				+ textHeightFor(trect.width())
 				+ Autistic::OrigTopSkip();
 			const auto left = trect.x();
 			const auto available = trect.width();
+			const auto textTop = top + (pillHeight - st::msgServiceFont->height) / 2;
 			p.setFont(st::msgServiceFont);
 			const auto labelWidth = st::msgServiceFont->width(label);
 			const auto textLeft = left + barWidth + barSkip;
+			const auto chipWidth = labelWidth + chipPad * 2;
 			const auto textWidth = std::max(
 				0,
-				left + available - textLeft - labelWidth - labelGap);
+				left + available - textLeft - chipWidth - labelGap);
 			const auto text = st::msgServiceFont->elided(
 				original->text,
 				textWidth);
-			const auto barColor = stm->msgReplyBarColor->c;
-			p.fillRect(
+			const auto accent = stm->msgReplyBarColor->c;
+
+			auto background = accent;
+			background.setAlphaF(0.10);
+			p.setPen(Qt::NoPen);
+			p.setBrush(background);
+			p.drawRoundedRect(
+				QRect(left, top, available, pillHeight),
+				6,
+				6);
+			p.setBrush(accent);
+			p.drawRoundedRect(
 				QRect(
 					left,
-					top + 4,
+					top + 3,
 					barWidth,
-					st::msgServiceFont->height),
-				barColor);
-			p.setPen(barColor);
+					std::max(1, pillHeight - 6)),
+				barWidth / 2.0,
+				barWidth / 2.0);
+
+			auto chip = accent;
+			chip.setAlphaF(0.22);
+			p.setBrush(chip);
+			p.drawRoundedRect(
+				QRect(
+					textLeft,
+					textTop - 1,
+					chipWidth,
+					st::msgServiceFont->height + 2),
+				3,
+				3);
+			p.setPen(accent);
 			p.drawTextLeft(
-				textLeft,
-				top + 4,
+				textLeft + chipPad,
+				textTop,
 				width(),
 				label);
 			auto textColor = stm->msgServiceFg->c;
-			textColor.setAlphaF(0.85);
+			textColor.setAlphaF(0.9);
 			p.setPen(textColor);
 			p.drawTextLeft(
-				textLeft + labelWidth + labelGap,
-				top + 4,
+				textLeft + chipWidth + labelGap,
+				textTop,
 				width(),
 				text);
 		}
@@ -4368,6 +4397,24 @@ TextState Message::textState(
 				} else {
 					AddTextStateOffset(&result, visibleTextLen);
 				}
+			} else if (Autistic::ShowOrigFor(item)
+				&& point.y() >= trect.y()
+					+ textHeightFor(trect.width())
+					+ Autistic::OrigTopSkip()
+				&& point.y() < trect.y()
+					+ textHeightFor(trect.width())
+					+ Autistic::OrigTopSkip()
+					+ Autistic::OrigPillHeight()
+				&& point.x() >= trect.x()
+				&& point.x() < trect.x() + trect.width()) {
+				result.link = std::make_shared<LambdaClickHandler>(
+					crl::guard(this, [=](ClickContext context) {
+						if (context.button != Qt::LeftButton) {
+							return;
+						}
+						Autistic::ShowOriginalHistory(item);
+					}));
+				return result;
 			} else if (getStateText(point, trect, &result, request)) {
 				if (_invertMedia) {
 					AddTextStateOffset(&result, visibleMediaTextLen);

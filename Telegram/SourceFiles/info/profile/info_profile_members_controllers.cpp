@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peers/edit_participants_box.h"
 #include "custom/client_badge_detector.h"
+#include "custom/nickname_gradient.h"
 #include "info/profile/info_profile_values.h"
 #include "dialogs/dialogs_three_state_icon.h"
 #include "data/data_chat.h"
@@ -570,7 +571,9 @@ int MemberListRow::paintNameIconGetWidth(
 			st::msgNameFont->height,
 			peer(),
 			st::boxBg->c,
-			(selected ? st::windowSubTextFgOver : st::windowSubTextFg)->c);
+			(selected ? st::windowSubTextFgOver : st::windowSubTextFg)->c,
+			Custom::NicknameGradientFor(
+				&peer()->session()).configFor(peer()));
 		_clientBadgeRect = QRect(
 			badgeLeft,
 			nameTop,

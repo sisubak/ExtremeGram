@@ -232,6 +232,8 @@ private:
 	Ui::PeerBadge _titleBadge;
 	Ui::Text::String _title;
 	int _titleNameVersion = 0;
+	QRect _clientBadgeRect;
+	PeerData *_clientBadgePeer = nullptr;
 
 	int _selectedCount = 0;
 	bool _canDelete = false;

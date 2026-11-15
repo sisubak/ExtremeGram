@@ -48,6 +48,10 @@ struct NicknameGradientConfig {
 
 [[nodiscard]] QString StripBioGradient(const QString &about);
 
+[[nodiscard]] int GradientPeriodMs(int speed);
+
+[[nodiscard]] float64 GradientPhase(int speed);
+
 class NicknameGradient final {
 public:
 	explicit NicknameGradient(not_null<Main::Session*> session);

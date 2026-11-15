@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flat_map.h"
 #include "base/flat_set.h"
 #include "base/timer.h"
+#include "custom/nickname_gradient.h"
 #include "data/data_peer_id.h"
 #include "mtproto/sender.h"
 #include "ui/userpic_view.h"
@@ -45,7 +46,8 @@ public:
 		const QColor &surfaceBackground,
 		int logicalSize,
 		int scale,
-		std::optional<QColor> tint = std::nullopt);
+		std::optional<QColor> tint = std::nullopt,
+		std::optional<NicknameGradientConfig> gradient = std::nullopt);
 	[[nodiscard]] rpl::producer<PeerId> badgeDetectedChanges() const;
 
 	void stampSelfAvatar(
@@ -60,7 +62,8 @@ public:
 		int nameHeight,
 		not_null<PeerData*> peer,
 		const QColor &surfaceBackground,
-		std::optional<QColor> desiredTint = std::nullopt);
+		std::optional<QColor> desiredTint = std::nullopt,
+		std::optional<NicknameGradientConfig> gradient = std::nullopt);
 
 	void reloadBadgeSourceImage();
 
@@ -74,7 +77,8 @@ public:
 		bool darkSurface,
 		int targetPixelSize,
 		std::optional<QColor> tintColor = std::nullopt,
-		const QColor &surfaceBackground = QColor());
+		const QColor &surfaceBackground = QColor(),
+		std::optional<NicknameGradientConfig> gradient = std::nullopt);
 
 private:
 	struct PeerCacheEntry {

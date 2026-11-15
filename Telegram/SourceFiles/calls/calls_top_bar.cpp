@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/calls_top_bar.h"
 #include "custom/client_badge_detector.h"
 #include "custom/client_badge_popup.h"
+#include "custom/nickname_gradient.h"
 
 #include "ui/effects/cross_line.h"
 #include "ui/paint/blobs_linear.h"
@@ -324,7 +325,9 @@ void TopBar::initControls() {
 				_extremeBadge->height(),
 				user,
 				st::groupCallLive1->c,
-				st::callBarFg->c);
+				st::callBarFg->c,
+				Custom::NicknameGradientFor(
+					&user->session()).configFor(user));
 		}, _extremeBadge->lifetime());
 		_extremeBadgeShown = Custom::ClientBadgeFor(
 			&user->session()).hasCustomClientBadge(user);

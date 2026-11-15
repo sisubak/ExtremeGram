@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/timer.h"
 #include "custom/client_badge_detector.h"
+#include "custom/nickname_gradient.h"
 #include "custom/redesign.h"
 #include "custom/smooth_animations.h"
 #include "data/data_peer.h"
@@ -326,7 +327,9 @@ void ShowClientBadgePopup(
 	const auto icon = ClientBadgeFor(&peer->session()).badgePreview(
 		st::boxBg->c,
 		style::ConvertScale(kIconSize),
-		dpr);
+		dpr,
+		std::nullopt,
+		NicknameGradientFor(&peer->session()).configFor(peer));
 	if (icon.isNull()) {
 		return;
 	}

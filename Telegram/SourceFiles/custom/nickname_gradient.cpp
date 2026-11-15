@@ -432,6 +432,15 @@ QString EncodeBioGradient(const NicknameGradientConfig &config) {
 	return EncodeSymbols(copy);
 }
 
+int GradientPeriodMs(int speed) {
+	return int(kSpeedPeriods[std::clamp(speed, 0, 2)] * 1000.0);
+}
+
+float64 GradientPhase(int speed) {
+	const auto ms = GradientPeriodMs(speed);
+	return ms ? std::fmod((crl::now() % ms) / float64(ms), 1.0) : 0.;
+}
+
 QString StripBioGradient(const QString &about) {
 	auto result = about;
 	const auto marker = QString::fromUtf8(kLegacyMarker);
@@ -503,12 +512,7 @@ QPen NicknameGradient::penFor(
 	if (count < kMinColors) {
 		return QPen();
 	}
-	const auto period = kSpeedPeriods[std::clamp(config.speed, 0, 2)];
-	const auto ms = int(period * 1000.0);
-	const auto phase = std::fmod(
-		(crl::now() % ms) / float64(ms),
-		1.0);
-	const auto offset = phase * width * 2.0;
+	const auto offset = GradientPhase(config.speed) * width * 2.0;
 	auto gradient = QLinearGradient(
 		QPointF(-offset, 0.0),
 		QPointF(width * 2.0 - offset, 0.0));

@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_entity.h"
 
 #include <optional>
+#include <vector>
 
 class HistoryItem;
 
@@ -19,7 +20,10 @@ namespace Autistic {
 
 void RememberOriginal(FullMsgId id, TextWithEntities text);
 [[nodiscard]] std::optional<TextWithEntities> OriginalFor(FullMsgId id);
+[[nodiscard]] std::vector<TextWithEntities> OriginalHistoryFor(FullMsgId id);
 [[nodiscard]] bool ShowOrigFor(not_null<HistoryItem*> item);
+
+void ShowOriginalHistory(not_null<HistoryItem*> item);
 
 [[nodiscard]] int OrigPillHeight();
 [[nodiscard]] int OrigTopSkip();

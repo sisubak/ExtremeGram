@@ -328,7 +328,8 @@ QImage ClientBadgeDetector::AdaptBadgeForSurface(
 		bool darkSurface,
 		int targetPixelSize,
 		std::optional<QColor> tintColor,
-		const QColor &surfaceBackground) {
+		const QColor &surfaceBackground,
+		std::optional<NicknameGradientConfig> gradient) {
 	if (cleanBadge.isNull() || targetPixelSize <= 0) {
 		return {};
 	}
@@ -338,6 +339,31 @@ QImage ClientBadgeDetector::AdaptBadgeForSurface(
 		targetPixelSize,
 		Qt::KeepAspectRatio,
 		Qt::SmoothTransformation).convertToFormat(QImage::Format_ARGB32);
+
+	if (gradient && gradient->colors.size() >= 2) {
+		auto filled = QImage(
+			scaled.size(),
+			QImage::Format_ARGB32_Premultiplied);
+		filled.fill(Qt::transparent);
+		{
+			auto p = QPainter(&filled);
+			const auto width = float64(scaled.width());
+			const auto offset = GradientPhase(gradient->speed) * width * 2.0;
+			auto brush = QLinearGradient(
+				QPointF(-offset, 0.),
+				QPointF(width * 2.0 - offset, 0.));
+			brush.setSpread(QGradient::RepeatSpread);
+			const auto count = int(gradient->colors.size());
+			for (auto i = 0; i != count; ++i) {
+				brush.setColorAt(double(i) / count, gradient->colors[i]);
+			}
+			brush.setColorAt(1.0, gradient->colors[0]);
+			p.fillRect(filled.rect(), QBrush(brush));
+			p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+			p.drawImage(0, 0, scaled);
+		}
+		return filled;
+	}
 
 	QColor resolved = tintColor.value_or(st::dialogsVerifiedIconBg->c);
 	if (surfaceBackground.isValid()) {
@@ -514,14 +540,15 @@ void ClientBadgeDetector::pollPendingPeers() {
 }
 
 int ClientBadgeDetector::badgeWidth(not_null<PeerData*> peer) {
-	return hasCustomClientBadge(peer) ? style::ConvertScale(20) : 0;
+	return hasCustomClientBadge(peer) ? style::ConvertScale(19) : 0;
 }
 
 QImage ClientBadgeDetector::badgePreview(
 		const QColor &surfaceBackground,
 		int logicalSize,
 		int scale,
-		std::optional<QColor> tint) {
+		std::optional<QColor> tint,
+		std::optional<NicknameGradientConfig> gradient) {
 	const auto &src = _cleanLightStrokeBadge.isNull()
 		? _cleanDarkStrokeBadge
 		: _cleanLightStrokeBadge;
@@ -534,7 +561,8 @@ QImage ClientBadgeDetector::badgePreview(
 		PerceivedLuminance(surfaceBackground) < 128.0,
 		logicalSize * dpr,
 		tint,
-		surfaceBackground);
+		surfaceBackground,
+		std::move(gradient));
 	result.setDevicePixelRatio(dpr);
 	return result;
 }
@@ -550,7 +578,8 @@ int ClientBadgeDetector::drawBadgeGetWidth(
 		int nameHeight,
 		not_null<PeerData*> peer,
 		const QColor &surfaceBackground,
-		std::optional<QColor> desiredTint) {
+		std::optional<QColor> desiredTint,
+		std::optional<NicknameGradientConfig> gradient) {
 	if (!hasCustomClientBadge(peer)) {
 		return 0;
 	}
@@ -560,35 +589,50 @@ int ClientBadgeDetector::drawBadgeGetWidth(
 		std::ceil(p.device()->devicePixelRatioF()));
 	const int pixelSize = logicalSize * std::max(1, dpr);
 
-	if (_cachedPixelSize != pixelSize) {
-		_tintedIconCache.clear();
-		_cachedPixelSize = pixelSize;
-	}
-
 	const bool darkSurface = (PerceivedLuminance(surfaceBackground) < 128.0);
 	const QColor baseTint = desiredTint.value_or(st::dialogsVerifiedIconBg->c);
-	const uint64 cacheKey = (uint64(baseTint.rgba()) << 32)
-		| (uint64(surfaceBackground.rgba() & 0x00FFFFFFU) << 1)
-		| (darkSurface ? 1ULL : 0ULL);
+	const auto gradientActive = gradient && gradient->colors.size() >= 2;
 
-	auto &icon = _tintedIconCache[cacheKey];
-	if (icon.isNull()) {
-		if (_tintedIconCache.size() > 64) {
-			_tintedIconCache.clear();
-		}
+	auto finalIcon = QImage();
+	if (gradientActive) {
 		const auto &src = _cleanLightStrokeBadge.isNull()
 			? _cleanDarkStrokeBadge
 			: _cleanLightStrokeBadge;
-		auto built = AdaptBadgeForSurface(
+		finalIcon = AdaptBadgeForSurface(
 			src,
 			darkSurface,
 			pixelSize,
 			baseTint,
-			surfaceBackground);
-		built.setDevicePixelRatio(std::max(1, dpr));
-		_tintedIconCache[cacheKey] = std::move(built);
+			surfaceBackground,
+			std::move(gradient));
+		finalIcon.setDevicePixelRatio(std::max(1, dpr));
+	} else {
+		if (_cachedPixelSize != pixelSize) {
+			_tintedIconCache.clear();
+			_cachedPixelSize = pixelSize;
+		}
+		const uint64 cacheKey = (uint64(baseTint.rgba()) << 32)
+			| (uint64(surfaceBackground.rgba() & 0x00FFFFFFU) << 1)
+			| (darkSurface ? 1ULL : 0ULL);
+		auto &icon = _tintedIconCache[cacheKey];
+		if (icon.isNull()) {
+			if (_tintedIconCache.size() > 64) {
+				_tintedIconCache.clear();
+			}
+			const auto &src = _cleanLightStrokeBadge.isNull()
+				? _cleanDarkStrokeBadge
+				: _cleanLightStrokeBadge;
+			auto built = AdaptBadgeForSurface(
+				src,
+				darkSurface,
+				pixelSize,
+				baseTint,
+				surfaceBackground);
+			built.setDevicePixelRatio(std::max(1, dpr));
+			_tintedIconCache[cacheKey] = std::move(built);
+		}
+		finalIcon = _tintedIconCache[cacheKey];
 	}
-	const auto &finalIcon = _tintedIconCache[cacheKey];
 	if (finalIcon.isNull()) {
 		return 0;
 	}
@@ -596,7 +640,9 @@ int ClientBadgeDetector::drawBadgeGetWidth(
 	const int padLeft = style::ConvertScale(3);
 	const QSize logicalIconSize = finalIcon.size()
 		/ finalIcon.devicePixelRatio();
-	const int drawY = y + std::max(0, (nameHeight - logicalIconSize.height()) / 2);
+	const int drawY = y
+		+ std::max(0, (nameHeight - logicalIconSize.height()) / 2)
+		- style::ConvertScale(1);
 
 	p.drawImage(QPoint(x + padLeft, drawY), finalIcon);
 	return padLeft + logicalIconSize.width() + style::ConvertScale(2);

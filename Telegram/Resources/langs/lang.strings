@@ -9705,6 +9705,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extremegram_nickname_gradient_applying" = "Сохраняю...";
 "lng_extremegram_nickname_gradient_too_long" = "Описание профиля слишком длинное для градиента.";
 "lng_extremegram_orig_before" = "было";
+"lng_extremegram_orig_history" = "История изменений";
 "lng_extremegram_deleted" = "удалено";
 "lng_extremegram_nickname_gradient_speed" = "Скорость";
 "lng_extremegram_nickname_gradient_slow" = "Медленно";

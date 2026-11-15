@@ -46,6 +46,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
 #include "calls/calls_instance.h"
+#include "custom/client_badge_detector.h"
+#include "custom/client_badge_popup.h"
+#include "custom/nickname_gradient.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_peer_values.h"
 #include "data/data_group_call.h" // GroupCall::input.
@@ -586,6 +589,8 @@ void TopBarWidget::paintEvent(QPaintEvent *e) {
 }
 
 void TopBarWidget::paintTopBar(Painter &p) {
+	_clientBadgeRect = QRect();
+	_clientBadgePeer = nullptr;
 	if (!_activeChat.key || _narrowRatio == 1.) {
 		return;
 	}
@@ -761,6 +766,32 @@ void TopBarWidget::paintTopBar(Painter &p) {
 			.availableWidth = namewidth,
 			.elisionLines = 1,
 		});
+		if (Custom::ClientBadgeFor(
+				&_controller->session()).hasCustomClientBadge(namePeer)) {
+			const auto badgeLeft = nameleft
+				+ std::min(_title.maxWidth(), namewidth)
+				+ badgeWidth;
+			const auto painted = Custom::ClientBadgeFor(
+				&_controller->session()
+			).drawBadgeGetWidth(
+				p,
+				badgeLeft,
+				nametop,
+				st::msgNameStyle.font->height,
+				namePeer,
+				st::topBarBg->c,
+				st::dialogsNameFg->c,
+				gradient);
+			_clientBadgeRect = QRect(
+				badgeLeft,
+				nametop,
+				painted,
+				st::msgNameStyle.font->height);
+			_clientBadgePeer = namePeer;
+		} else {
+			_clientBadgeRect = QRect();
+			_clientBadgePeer = nullptr;
+		}
 
 		p.setFont(st::dialogsTextFont);
 		if (!paintConnectingState(p, statusleft, statustop, width())
@@ -885,6 +916,13 @@ void TopBarWidget::mousePressEvent(QMouseEvent *e) {
 		&& (e->pos().y() < st::topBarHeight)
 		&& !showSelectedState()
 		&& !_chooseForReportReason;
+	if (handleClick && _clientBadgePeer && _clientBadgeRect.contains(e->pos())) {
+		const auto anchor = QRect(
+			mapToGlobal(_clientBadgeRect.topLeft()),
+			_clientBadgeRect.size());
+		Custom::ShowClientBadgePopup(this, _clientBadgePeer, anchor);
+		return;
+	}
 	if (handleClick) {
 		const auto archiveTop = (_activeChat.section == Section::ChatsList)
 			&& _activeChat.key.folder();
