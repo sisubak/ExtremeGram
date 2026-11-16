@@ -482,8 +482,7 @@ QImage NicknameGradientBackground(
 	}
 	const auto ratio = style::DevicePixelRatio();
 	auto image = QImage(
-		qRound(size.width() * ratio),
-		qRound(size.height() * ratio),
+		size * ratio,
 		QImage::Format_ARGB32_Premultiplied);
 	image.setDevicePixelRatio(ratio);
 	image.fill(Qt::transparent);
@@ -620,7 +619,7 @@ void NicknameGradient::repaintPeer(PeerId peerId) {
 void NicknameGradient::ensureTimer() {
 	_lastRequest = crl::now();
 	if (!_tickTimer.isActive()) {
-		_tickTimer.callEach(50);
+		_tickTimer.callEach(16);
 	}
 }
 
@@ -743,7 +742,7 @@ void ShowNicknameGradientBox(
 		const auto previewTimer = std::make_shared<base::Timer>([=] {
 			preview->update();
 		});
-		previewTimer->callEach(50);
+		previewTimer->callEach(16);
 		preview->lifetime().add([previewTimer] {
 			previewTimer->cancel();
 		});

@@ -1196,6 +1196,10 @@ PeerListContent::PeerListContent(
 		invalidateLoadedUserpics();
 		update();
 	}, lifetime());
+	Custom::NicknameGradientFor(&_controller->session()).ticks(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
 
 	using UpdateFlag = Data::PeerUpdate::Flag;
 	_controller->session().changes().peerUpdates(

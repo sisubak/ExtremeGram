@@ -776,6 +776,9 @@ void TopBar::refreshTitleGradient() {
 		updateCollectibleStatus();
 		update();
 	}
+	if (_extremeBadge) {
+		_extremeBadge->update();
+	}
 }
 
 void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {

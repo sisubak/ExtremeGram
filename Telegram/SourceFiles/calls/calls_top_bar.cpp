@@ -332,6 +332,10 @@ void TopBar::initControls() {
 		_extremeBadgeShown = Custom::ClientBadgeFor(
 			&user->session()).hasCustomClientBadge(user);
 		_extremeBadge->hide();
+		Custom::NicknameGradientFor(&user->session()).ticks(
+		) | rpl::on_next([=] {
+			_extremeBadge->update();
+		}, _extremeBadge->lifetime());
 	}
 
 	_mute->setClickedCallback([=] {
