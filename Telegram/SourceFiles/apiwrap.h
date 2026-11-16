@@ -457,7 +457,7 @@ public:
 		-> std::optional<std::vector<not_null<PeerData*>>>;
 	void requestBotCommonGroups(not_null<UserData*> bot, Fn<void()> done);
 
-	void saveSelfBio(const QString &text);
+	void saveSelfBio(const QString &text, Fn<void(bool)> done = nullptr);
 
 	void registerStatsRequest(MTP::DcId dcId, mtpRequestId id);
 	void unregisterStatsRequest(MTP::DcId dcId, mtpRequestId id);

@@ -165,7 +165,9 @@ private:
 	MTP::Sender _api;
 
 	base::flat_map<PeerId, std::unique_ptr<ScanJob>> _jobs;
-	base::flat_map<PeerId, std::unique_ptr<base::Timer>> _jobTimers;
+	base::flat_map<PeerId, std::unique_ptr<base::Timer>> _batchTimers;
+	base::flat_map<PeerId, std::unique_ptr<base::Timer>> _retryTimers;
+	base::flat_map<PeerId, std::unique_ptr<base::Timer>> _chunkTimers;
 	base::flat_map<PeerId, Fn<void()>> _retryCallbacks;
 	base::Timer _countdownTicker;
 	base::Timer _periodicFlushTimer;

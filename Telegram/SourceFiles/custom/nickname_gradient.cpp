@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/nickname_gradient.h"
 
 #include "apiwrap.h"
+#include "base/weak_ptr.h"
 #include "data/data_changes.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -661,7 +662,14 @@ void ApplyNicknameGradient(
 		return;
 	}
 	if (updated != user->about()) {
-		session->api().saveSelfBio(updated);
+		session->api().saveSelfBio(updated, [=](bool ok) {
+			if (done) {
+				done(ok, ok
+					? tr::lng_box_done(tr::now)
+					: tr::lng_extremegram_nickname_gradient_failed(tr::now));
+			}
+		});
+		return;
 	}
 	if (done) {
 		done(true, tr::lng_box_done(tr::now));
@@ -901,9 +909,9 @@ void ShowNicknameGradientBox(
 			ApplyNicknameGradient(
 				session,
 				std::nullopt,
-				[=](bool, QString message) {
+				crl::guard(controller, [=](bool, QString message) {
 					controller->showToast(std::move(message));
-				});
+				}));
 			box->closeBox();
 		});
 
@@ -918,9 +926,9 @@ void ShowNicknameGradientBox(
 					*speed,
 					*surfaces,
 					false },
-				[=](bool, QString message) {
+				crl::guard(controller, [=](bool, QString message) {
 					controller->showToast(std::move(message));
-				});
+				}));
 			box->closeBox();
 		});
 		box->addButton(tr::lng_cancel(), [=] {

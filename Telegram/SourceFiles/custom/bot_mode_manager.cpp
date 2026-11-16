@@ -903,8 +903,16 @@ bool BotModeManager::stopScan(not_null<History*> history) {
 		_api.request(job.currentRequestId).cancel();
 		job.currentRequestId = 0;
 	}
-	if (const auto timerIt = _jobTimers.find(peerId);
-			timerIt != _jobTimers.end() && timerIt->second) {
+	if (const auto timerIt = _batchTimers.find(peerId);
+			timerIt != _batchTimers.end() && timerIt->second) {
+		timerIt->second->cancel();
+	}
+	if (const auto timerIt = _retryTimers.find(peerId);
+			timerIt != _retryTimers.end() && timerIt->second) {
+		timerIt->second->cancel();
+	}
+	if (const auto timerIt = _chunkTimers.find(peerId);
+			timerIt != _chunkTimers.end() && timerIt->second) {
 		timerIt->second->cancel();
 	}
 	_retryCallbacks.erase(peerId);
@@ -1018,7 +1026,9 @@ void BotModeManager::requestBatch(PeerId peerId) {
 		}
 
 		st.offsetId = minId;
-		saveStats(st);
+		if (st.scannedMessages % (kBatchSize * 10) == 0) {
+			saveStats(st);
+		}
 		reportProgress(
 			st,
 			QString::fromUtf8("Подсчёт: %1 / %2 (участников: %3)")
@@ -1031,7 +1041,7 @@ void BotModeManager::requestBatch(PeerId peerId) {
 			return;
 		}
 
-		auto &timer = _jobTimers[peerId];
+		auto &timer = _batchTimers[peerId];
 		if (!timer) {
 			timer = std::make_unique<base::Timer>([=] {
 				requestBatch(peerId);
@@ -1064,7 +1074,7 @@ void BotModeManager::scheduleRetry(
 	}
 
 	_retryCallbacks[peerId] = std::move(retryFn);
-	auto &timer = _jobTimers[peerId];
+	auto &timer = _retryTimers[peerId];
 	timer = std::make_unique<base::Timer>([=] {
 		if (const auto cbIt = _retryCallbacks.find(peerId);
 				cbIt != _retryCallbacks.end()) {
@@ -1158,7 +1168,7 @@ void BotModeManager::sendChunk(PeerId peerId) {
 }
 
 void BotModeManager::scheduleChunk(PeerId peerId, int seconds) {
-	auto &timer = _jobTimers[peerId];
+	auto &timer = _chunkTimers[peerId];
 	timer = std::make_unique<base::Timer>([=] {
 		sendChunk(peerId);
 	});

@@ -24,11 +24,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_entity.h"
 
 #include <memory>
+#include <utility>
 
 namespace Autistic {
 namespace {
 
 constexpr auto kTauntStepMs = crl::time(700);
+
+using ChainKey = std::pair<Main::Session*, FullMsgId>;
 
 struct TauntChain {
 	base::Timer timer;
@@ -38,17 +41,21 @@ struct TauntChain {
 	Fn<mtpRequestId()> finish;
 };
 
-base::flat_map<FullMsgId, std::unique_ptr<TauntChain>> &Chains() {
+base::flat_map<ChainKey, std::unique_ptr<TauntChain>> &Chains() {
 	static auto value = base::flat_map<
-		FullMsgId,
+		ChainKey,
 		std::unique_ptr<TauntChain>>{};
 	return value;
 }
 
-void Next(FullMsgId id) {
+[[nodiscard]] ChainKey KeyFor(not_null<HistoryItem*> item) {
+	return { &item->history()->session(), item->fullId() };
+}
+
+void Next(ChainKey key) {
 	crl::on_main([=] {
 		auto &chains = Chains();
-		const auto i = chains.find(id);
+		const auto i = chains.find(key);
 		if (i == chains.end()) {
 			return;
 		}
@@ -56,18 +63,33 @@ void Next(FullMsgId id) {
 	});
 }
 
-void Fire(FullMsgId id) {
+void Abort(ChainKey key) {
+	crl::on_main([=] {
+		auto &chains = Chains();
+		const auto i = chains.find(key);
+		if (i == chains.end()) {
+			return;
+		}
+		auto chain = std::move(i->second);
+		chains.erase(i);
+		if (chain->finish) {
+			chain->finish();
+		}
+	});
+}
+
+void Fire(ChainKey key) {
 	auto &chains = Chains();
-	const auto i = chains.find(id);
+	const auto i = chains.find(key);
 	if (i == chains.end()) {
 		return;
 	}
 	auto &chain = *i->second;
 	const auto session = chain.session.get();
-	const auto item = session ? session->data().message(id) : nullptr;
+	const auto item = session ? session->data().message(key.second) : nullptr;
 	if (!item) {
 		crl::on_main([=] {
-			Chains().erase(id);
+			Chains().erase(key);
 		});
 		return;
 	}
@@ -75,7 +97,7 @@ void Fire(FullMsgId id) {
 		const auto finish = chain.finish;
 		crl::on_main([=] {
 			finish();
-			Chains().erase(id);
+			Chains().erase(key);
 		});
 		return;
 	}
@@ -85,8 +107,8 @@ void Fire(FullMsgId id) {
 		TextWithEntities{ .text = text },
 		Data::WebPageDraft{},
 		Api::SendOptions{},
-		[=](mtpRequestId) { Next(id); },
-		[=](const QString &, mtpRequestId) { Next(id); },
+		[=](mtpRequestId) { Next(key); },
+		[=](const QString &, mtpRequestId) { Abort(key); },
 		false);
 }
 
@@ -114,13 +136,14 @@ bool Enabled() {
 
 bool ShouldTaunt(not_null<HistoryItem*> item) {
 	return Qualifies(item)
-		&& Chains().find(item->fullId()) == Chains().end();
+		&& Chains().find(KeyFor(item)) == Chains().end();
 }
 
 void TauntDelete(not_null<HistoryItem*> item, bool revoke) {
 	if (!ShouldTaunt(item)) {
 		return;
 	}
+	const auto key = KeyFor(item);
 	const auto id = item->fullId();
 	auto chain = std::make_unique<TauntChain>();
 	chain->session = base::make_weak(&item->history()->session());
@@ -136,33 +159,33 @@ void TauntDelete(not_null<HistoryItem*> item, bool revoke) {
 		return 0;
 	};
 	chain->timer.setCallback([=] {
-		Fire(id);
+		Fire(key);
 	});
-	Chains().emplace(id, std::move(chain));
-	Fire(id);
+	Chains().emplace(key, std::move(chain));
+	Fire(key);
 }
 
 bool ShouldInterceptEdit(
 		not_null<HistoryItem*> item,
 		const QString &newText) {
 	return Qualifies(item)
-		&& Chains().find(item->fullId()) == Chains().end()
+		&& Chains().find(KeyFor(item)) == Chains().end()
 		&& newText != item->originalText().text;
 }
 
 mtpRequestId TauntEdit(
 		not_null<HistoryItem*> item,
 		Fn<mtpRequestId()> finalCall) {
-	const auto id = item->fullId();
+	const auto key = KeyFor(item);
 	auto chain = std::make_unique<TauntChain>();
 	chain->session = base::make_weak(&item->history()->session());
 	chain->steps = TauntSteps();
 	chain->finish = std::move(finalCall);
 	chain->timer.setCallback([=] {
-		Fire(id);
+		Fire(key);
 	});
-	Chains().emplace(id, std::move(chain));
-	Fire(id);
+	Chains().emplace(key, std::move(chain));
+	Fire(key);
 	return 0;
 }
 
