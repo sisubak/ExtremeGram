@@ -113,8 +113,7 @@ const DescriptorList &DescriptorData() {
 			&tr::lng_extremegram_auto_stamp_avatar,
 			"enhanced/extremegram-auto-stamp-avatar",
 			{},
-			false,
-			true),
+			false),
 		Bool(OptionId::ShowMessagesId, "show_messages_id",
 			&tr::lng_settings_show_message_id,
 			"enhanced/show-message-id", {}, true),
@@ -362,7 +361,7 @@ const DescriptorList &DescriptorData() {
 				"extremegram_online_spam_interval",
 				&tr::lng_extremegram_online_spam_interval,
 				"enhanced/online-spam-interval",
-				{ .minimum = 10, .maximum = 60000 });
+				{ .minimum = 1000, .maximum = 60000 });
 			return result;
 		}(),
 		Bool(OptionId::AutisticTelegram,

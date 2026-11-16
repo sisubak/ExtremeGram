@@ -13,11 +13,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace Custom::Animations {
 namespace {
 
 constexpr auto kAppearDurationMs = crl::time(420);
+constexpr auto kMaxAppearStates = 256;
 
 struct MessageAppearState {
 	Ui::Animations::Simple progress;
@@ -31,6 +33,7 @@ public:
 				EnhancedSettings::Option::SmoothInterfaceAnimations)) {
 			return;
 		}
+		pruneStates();
 		auto &entry = _states[itemId];
 		if (entry.finished || entry.progress.animating()) {
 			return;
@@ -71,6 +74,24 @@ public:
 	}
 
 private:
+	void pruneStates() {
+		if (_states.size() < kMaxAppearStates) {
+			return;
+		}
+		auto finished = std::vector<FullMsgId>();
+		for (const auto &[id, state] : _states) {
+			if (state.finished) {
+				finished.push_back(id);
+			}
+		}
+		for (const auto &id : finished) {
+			_states.erase(id);
+		}
+		while (_states.size() >= kMaxAppearStates) {
+			_states.erase(_states.begin());
+		}
+	}
+
 	base::flat_map<FullMsgId, MessageAppearState> _states;
 };
 

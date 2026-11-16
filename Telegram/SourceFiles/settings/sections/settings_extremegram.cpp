@@ -35,7 +35,7 @@ namespace {
 
 using namespace Builder;
 
-void BuildExtremeGramToggle(
+Ui::SettingsButton *BuildExtremeGramToggle(
 		SectionBuilder &builder,
 		Window::SessionController *controller,
 		QString id,
@@ -50,7 +50,7 @@ void BuildExtremeGramToggle(
 		.keywords = std::move(keywords),
 	});
 	if (!button || !controller) {
-		return;
+		return button;
 	}
 	button->toggledValue(
 	) | rpl::filter([=](bool value) {
@@ -61,6 +61,7 @@ void BuildExtremeGramToggle(
 			key,
 			value);
 	}, button->lifetime());
+	return button;
 }
 
 void BuildOnlineSpamInterval(
@@ -112,7 +113,7 @@ void BuildOnlineSpamInterval(
 		const auto current = EnhancedSettings::Get(key);
 		const auto value = text.isEmpty()
 			? current
-			: std::clamp(text.toInt(), 10, 60000);
+			: std::clamp(text.toInt(), 1000, 60000);
 		if (value != current) {
 			EnhancedSettings::ApplyOption(
 				not_null<Window::SessionController*>(controller),
@@ -158,16 +159,37 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		tr::lng_extremegram_smooth_motion_blur(),
 		EnhancedSettings::Option::SmoothMotionBlur,
 		{ u"animation"_q, u"blur"_q, u"motion"_q });
-	BuildExtremeGramToggle(
+	const auto onlineSpam = BuildExtremeGramToggle(
 		builder,
 		controller,
 		u"extremegram/online-spam"_q,
 		tr::lng_settings_online_spam(),
 		EnhancedSettings::Option::OnlineSpam,
 		{ u"online"_q, u"status"_q });
+	if (onlineSpam && controller) {
+		onlineSpam->toggledValue(
+		) | rpl::filter([](bool value) {
+			return value;
+		}) | rpl::on_next([=](bool) {
+			const auto key = EnhancedSettings::Option::OnlineSpamInterval;
+			if (EnhancedSettings::Get(key) < 4000) {
+				EnhancedSettings::ApplyOption(
+					not_null<Window::SessionController*>(controller),
+					key,
+					4000);
+			}
+		}, onlineSpam->lifetime());
+	}
 	BuildOnlineSpamInterval(builder, controller);
 	builder.addDividerText(
 		rpl::single(tr::lng_extremegram_online_spam_about(tr::now)));
+	BuildExtremeGramToggle(
+		builder,
+		controller,
+		u"extremegram/auto-stamp-avatar"_q,
+		tr::lng_extremegram_auto_stamp_avatar(),
+		EnhancedSettings::Option::AutoStampAvatar,
+		{ u"avatar"_q, u"stamp"_q, u"badge"_q });
 
 	builder.addSkip();
 	builder.addSubsectionTitle({

@@ -115,11 +115,6 @@ void ToggleMaster(not_null<Window::SessionController*> controller) {
 		EnhancedSettings::Set(
 			EnhancedSettings::Option::OnlineSpamInterval,
 			4000);
-	} else if (!next && EnhancedSettings::Get(
-			EnhancedSettings::Option::OnlineSpamInterval) == 4000) {
-		EnhancedSettings::Set(
-			EnhancedSettings::Option::OnlineSpamInterval,
-			10);
 	}
 	RelayoutStream().fire({});
 }

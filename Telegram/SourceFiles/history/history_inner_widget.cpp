@@ -453,7 +453,7 @@ HistoryInner::HistoryInner(
 		if (item->history() == _history || item->history() == _migrated) {
 			Custom::Animations::NotifyMessageAdded(
 				item,
-				[=] { update(); });
+				crl::guard(this, [=] { update(); }));
 		}
 	}, lifetime());
 	Custom::ClientBadgeFor(

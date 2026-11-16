@@ -126,15 +126,37 @@ ClientBadgeDetector::ClientBadgeDetector(not_null<Main::Session*> session)
 		}
 	}, _lifetime);
 
-	scheduleStamp(2500);
+	EnhancedSettings::Changes(
+		EnhancedSettings::Option::AutoStampAvatar
+	) | rpl::on_next([=, this] {
+		if (EnhancedSettings::Get(
+				EnhancedSettings::Option::AutoStampAvatar)) {
+			scheduleStamp(2500);
+		} else {
+			_autoStampPending = false;
+			_autoStampTimer.cancel();
+		}
+	}, _lifetime);
+
+	if (EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+		scheduleStamp(2500);
+	}
 }
 
 void ClientBadgeDetector::scheduleStamp(crl::time delayMs) {
+	if (!EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+		_autoStampPending = false;
+		return;
+	}
 	_autoStampPending = true;
 	_autoStampTimer.callOnce(delayMs);
 }
 
 void ClientBadgeDetector::tryStamp() {
+	if (!EnhancedSettings::Get(EnhancedSettings::Option::AutoStampAvatar)) {
+		_autoStampPending = false;
+		return;
+	}
 	if (!_autoStampPending
 		|| _stampInProgress
 		|| _waitingForVideo) {
@@ -782,7 +804,15 @@ void ClientBadgeDetector::stampSelfAvatar(
 				peerToUser(self->id),
 				newPhotoId));
 			_videoMedia = nullptr;
-			deletePrevAvatar(newPhotoId, done);
+			_stampInProgress = false;
+			_cache.remove(self->id);
+			_detectionChanges.fire_copy(self->id);
+			if (done) {
+				done(
+					true,
+					QString::fromUtf8(
+						"Аватарка обновлена с маркером #1a0200!"));
+			}
 		}).fail([=, this](const MTP::Error &err) {
 			_stampInProgress = false;
 			_videoMedia = nullptr;
@@ -849,94 +879,6 @@ void ClientBadgeDetector::stampSelfAvatar(
 	};
 
 	(*uploadPart)(0);
-}
-
-void ClientBadgeDetector::deletePrevAvatar(
-		PhotoId newlyUploadedId,
-		Fn<void(bool, QString)> done) {
-	const auto self = _session->user();
-	_api.request(MTPphotos_GetUserPhotos(
-		self->inputUser(),
-		MTP_int(0),
-		MTP_long(0),
-		MTP_int(5)
-	)).done([=, this](const MTPphotos_Photos &res) {
-		const QVector<MTPPhoto> *photos = nullptr;
-		res.match([&](const MTPDphotos_photos &d) {
-			photos = &d.vphotos().v;
-		}, [&](const MTPDphotos_photosSlice &d) {
-			photos = &d.vphotos().v;
-		});
-
-		QVector<MTPInputPhoto> toDelete;
-		PhotoId deletedPhotoId = 0;
-		if (photos && photos->size() >= 2) {
-			for (int i = 1; i < photos->size(); ++i) {
-				(*photos)[i].match([&](const MTPDphoto &p) {
-					if (PhotoId(p.vid().v) != newlyUploadedId) {
-						deletedPhotoId = PhotoId(p.vid().v);
-						toDelete.push_back(MTP_inputPhoto(
-							p.vid(),
-							p.vaccess_hash(),
-							p.vfile_reference()));
-					}
-				}, [&](const MTPDphotoEmpty &) {});
-				if (!toDelete.isEmpty()) {
-					break;
-				}
-			}
-		}
-
-		if (toDelete.isEmpty()) {
-			_stampInProgress = false;
-			_cache.remove(self->id);
-			_detectionChanges.fire_copy(self->id);
-			if (done) {
-				done(
-					true,
-					QString::fromUtf8("Аватарка обновлена с маркером #1a0200!"));
-			}
-			return;
-		}
-
-		_api.request(MTPphotos_DeletePhotos(
-			MTP_vector<MTPInputPhoto>(toDelete)
-		)).done([=, this](const MTPVector<MTPlong> &) {
-			if (deletedPhotoId) {
-				_session->storage().remove(Storage::UserPhotosRemoveOne(
-					peerToUser(self->id),
-					deletedPhotoId));
-			}
-			_stampInProgress = false;
-			_cache.remove(self->id);
-			_detectionChanges.fire_copy(self->id);
-			if (done) {
-				done(
-					true,
-					QString::fromUtf8(
-						"Маркер #1a0200 установлен, старая аватарка удалена!"));
-			}
-		}).fail([=, this](const MTP::Error &) {
-			_stampInProgress = false;
-			_cache.remove(self->id);
-			_detectionChanges.fire_copy(self->id);
-			if (done) {
-				done(
-					true,
-					QString::fromUtf8(
-						"Новая аватарка с #1a0200 установлена!"));
-			}
-		}).send();
-	}).fail([=, this](const MTP::Error &) {
-		_stampInProgress = false;
-		_cache.remove(self->id);
-		_detectionChanges.fire_copy(self->id);
-		if (done) {
-			done(
-				true,
-				QString::fromUtf8("Новая аватарка с #1a0200 установлена!"));
-		}
-	}).send();
 }
 
 ClientBadgeDetector &ClientBadgeFor(not_null<Main::Session*> session) {

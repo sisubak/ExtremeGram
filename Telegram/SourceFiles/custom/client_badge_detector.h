@@ -91,9 +91,6 @@ private:
 	void pollPendingPeers();
 	void scheduleStamp(crl::time delayMs);
 	void tryStamp();
-	void deletePrevAvatar(
-		PhotoId newlyUploadedId,
-		Fn<void(bool, QString)> done);
 	[[nodiscard]] QImage loadRawBadgeAsset(bool preferLightStroke) const;
 
 	const not_null<Main::Session*> _session;

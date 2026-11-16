@@ -1046,7 +1046,7 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	} else if (onlineSpamActive) {
 		const auto configured = EnhancedSettings::Get(
 			EnhancedSettings::Option::OnlineSpamInterval);
-		constexpr auto kMinimumInterval = crl::time(10);
+		constexpr auto kMinimumInterval = crl::time(1000);
 		const auto spamInterval = std::max(
 			crl::time(configured),
 			kMinimumInterval);
