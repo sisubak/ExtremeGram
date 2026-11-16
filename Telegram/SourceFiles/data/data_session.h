@@ -422,6 +422,8 @@ public:
 	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> itemShowHighlightRequest() const;
 	void requestItemViewRefresh(not_null<const HistoryItem*> item);
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemViewRefreshRequest() const;
+	void requestItemEditAnimation(not_null<const HistoryItem*> item);
+	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemEditAnimationRequest() const;
 	void requestItemTextRefresh(not_null<HistoryItem*> item);
 	void requestUnreadReactionsAnimation(not_null<HistoryItem*> item);
 	void notifyHistoryUnloaded(not_null<const History*> history);
@@ -1229,6 +1231,7 @@ private:
 	rpl::event_stream<ViewHeightAdjusted> _viewHeightAdjusted;
 	rpl::event_stream<not_null<HistoryItem*>> _itemShowHighlightRequest;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemViewRefreshRequest;
+	rpl::event_stream<not_null<const HistoryItem*>> _itemEditAnimationRequest;
 	rpl::event_stream<not_null<HistoryItem*>> _itemTextRefreshRequest;
 	rpl::event_stream<DrawToReplyRequest> _drawToReplyRequests;
 	rpl::event_stream<not_null<HistoryItem*>> _itemDataChanges;

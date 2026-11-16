@@ -22,7 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Ui {
 namespace {
 
-constexpr auto kFlyDuration = crl::time(300);
+constexpr auto kFlyDuration = crl::time(380);
 constexpr auto kMiniCopies = 10;
 constexpr auto kMiniCopiesDurationMax = crl::time(1400);
 constexpr auto kMiniCopiesDurationMin = crl::time(700);
@@ -30,7 +30,7 @@ constexpr auto kMiniCopiesScaleInDuration = crl::time(200);
 constexpr auto kMiniCopiesScaleOutDuration = crl::time(200);
 constexpr auto kMiniCopiesMaxScaleMin = 0.6;
 constexpr auto kMiniCopiesMaxScaleMax = 1.05;
-constexpr auto kBurstDuration = crl::time(700);
+constexpr auto kBurstDuration = crl::time(900);
 
 } // namespace
 
@@ -142,7 +142,12 @@ ReactionFlyAnimation::ReactionFlyAnimation(
 	resolve(_effect, aroundAnimation, size * 2);
 	if (!args.flyIcon.isNull()) {
 		_flyIcon = std::move(args.flyIcon);
-		_fly.start(flyCallback(), 0., 1., kFlyDuration);
+		_fly.start(
+			flyCallback(),
+			0.,
+			1.,
+			kFlyDuration,
+			anim::easeOutCubic);
 	} else if (!_center && !_effect && _miniCopies.empty()) {
 		return;
 	} else {
@@ -446,7 +451,12 @@ void ReactionFlyAnimation::startAnimations() {
 		_minis.start(callback(), 0., 1., kMiniCopiesDurationMax);
 	}
 	if (!_effectOnly) {
-		_burst.start(callback(), 0., 1., kBurstDuration);
+		_burst.start(
+			callback(),
+			0.,
+			1.,
+			kBurstDuration,
+			anim::easeOutCubic);
 	}
 }
 

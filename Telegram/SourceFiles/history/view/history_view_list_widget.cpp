@@ -703,6 +703,12 @@ ListWidget::ListWidget(
 			refreshItem(view);
 		}
 	}, lifetime());
+	_session->data().itemEditAnimationRequest(
+	) | rpl::on_next([this](auto item) {
+		if (const auto view = viewForItem(item)) {
+			view->animateEdit();
+		}
+	}, lifetime());
 	_session->data().itemShowHighlightRequest(
 	) | rpl::on_next([this](auto item) {
 		showItemHighlight(item);

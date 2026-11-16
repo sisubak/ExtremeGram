@@ -2132,11 +2132,20 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 		if (_editAnimation.animating()) {
 			const auto progress = _editAnimation.value(0.);
+			const auto fade = 1. - progress;
+			const auto path = BubbleWashPath(
+				simple.geometry,
+				simple.rounding);
 			auto wash = stm->msgReplyBarColor->c;
-			wash.setAlphaF(wash.alphaF() * 0.30 * (1. - progress));
+			wash.setAlphaF(wash.alphaF() * 0.45 * fade);
 			p.setPen(Qt::NoPen);
 			p.setBrush(wash);
-			p.drawPath(BubbleWashPath(simple.geometry, simple.rounding));
+			p.drawPath(path);
+			auto outline = stm->msgReplyBarColor->c;
+			outline.setAlphaF(outline.alphaF() * 0.85 * fade);
+			p.setBrush(Qt::NoBrush);
+			p.setPen(QPen(outline, st::lineWidth * 2.));
+			p.drawPath(path);
 		}
 
 		auto inner = g;
@@ -5904,7 +5913,7 @@ void Message::itemDataChanged() {
 void Message::animateEdit() {
 	_editAnimation.start([=](float64) {
 		repaint();
-	}, 0., 1., crl::time(900), anim::linear);
+	}, 0., 1., crl::time(1000), anim::easeOutCubic);
 }
 
 void Message::refreshDataIdHook() {

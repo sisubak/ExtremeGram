@@ -46,21 +46,46 @@ void MusicButton::updateData(MusicButtonData data) {
 	update();
 }
 
+QColor MusicButton::currentBg() const {
+	const auto fallback = st::shadowFg->c;
+	if (!_bgAnimation.animating()) {
+		return _overrideBg.value_or(fallback);
+	}
+	return anim::color(
+		_previousBg.value_or(fallback),
+		_overrideBg.value_or(fallback),
+		_bgAnimation.value(0.));
+}
+
 void MusicButton::setOverrideBg(std::optional<QColor> color) {
+	if (_overrideBg == color) {
+		return;
+	}
+	_previousBg = currentBg();
 	_overrideBg = color;
+	_bgAnimation.start([=] {
+		update();
+	}, 0., 1., crl::time(220));
 	update();
 }
 
 void MusicButton::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
-	if (_overrideBg) {
-		p.fillRect(e->rect(), Ui::BlendColors(
-			*_overrideBg,
+	const auto color = currentBg();
+	p.fillRect(e->rect(), _overrideBg
+		? Ui::BlendColors(
+			color,
 			Qt::black,
-			st::infoProfileTopBarActionButtonBgOpacity));
-	} else {
-		p.fillRect(e->rect(), st::shadowFg);
+			st::infoProfileTopBarActionButtonBgOpacity)
+		: color);
+	const auto hovered = _overAnimation.value(isOver() ? 1. : 0.);
+	if (hovered > 0.) {
+		const auto light = _overrideBg
+			&& Ui::IsLightBackground(*_overrideBg);
+		auto overlay = light ? QColor(Qt::black) : QColor(Qt::white);
+		overlay.setAlphaF(0.06 * hovered);
+		p.fillRect(e->rect(), overlay);
 	}
 	const auto lightBackground = _overrideBg
 		&& Ui::IsLightBackground(*_overrideBg);
@@ -158,6 +183,19 @@ int MusicButton::resizeGetHeight(int newWidth) {
 	const auto &font = st::defaultTextStyle.font;
 
 	return padding.top() + font->height + padding.bottom();
+}
+
+void MusicButton::onStateChanged(State was, StateChangeSource source) {
+	RippleButton::onStateChanged(was, source);
+
+	const auto over = isOver();
+	if (over != ((was & StateFlag::Over) != 0)) {
+		_overAnimation.start(
+			[=] { update(); },
+			over ? 0. : 1.,
+			over ? 1. : 0.,
+			crl::time(160));
+	}
 }
 
 } // namespace Info::Profile

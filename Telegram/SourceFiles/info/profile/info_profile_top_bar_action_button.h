@@ -68,9 +68,12 @@ private:
 	const style::color *_lottieColor = nullptr;
 
 	QColor _bgColor;
+	QColor _previousBgColor;
 	std::optional<QColor> _fgColor;
+	std::optional<QColor> _previousFgColor;
 	std::optional<QColor> _rippleColor;
 	Ui::Animations::Simple _overAnimation;
+	Ui::Animations::Simple _styleAnimation;
 
 };
 

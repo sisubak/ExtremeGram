@@ -28,10 +28,15 @@ public:
 private:
 	void paintEvent(QPaintEvent *e) override;
 	int resizeGetHeight(int newWidth) override;
+	void onStateChanged(State was, StateChangeSource source) override;
+	[[nodiscard]] QColor currentBg() const;
 
 	Ui::Text::String _performer;
 	Ui::Text::String _title;
 	std::optional<QColor> _overrideBg;
+	std::optional<QColor> _previousBg;
+	Ui::Animations::Simple _bgAnimation;
+	Ui::Animations::Simple _overAnimation;
 
 	const QString _noteSymbol;
 	const int _noteWidth;

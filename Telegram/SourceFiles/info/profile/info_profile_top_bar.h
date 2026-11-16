@@ -333,6 +333,7 @@ private:
 	bool _roundEdges = true;
 
 	rpl::variable<std::optional<QColor>> _edgeColor;
+	rpl::variable<std::optional<QColor>> _gradientEdgeColor;
 	bool _hasGradientBg = false;
 	bool _nicknameGradientBg = false;
 	std::optional<QColor> _solidBg;

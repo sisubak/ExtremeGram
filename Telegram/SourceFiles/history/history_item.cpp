@@ -1346,6 +1346,7 @@ void HistoryItem::finishEdition(int oldKeyboardTop) {
 			if (const auto view = item->mainView()) {
 				view->animateEdit();
 			}
+			_history->owner().requestItemEditAnimation(item);
 			item->invalidateChatListEntry();
 		}
 	} else {
@@ -1353,6 +1354,7 @@ void HistoryItem::finishEdition(int oldKeyboardTop) {
 		if (const auto view = mainView()) {
 			view->animateEdit();
 		}
+		_history->owner().requestItemEditAnimation(this);
 		invalidateChatListEntry();
 	}
 

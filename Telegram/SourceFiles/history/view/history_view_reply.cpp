@@ -644,6 +644,7 @@ void Reply::updateName(
 	const auto history = view->history();
 	const auto &fields = data->fields();
 	const auto sender = resolvedSender.value_or(this->sender(view, data));
+	_namePeer = sender;
 	const auto externalPeer = fields.externalPeerId
 		? history->owner().peer(fields.externalPeerId).get()
 		: nullptr;
@@ -1016,9 +1017,9 @@ void Reply::paint(
 			const auto namew = textw - previewSkip - nameIconsSkip();
 			auto firstLineSkip = _nameTwoLines ? 0 : previewSkip;
 			if (namew > 0) {
-				const auto gradient = _colorPeer
+				const auto gradient = _namePeer
 					? Custom::NicknameGradientFor(
-						&view->history()->session()).configFor(_colorPeer)
+						&view->history()->session()).configFor(_namePeer)
 					: std::nullopt;
 				if (gradient) {
 					p.setPen(Custom::NicknameGradientFor(

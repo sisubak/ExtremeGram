@@ -151,6 +151,7 @@ private:
 	mutable QImage _spoilerCache;
 	mutable PeerData *_externalSender = nullptr;
 	mutable PeerData *_colorPeer = nullptr;
+	mutable PeerData *_namePeer = nullptr;
 	mutable struct {
 		std::unique_ptr<Ui::RippleAnimation> animation;
 		QPoint lastPoint;

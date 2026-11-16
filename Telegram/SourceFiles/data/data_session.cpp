@@ -2310,6 +2310,14 @@ rpl::producer<not_null<const HistoryItem*>> Session::itemViewRefreshRequest() co
 	return _itemViewRefreshRequest.events();
 }
 
+void Session::requestItemEditAnimation(not_null<const HistoryItem*> item) {
+	_itemEditAnimationRequest.fire_copy(item);
+}
+
+rpl::producer<not_null<const HistoryItem*>> Session::itemEditAnimationRequest() const {
+	return _itemEditAnimationRequest.events();
+}
+
 void Session::notifyItemDataChange(not_null<HistoryItem*> item) {
 	_itemDataChanges.fire_copy(item);
 }

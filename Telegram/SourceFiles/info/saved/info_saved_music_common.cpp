@@ -51,6 +51,7 @@ void SetupSavedMusic(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			container,
 			object_ptr<Ui::VerticalLayout>(container)));
+	divider->finishAnimating();
 
 	rpl::combine(
 		std::move(musicValue),
@@ -77,7 +78,6 @@ void SetupSavedMusic(
 			divider->toggle(true, anim::type::normal);
 		}
 	}, container->lifetime());
-	divider->finishAnimating();
 }
 
 } // namespace Info::Saved

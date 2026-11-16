@@ -102,14 +102,47 @@ void TopBarActionButton::setLottieColor(const style::color *color) {
 }
 
 void TopBarActionButton::setStyle(const TopBarActionButtonStyle &style) {
-	_bgColor = style.bgColor;
-	_fgColor = style.fgColor;
-	_rippleColor = _fgColor
-		? std::make_optional(
-			anim::with_alpha(
-				*_fgColor,
-				st::infoProfileTopBarBackdropRippleOpacity))
-		: std::nullopt;
+	if (_bgColor == style.bgColor && _fgColor == style.fgColor) {
+		return;
+	}
+	const auto animate = _bgColor.isValid()
+		&& style.bgColor.isValid();
+	if (!animate) {
+		_bgColor = style.bgColor;
+		_fgColor = style.fgColor;
+		_rippleColor = _fgColor
+			? std::make_optional(
+				anim::with_alpha(
+					*_fgColor,
+					st::infoProfileTopBarBackdropRippleOpacity))
+			: std::nullopt;
+		update();
+		return;
+	}
+	_previousBgColor = _bgColor;
+	_previousFgColor = _fgColor;
+	_bgColor = _previousBgColor;
+	_fgColor = _previousFgColor;
+	_styleAnimation.start([=] {
+		const auto progress = _styleAnimation.value(0.);
+		_bgColor = anim::color(
+			_previousBgColor,
+			style.bgColor,
+			progress);
+		_fgColor = (_previousFgColor && style.fgColor)
+			? std::optional<QColor>(anim::color(
+				*_previousFgColor,
+				*style.fgColor,
+				progress))
+			: style.fgColor;
+		_rippleColor = _fgColor
+			? std::make_optional(
+				anim::with_alpha(
+					*_fgColor,
+					st::infoProfileTopBarBackdropRippleOpacity))
+			: std::nullopt;
+		update();
+	}, 0., 1., crl::time(220));
 	update();
 }
 

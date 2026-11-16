@@ -770,6 +770,14 @@ void TopBar::refreshTitleGradient() {
 	} else {
 		_title->setPenOverride(std::nullopt);
 	}
+	const auto collectible = effectiveCollectible();
+	const auto colorProfile = effectiveColorProfile();
+	_gradientEdgeColor = (!collectible
+		&& (!colorProfile || colorProfile->bg.empty())
+		&& config
+		&& !config->colors.empty())
+		? std::optional<QColor>(config->colors.front())
+		: std::optional<QColor>();
 	const auto surfaces = config && config->profileBg;
 	if (_nicknameGradientBg != surfaces) {
 		_nicknameGradientBg = surfaces;
@@ -4206,7 +4214,14 @@ void TopBar::setupStatusWithRating() {
 }
 
 rpl::producer<std::optional<QColor>> TopBar::edgeColor() const {
-	return _edgeColor.value();
+	return rpl::combine(
+		_edgeColor.value(),
+		_gradientEdgeColor.value()
+	) | rpl::map([](
+			std::optional<QColor> edge,
+			std::optional<QColor> gradient) {
+		return edge ? edge : gradient;
+	});
 }
 
 const style::FlatLabel &TopBar::statusStyle() const {
