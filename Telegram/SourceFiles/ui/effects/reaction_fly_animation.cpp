@@ -204,7 +204,14 @@ QRect ReactionFlyAnimation::paintGetArea(
 				target.topLeft() - QPoint(target.width(), target.height()),
 				target.size() * 3);
 		if (clip.isEmpty() || area.intersects(clip)) {
+			if (!_burstClip.isEmpty()) {
+				p.save();
+				p.setClipPath(_burstClip);
+			}
 			paintBurst(p, target, colored);
+			if (!_burstClip.isEmpty()) {
+				p.restore();
+			}
 			paintCenterFrame(p, target, colored, now);
 			if (const auto effect = _effect.get()) {
 				if (effect->animating()) {
@@ -462,6 +469,10 @@ void ReactionFlyAnimation::startAnimations() {
 
 void ReactionFlyAnimation::setRepaintCallback(Fn<void()> repaint) {
 	_repaint = std::move(repaint);
+}
+
+void ReactionFlyAnimation::setBurstClip(QPainterPath clip) {
+	_burstClip = std::move(clip);
 }
 
 bool ReactionFlyAnimation::flying() const {

@@ -462,6 +462,8 @@ bool BotModeManager::interceptCommand(
 	// Autistic-mode commands are plain text while the mode is off.
 	const auto commandsOn = Autistic::on(
 		EnhancedSettings::Option::AutisticCommands);
+	const auto botModeOn = EnhancedSettings::Get(
+		EnhancedSettings::Option::BotMode);
 	if ((isBot || isStopBot || isAccount || isVxod || isIgnore || isUnignore)
 		&& !commandsOn) {
 		return false;
@@ -509,23 +511,21 @@ bool BotModeManager::interceptCommand(
 			controller,
 			isUnignore);
 	}
-	if (controller && isHelp) {
-		auto text = QString::fromUtf8("Команды ExtremeGram:");
-		for (const auto &[command, hint] : CommandHints()) {
-			text += QString::fromUtf8("\n!%1 — %2").arg(command, hint);
-		}
-		controller->showToast(text);
-	}
 	if (isHelp) {
-		return true;
-	}
-	if (!EnhancedSettings::Get(EnhancedSettings::Option::BotMode)) {
+		if (!botModeOn) {
+			return false;
+		}
 		if (controller) {
-			controller->showToast(QString::fromUtf8(commandsOn
-				? "Бот-режим выключен. Отправьте !bot, чтобы включить."
-				: "Бот-режим выключен. Включите его в настройках ExtremeGram."));
+			auto text = QString::fromUtf8("Команды ExtremeGram:");
+			for (const auto &[command, hint] : CommandHints()) {
+				text += QString::fromUtf8("\n!%1 — %2").arg(command, hint);
+			}
+			controller->showToast(text);
 		}
 		return true;
+	}
+	if (!botModeOn) {
+		return false;
 	}
 	if (isMute) {
 		const auto spaceIdx = trimmed.indexOf(QChar(' '));

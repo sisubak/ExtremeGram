@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom/anti_spy.h"
 #include "custom/nickname_gradient.h"
 #include "lang/lang_keys.h"
+#include "platform/platform_specific.h"
 #include "settings/settings_builder.h"
 #include "settings/sections/settings_main.h"
 #include "styles/style_menu_icons.h"
@@ -191,30 +192,32 @@ void BuildExtremeGramSection(SectionBuilder &builder) {
 		EnhancedSettings::Option::AutoStampAvatar,
 		{ u"avatar"_q, u"stamp"_q, u"badge"_q });
 
-	builder.addSkip();
-	builder.addSubsectionTitle({
-		.id = u"extremegram/privacy"_q,
-		.title = tr::lng_extremegram_privacy(),
-		.keywords = { u"анти-шпион"_q, u"obs"_q, u"discord"_q, u"скриншот"_q },
-	});
-	BuildExtremeGramToggle(
-		builder,
-		controller,
-		u"extremegram/anti-spy"_q,
-		tr::lng_extremegram_anti_spy(),
-		EnhancedSettings::Option::AntiSpy,
-		{ u"анти-шпион"_q, u"obs"_q, u"discord"_q });
-	builder.addButton({
-		.id = u"extremegram/anti-spy-apps"_q,
-		.title = tr::lng_extremegram_anti_spy_apps(),
-		.st = &st::settingsButtonNoIcon,
-		.onClick = [=] {
-			Custom::AntiSpy::ShowSettingsBox(
-				not_null<Window::SessionController*>(controller));
-		},
-		.keywords = { u"obs"_q, u"discord"_q, u"sharex"_q, u"bandicam"_q },
-	});
-	builder.addDividerText(tr::lng_extremegram_anti_spy_about());
+	if (Platform::ScreenshotProtectionSupported()) {
+		builder.addSkip();
+		builder.addSubsectionTitle({
+			.id = u"extremegram/privacy"_q,
+			.title = tr::lng_extremegram_privacy(),
+			.keywords = { u"анти-шпион"_q, u"obs"_q, u"discord"_q, u"скриншот"_q },
+		});
+		BuildExtremeGramToggle(
+			builder,
+			controller,
+			u"extremegram/anti-spy"_q,
+			tr::lng_extremegram_anti_spy(),
+			EnhancedSettings::Option::AntiSpy,
+			{ u"анти-шпион"_q, u"obs"_q, u"discord"_q });
+		builder.addButton({
+			.id = u"extremegram/anti-spy-apps"_q,
+			.title = tr::lng_extremegram_anti_spy_apps(),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Custom::AntiSpy::ShowSettingsBox(
+					not_null<Window::SessionController*>(controller));
+			},
+			.keywords = { u"obs"_q, u"discord"_q, u"sharex"_q, u"bandicam"_q },
+		});
+		builder.addDividerText(tr::lng_extremegram_anti_spy_about());
+	}
 
 	builder.addSkip();
 	builder.addSubsectionTitle({

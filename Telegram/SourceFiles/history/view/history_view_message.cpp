@@ -2168,7 +2168,13 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			const auto reactionsPosition = QPoint(trect.left(), trect.top() + trect.height() + reactionsTop);
 			p.translate(reactionsPosition);
 			prepareCustomEmojiPaint(p, context, *_reactions);
-			_reactions->paint(p, context, g.width(), context.clip.translated(-reactionsPosition));
+			_reactions->paint(
+				p,
+				context,
+				g.width(),
+				context.clip.translated(-reactionsPosition),
+				g,
+				countBubbleRounding(messageRounding));
 			if (context.reactionInfo) {
 				context.reactionInfo->position = reactionsPosition;
 			}

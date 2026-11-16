@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "history/view/history_view_object.h"
 #include "data/data_message_reaction_id.h"
+#include "ui/chat/message_bubble.h"
 
 namespace Data {
 class Reactions;
@@ -80,7 +81,9 @@ public:
 		Painter &p,
 		const PaintContext &context,
 		int outerWidth,
-		const QRect &clip) const;
+		const QRect &clip,
+		const QRect &bubble = QRect(),
+		Ui::BubbleRounding bubbleRounding = {}) const;
 	[[nodiscard]] bool getState(
 		QPoint point,
 		not_null<TextState*> outResult) const;

@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animations.h"
 #include "data/data_message_reaction_id.h"
 
+#include <QtGui/QPainterPath>
+
 namespace Ui::Text {
 class CustomEmoji;
 } // namespace Ui::Text
@@ -67,6 +69,7 @@ public:
 	~ReactionFlyAnimation();
 
 	void setRepaintCallback(Fn<void()> repaint);
+	void setBurstClip(QPainterPath clip);
 	QRect paintGetArea(
 		QPainter &p,
 		QPoint origin,
@@ -146,6 +149,7 @@ private:
 	bool _valid = false;
 
 	mutable Parabolic _cached;
+	QPainterPath _burstClip;
 
 };
 

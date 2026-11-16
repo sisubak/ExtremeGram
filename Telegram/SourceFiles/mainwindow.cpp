@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_instance.h"
 #include "core/sandbox.h"
 #include "core/application.h"
+#include "core/enhanced_settings.h"
 #include "export/export_manager.h"
 #include "inline_bots/bot_attach_web_view.h" // AttachWebView::cancel.
 #include "intro/intro_widget.h"
@@ -735,7 +736,8 @@ void MainWindow::closeEvent(QCloseEvent *e) {
 	}
 #ifdef Q_OS_WIN
 	const auto requester = Custom::SelfDefense::ForeignCloseRequester();
-	if (!requester.isEmpty()) {
+	if (!requester.isEmpty()
+		&& EnhancedSettings::Get(EnhancedSettings::Option::AntiSpy)) {
 		e->ignore();
 		Ui::show(Ui::MakeConfirmBox({
 			.text = tr::lng_extremegram_close_blocked_about(
