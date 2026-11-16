@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/required.h"
 #include "data/data_chat_participant_status.h"
 
+#include <memory>
+
 class ChannelData;
 class UserData;
 
@@ -28,7 +30,7 @@ void ShowExtremeGramMuteBox(
 	ChatRestrictionsInfo oldRights);
 
 void ShowExtremeGramMuteBox(
-	not_null<Ui::Show*> show,
+	std::shared_ptr<Ui::Show> show,
 	not_null<ChannelData*> channel,
 	not_null<UserData*> user,
 	ChatRestrictionsInfo oldRights);

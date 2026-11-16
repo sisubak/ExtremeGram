@@ -58,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_moderate_messages_box.h"
+#include "styles/style_widgets.h"
 #include "styles/style_window.h"
 
 #include "window/window_session_controller.h"
@@ -1331,51 +1332,6 @@ void CreateModerateMessagesBox(
 		Ui::AddExpandablePeerList(ban, controller, inner);
 		handleSubmition(ban);
 
-		if (EnhancedSettings::Get(
-				EnhancedSettings::Option::ExtremeMuteDialog)
-			&& isSingle
-			&& (peer->asChannel() != nullptr)
-			&& peer->isMegagroup()
-			&& !peer->isMonoforum()) {
-			const auto channel = peer->asChannel();
-			const auto user = participants.front()->asUser();
-			const auto link = box->addRow(
-				object_ptr<Ui::FlatLabel>(
-					box,
-					rpl::single(Ui::Text::Link(
-						tr::lng_extremegram_mute_dialog_link(tr::now))),
-					st::moderateBoxDividerLabel),
-				st::boxRowPadding + buttonPadding);
-			link->setClickHandlerFilter([=](
-					const ClickHandlerPtr &,
-					Qt::MouseButton button) {
-				if (button != Qt::LeftButton) {
-					return false;
-				}
-				channel->session().api().request(MTPchannels_GetParticipant(
-					channel->inputChannel(),
-					user->input()
-				)).done([=](
-						const MTPchannels_ChannelParticipant &result) {
-					channel->owner().processUsers(result.data().vusers());
-					const auto participant = Api::ChatParticipant(
-						result.data().vparticipant(),
-						channel);
-					if (participant.isCreatorOrAdmin()) {
-						box->uiShow()->showToast(
-							tr::lng_extremegram_mute_admin(tr::now));
-						return;
-					}
-					ShowExtremeGramMuteBox(
-						box->uiShow().get(),
-						channel,
-						user,
-						participant.restrictions());
-				}).send();
-				return true;
-			});
-		}
-
 		auto ownedUntilWrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			inner,
 			object_ptr<Ui::VerticalLayout>(inner));
@@ -1593,6 +1549,46 @@ void CreateModerateMessagesBox(
 			}, communityBan->lifetime());
 		}
 		inner->add(std::move(ownedUntilWrap));
+
+		if (EnhancedSettings::Get(
+				EnhancedSettings::Option::ExtremeMuteDialog)
+			&& isSingle
+			&& (peer->asChannel() != nullptr)
+			&& peer->isMegagroup()
+			&& !peer->isMonoforum()) {
+			const auto channel = peer->asChannel();
+			const auto user = participants.front()->asUser();
+			const auto mute = box->addRow(
+				object_ptr<Ui::RoundButton>(
+					box,
+					tr::lng_extremegram_mute_dialog_link(),
+					st::defaultLightButton),
+				st::boxRowPadding + buttonPadding,
+				style::al_justify);
+			mute->setFullRadius(true);
+			mute->setClickedCallback([=] {
+				channel->session().api().request(MTPchannels_GetParticipant(
+					channel->inputChannel(),
+					user->input()
+				)).done(crl::guard(box, [=](
+						const MTPchannels_ChannelParticipant &result) {
+					channel->owner().processUsers(result.data().vusers());
+					const auto participant = Api::ChatParticipant(
+						result.data().vparticipant(),
+						channel);
+					if (participant.isCreatorOrAdmin()) {
+						box->uiShow()->showToast(
+							tr::lng_extremegram_mute_admin(tr::now));
+						return;
+					}
+					ShowExtremeGramMuteBox(
+						box->uiShow(),
+						channel,
+						user,
+						participant.restrictions());
+				})).send();
+			});
+		}
 
 		// Handle confirmation manually.
 		confirms->events() | rpl::on_next([=] {

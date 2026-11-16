@@ -2130,38 +2130,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 				});
 		}
 
-		if (const auto author = data()->displayFrom()) {
-			const auto nickname = Custom::NicknameGradientFor(
-				&history()->session()).configFor(author);
-			if (nickname
-				&& nickname->messageBg
-				&& nickname->colors.size() >= 2
-				&& !mediaDisplayed) {
-				const auto count = int(nickname->colors.size());
-				const auto width = simple.geometry.width();
-				const auto offset = Custom::GradientPhase(
-					nickname->speed) * width * 2.0;
-				auto brush = QLinearGradient(
-					QPointF(simple.geometry.x() - offset, 0.),
-					QPointF(
-						simple.geometry.x() + width * 2.0 - offset,
-						0.));
-				brush.setSpread(QGradient::RepeatSpread);
-				constexpr auto kAlpha = 0.18;
-				for (auto i = 0; i != count; ++i) {
-					auto color = nickname->colors[i];
-					color.setAlphaF(kAlpha);
-					brush.setColorAt(double(i) / count, color);
-				}
-				auto first = nickname->colors[0];
-				first.setAlphaF(kAlpha);
-				brush.setColorAt(1.0, first);
-				p.fillPath(
-					BubbleWashPath(simple.geometry, simple.rounding),
-					QBrush(brush));
-			}
-		}
-
 		if (_editAnimation.animating()) {
 			const auto progress = _editAnimation.value(0.);
 			auto wash = stm->msgReplyBarColor->c;

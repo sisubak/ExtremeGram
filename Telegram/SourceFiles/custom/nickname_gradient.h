@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <rpl/event_stream.h>
 
 #include <QColor>
+#include <QImage>
 #include <QPen>
 #include <optional>
 #include <vector>
@@ -53,6 +54,10 @@ struct NicknameGradientConfig {
 [[nodiscard]] int GradientPeriodMs(int speed);
 
 [[nodiscard]] float64 GradientPhase(int speed);
+
+[[nodiscard]] QImage NicknameGradientBackground(
+	QSize size,
+	const std::vector<QColor> &colors);
 
 class NicknameGradient final {
 public:

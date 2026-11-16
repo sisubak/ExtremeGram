@@ -125,7 +125,11 @@ void ReplaceModeCommandToken(
 	} else {
 		replace.setPosition(position);
 	}
-	replace.insertText(u'!' + command + u' ');
+	auto name = command;
+	if (name.startsWith(u'!')) {
+		name.remove(0, 1);
+	}
+	replace.insertText(u'!' + name + u' ');
 }
 
 template <typename T, typename U>

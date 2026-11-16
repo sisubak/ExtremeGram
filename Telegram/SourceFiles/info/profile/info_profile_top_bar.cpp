@@ -774,8 +774,6 @@ void TopBar::refreshTitleGradient() {
 	if (_nicknameGradientBg != surfaces) {
 		_nicknameGradientBg = surfaces;
 		updateCollectibleStatus();
-	}
-	if (_nicknameGradientBg) {
 		update();
 	}
 }
@@ -901,8 +899,7 @@ void TopBar::updateCollectibleStatus() {
 	const auto collectible = effectiveCollectible();
 	const auto colorProfile = effectiveColorProfile();
 	_hasGradientBg = (collectible != nullptr)
-		|| (colorProfile && colorProfile->bg.size() > 1)
-		|| _nicknameGradientBg;
+		|| (colorProfile && colorProfile->bg.size() > 1);
 	_solidBg = (colorProfile && colorProfile->bg.size() == 1)
 		? std::make_optional(colorProfile->bg.front())
 		: std::nullopt;
@@ -2021,6 +2018,44 @@ void TopBar::paintEdges(QPainter &p, const QRect &clip) const {
 	}
 }
 
+void TopBar::paintNicknameGradient(
+		QPainter &p,
+		const QRect &clip,
+		const std::vector<QColor> &colors) {
+	const auto full = QSize(width(), maximumHeight());
+	if (_nicknameGradientImage.isNull()
+		|| _nicknameGradientSize != full
+		|| _nicknameGradientColors != colors) {
+		_nicknameGradientSize = full;
+		_nicknameGradientColors = colors;
+		_nicknameGradientImage = Custom::NicknameGradientBackground(
+			full,
+			colors);
+		_nicknameGradientImage.setDevicePixelRatio(
+			style::DevicePixelRatio());
+	}
+	if (_nicknameGradientImage.isNull()) {
+		return;
+	}
+	const auto x = (width() - _nicknameGradientSize.width()) / 2;
+	const auto y = (height() - _nicknameGradientSize.height()) / 2;
+	if (clipTouchesRoundedCorners(clip)) {
+		if (_cachedClipPath.isEmpty()) {
+			const auto radius = st::boxRadius;
+			_cachedClipPath.addRoundedRect(
+				rect() + QMargins{ 0, 0, 0, radius + 1 },
+				radius,
+				radius);
+		}
+		auto hq = PainterHighQualityEnabler(p);
+		p.setPen(Qt::NoPen);
+		p.setClipPath(_cachedClipPath);
+		p.drawImage(x, y, _nicknameGradientImage);
+	} else {
+		p.drawImage(x, y, _nicknameGradientImage);
+	}
+}
+
 int TopBar::titleMostLeft() const {
 	return (_back && _back->toggled())
 		? _back->width()
@@ -3028,33 +3063,15 @@ void TopBar::paintEvent(QPaintEvent *e) {
 				offset);
 		}
 	}
-	const auto nickname = _nicknameGradientBg
-		? Custom::NicknameGradientFor(&_peer->session()).configFor(_peer)
-		: std::optional<Custom::NicknameGradientConfig>();
+	const auto nickname = Custom::NicknameGradientFor(
+		&_peer->session()).configFor(_peer);
 	if (tokens.minimalProfile) {
 		paintEdges(p, clipBounds, st::windowBg);
-	} else if (nickname && nickname->colors.size() >= 2) {
-		const auto count = int(nickname->colors.size());
-		const auto w = float64(width());
-		const auto offset = Custom::GradientPhase(nickname->speed) * w * 2.0;
-		auto brush = QLinearGradient(
-			QPointF(-offset, 0.),
-			QPointF(w * 2.0 - offset, 0.));
-		brush.setSpread(QGradient::RepeatSpread);
-		const auto base = st::windowBg->c;
-		const auto blend = [&](const QColor &color) {
-			return QColor(
-				(base.red() + color.red()) / 2,
-				(base.green() + color.green()) / 2,
-				(base.blue() + color.blue()) / 2);
-		};
-		for (auto i = 0; i != count; ++i) {
-			brush.setColorAt(
-				double(i) / count,
-				blend(nickname->colors[i]));
-		}
-		brush.setColorAt(1.0, blend(nickname->colors[0]));
-		paintEdges(p, clipBounds, QBrush(brush));
+	} else if (nickname
+		&& nickname->profileBg
+		&& nickname->colors.size() >= 2) {
+		paintEdges(p, clipBounds);
+		paintNicknameGradient(p, clipBounds, nickname->colors);
 	} else if (!_hasGradientBg) {
 		paintEdges(p, clipBounds);
 	} else {

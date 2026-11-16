@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/userpic_view.h"
 
+#include <vector>
+
 namespace Data {
 class ForumTopic;
 class DocumentMedia;
@@ -163,6 +165,10 @@ private:
 		const QRect &clip,
 		const QBrush &brush) const;
 	void paintEdges(QPainter &p, const QRect &clip) const;
+	void paintNicknameGradient(
+		QPainter &p,
+		const QRect &clip,
+		const std::vector<QColor> &colors);
 	void updateLabelsPosition();
 	void refreshTitleGradient();
 	[[nodiscard]] int titleMostLeft() const;
@@ -331,6 +337,9 @@ private:
 	bool _nicknameGradientBg = false;
 	std::optional<QColor> _solidBg;
 	QImage _cachedGradient;
+	QImage _nicknameGradientImage;
+	QSize _nicknameGradientSize;
+	std::vector<QColor> _nicknameGradientColors;
 	QPainterPath _cachedClipPath;
 	std::unique_ptr<Ui::Text::CustomEmoji> _patternEmoji;
 	QImage _basePatternImage;

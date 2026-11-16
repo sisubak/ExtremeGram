@@ -323,8 +323,7 @@ struct InvisibleMarker {
 
 [[nodiscard]] QString EncodeSymbols(
 		const NicknameGradientConfig &config) {
-	const auto flags = (config.profileBg ? 1 : 0)
-		| (config.messageBg ? 2 : 0);
+	const auto flags = config.profileBg ? 1 : 0;
 	const auto version = flags ? kVersion2 : kVersion1;
 	auto writer = BitWriter();
 	writer.write(kMagic, 8);
@@ -473,6 +472,48 @@ int GradientPeriodMs(int speed) {
 float64 GradientPhase(int speed) {
 	const auto ms = GradientPeriodMs(speed);
 	return ms ? std::fmod((crl::now() % ms) / float64(ms), 1.0) : 0.;
+}
+
+QImage NicknameGradientBackground(
+		QSize size,
+		const std::vector<QColor> &colors) {
+	if (size.isEmpty() || colors.size() < kMinColors) {
+		return QImage();
+	}
+	const auto ratio = style::DevicePixelRatio();
+	auto image = QImage(
+		qRound(size.width() * ratio),
+		qRound(size.height() * ratio),
+		QImage::Format_ARGB32_Premultiplied);
+	image.setDevicePixelRatio(ratio);
+	image.fill(Qt::transparent);
+	{
+		auto p = QPainter(&image);
+		p.setRenderHint(QPainter::Antialiasing, true);
+		p.setPen(Qt::NoPen);
+		const auto width = float64(size.width());
+		const auto height = float64(size.height());
+		const auto count = int(colors.size());
+		const auto radius = std::max(width, height) * 0.92;
+		for (auto i = 0; i != count; ++i) {
+			const auto progress = (count == 1)
+				? 0.5
+				: float64(i) / (count - 1);
+			const auto x = width * (0.14 + 0.72 * progress);
+			const auto y = height * ((i % 2 == 0) ? 0.36 : 0.64);
+			auto center = colors[i];
+			center.setAlphaF(0.50);
+			auto gradient = QRadialGradient(QPointF(x, y), radius);
+			gradient.setColorAt(0., center);
+			center.setAlphaF(0.28);
+			gradient.setColorAt(0.55, center);
+			center.setAlphaF(0.);
+			gradient.setColorAt(1., center);
+			p.setBrush(gradient);
+			p.drawEllipse(QPointF(x, y), radius, radius);
+		}
+	}
+	return image;
 }
 
 QString StripBioGradient(const QString &about) {
@@ -656,7 +697,7 @@ void ShowNicknameGradientBox(
 	const auto speed = std::make_shared<int>(
 		current ? current->speed : 1);
 	const auto surfaces = std::make_shared<bool>(
-		current ? (current->profileBg || current->messageBg) : false);
+		current ? current->profileBg : false);
 
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(tr::lng_extremegram_nickname_gradient());
@@ -877,7 +918,7 @@ void ShowNicknameGradientBox(
 					*colors,
 					*speed,
 					*surfaces,
-					*surfaces },
+					false },
 				[=](bool, QString message) {
 					controller->showToast(std::move(message));
 				});

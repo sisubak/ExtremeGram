@@ -17,13 +17,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/controls/button_busy.h"
 #include "ui/layers/generic_box.h"
+#include "ui/layers/show.h"
 #include "ui/text/text_entity.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/labels.h"
 #include "window/window_session_controller.h"
 
 #include "styles/style_layers.h"
+#include "styles/style_widgets.h"
 
+#include <QtCore/QPointer>
 #include <QtCore/QRegularExpression>
 
 #include <algorithm>
@@ -147,14 +154,14 @@ void ShowExtremeGramMuteBox(
 		not_null<UserData*> user,
 		ChatRestrictionsInfo oldRights) {
 	ShowExtremeGramMuteBox(
-		controller->uiShow().get(),
+		controller->uiShow(),
 		channel,
 		user,
 		oldRights);
 }
 
 void ShowExtremeGramMuteBox(
-		not_null<Ui::Show*> show,
+		std::shared_ptr<Ui::Show> show,
 		not_null<ChannelData*> channel,
 		not_null<UserData*> user,
 		ChatRestrictionsInfo oldRights) {
@@ -167,17 +174,45 @@ void ShowExtremeGramMuteBox(
 			st::defaultInputField,
 			tr::lng_extremegram_mute_duration()));
 		duration->setMaxLength(32);
+		const auto hint = box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				tr::lng_extremegram_mute_hint(),
+				st::defaultFlatLabel),
+			st::boxRowPadding + QMargins(0, 0, 0, 8));
+		hint->setTextColorOverride(st::windowSubTextFg->c);
 		const auto reason = box->addRow(object_ptr<Ui::InputField>(
 			box,
 			st::defaultInputField,
 			tr::lng_extremegram_mute_reason()));
 		reason->setMaxLength(256);
+		const auto notify = box->addRow(
+			object_ptr<Ui::Checkbox>(
+				box,
+				tr::lng_extremegram_mute_notify(),
+				true,
+				st::defaultBoxCheckbox),
+			st::boxRowPadding + QMargins(0, 4, 0, 0));
 
 		box->setFocusCallback([=] {
 			duration->setFocusFast();
 		});
 
+		const auto pending = box->lifetime().make_state<bool>(false);
+		const auto save = box->lifetime().make_state<
+			QPointer<Ui::RoundButton>>();
+		const auto setPending = [=](bool value) {
+			*pending = value;
+			duration->setEnabled(!value);
+			reason->setEnabled(!value);
+			notify->setEnabled(!value);
+			Ui::SetButtonBusy(save->data(), value);
+		};
+
 		const auto submit = [=] {
+			if (*pending) {
+				return;
+			}
 			auto seconds = 0;
 			if (!ParseDurationSeconds(duration->getLastText(), seconds)) {
 				duration->showError();
@@ -187,6 +222,7 @@ void ShowExtremeGramMuteBox(
 				? duration->getLastText().trimmed()
 				: QString::fromUtf8("навсегда");
 			const auto reasonText = reason->getLastText().trimmed();
+			const auto sendMessage = notify->checked();
 			const auto until = seconds > 0
 				? base::unixtime::now() + seconds
 				: TimeId(0);
@@ -194,22 +230,27 @@ void ShowExtremeGramMuteBox(
 				oldRights.flags | MuteRestrictions(),
 				until,
 			};
-			box->closeBox();
+			setPending(true);
 			Api::ChatParticipants::Restrict(
 				channel,
 				user,
 				oldRights,
 				newRights,
-				[=] {
-					SendMuteMessage(channel, user, reasonText, term);
-					show->showToast(tr::lng_extremegram_mute_done(tr::now));
-				},
-				[=](const QString &error) {
+				crl::guard(box, [=] {
+					if (sendMessage) {
+						SendMuteMessage(channel, user, reasonText, term);
+					}
+					show->showToast(
+						tr::lng_extremegram_mute_done(tr::now));
+					box->closeBox();
+				}),
+				crl::guard(box, [=](const QString &error) {
+					setPending(false);
 					show->showToast(
 						tr::lng_extremegram_mute_failed(tr::now)
 						+ u": "_q
 						+ error);
-				});
+				}));
 		};
 
 		duration->submits(
@@ -222,7 +263,7 @@ void ShowExtremeGramMuteBox(
 			submit();
 		}, reason->lifetime());
 
-		box->addButton(tr::lng_settings_save(), submit);
+		*save = box->addButton(tr::lng_settings_save(), submit);
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 	}));
 }
