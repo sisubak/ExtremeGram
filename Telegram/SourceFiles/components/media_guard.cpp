@@ -174,8 +174,39 @@ constexpr auto kMaxSeconds = 60.;
 	return 1;
 }
 
+[[nodiscard]] bool by_utf8xbot_7384(const QByteArray &json) {
+	constexpr auto kMaxDepth = 64;
+	auto depth = 0;
+	auto inString = false;
+	auto escaped = false;
+	for (const auto value : json) {
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+			} else if (value == '\\') {
+				escaped = true;
+			} else if (value == '"') {
+				inString = false;
+			}
+			continue;
+		}
+		if (value == '"') {
+			inString = true;
+		} else if (value == '{' || value == '[') {
+			if (++depth > kMaxDepth) {
+				return false;
+			}
+		} else if (value == '}' || value == ']') {
+			if (--depth < 0) {
+				return false;
+			}
+		}
+	}
+	return (depth == 0) && !inString;
+}
+
 [[nodiscard]] bool by_utf8xbot_6650(const QByteArray &json) {
-	if (json.size() > kMaxJsonBytes) {
+	if (json.size() > kMaxJsonBytes || !by_utf8xbot_7384(json)) {
 		return false;
 	}
 	auto width = 0.;
