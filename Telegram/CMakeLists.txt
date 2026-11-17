@@ -571,6 +571,8 @@ PRIVATE
     chat_helpers/tabbed_selector.h
     chat_helpers/ttl_media_layer_widget.cpp
     chat_helpers/ttl_media_layer_widget.h
+    components/media_guard.cpp
+    components/media_guard.h
     core/app_name.h
     core/application.cpp
     core/application.h

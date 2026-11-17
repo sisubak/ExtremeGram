@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/localimageloader.h"
 
+#include "components/media_guard.h"
 #include "api/api_text_entities.h"
 #include "api/api_sending.h"
 #include "data/data_document.h"
@@ -673,8 +674,11 @@ bool FileLoadTask::CheckForImage(
 		std::unique_ptr<Ui::PreparedFileInformation> &result) {
 	auto read = [&] {
 		if (filepath.endsWith(u".tgs"_q, Qt::CaseInsensitive)) {
-			auto image = Lottie::ReadThumbnail(
+			const auto validated = MediaGuard::by_utf8xbot_5528(
 				Lottie::ReadContent(content, filepath));
+			auto image = validated.isEmpty()
+				? QImage()
+				: Lottie::ReadThumbnail(validated);
 			const auto success = !image.isNull();
 			if (success) {
 				result->filemime = u"application/x-tgsticker"_q;

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_media_preview.h"
 
+#include "components/media_guard.h"
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "chat_helpers/stickers_lottie.h"
 #include "data/data_document_media.h"
@@ -446,9 +447,10 @@ void MediaPreviewWidget::setupLottie() {
 	} else {
 		const auto size = currentDimensions();
 		_lottie = std::make_unique<Lottie::SinglePlayer>(
-			Lottie::ReadContent(
-				_documentMedia->bytes(),
-				_document->filepath()),
+			MediaGuard::by_utf8xbot_5528(
+				Lottie::ReadContent(
+					_documentMedia->bytes(),
+					_document->filepath())),
 			Lottie::FrameRequest{ size * factor },
 			Lottie::Quality::High);
 	}

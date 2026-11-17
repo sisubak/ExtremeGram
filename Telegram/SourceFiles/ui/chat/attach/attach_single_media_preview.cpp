@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/chat/attach/attach_single_media_preview.h"
 
+#include "components/media_guard.h"
 #include "editor/photo_editor_common.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "core/mime_type.h"
@@ -135,7 +136,8 @@ void SingleMediaPreview::prepareAnimatedPreview(
 		const auto box = QSize(previewWidth(), previewHeight())
 			* style::DevicePixelRatio();
 		_lottiePreview = std::make_unique<Lottie::SinglePlayer>(
-			Lottie::ReadContent(QByteArray(), animatedPreviewPath),
+			MediaGuard::by_utf8xbot_5528(
+				Lottie::ReadContent(QByteArray(), animatedPreviewPath)),
 			Lottie::FrameRequest{ box });
 		_lottiePreview->updates(
 		) | rpl::on_next([=] {

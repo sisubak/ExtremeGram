@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_click_handler.h"
 #include "data/data_file_origin.h"
 #include "chat_helpers/stickers_lottie.h"
+#include "components/media_guard.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
@@ -624,6 +625,10 @@ void Sticker::setWebpagePart() {
 
 void Sticker::setupPlayer() {
 	Expects(_dataMedia != nullptr);
+
+	if (!MediaGuard::by_utf8xbot_3409(_data.get())) {
+		return;
+	}
 
 	if (_data->sticker()->isLottie()) {
 		_player = std::make_unique<LottiePlayer>(

@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_frame_generator.h"
 #include "ffmpeg/ffmpeg_frame_generator.h"
 #include "chat_helpers/stickers_lottie.h"
+#include "components/media_guard.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "storage/file_download.h" // kMaxFileInMemory
 #include "ui/chat/chats_filter_tag.h"
@@ -365,6 +366,10 @@ void CustomEmojiLoader::check() {
 
 	const auto media = load->process->media.get();
 	const auto document = media->owner();
+	if (!MediaGuard::by_utf8xbot_3409(document.get())) {
+		load->process->lifetime.destroy();
+		return;
+	}
 	const auto data = media->bytes();
 	const auto filepath = document->filepath();
 	if (data.isEmpty() && filepath.isEmpty()) {
@@ -390,7 +395,8 @@ void CustomEmojiLoader::check() {
 		}
 	};
 	const auto type = document->sticker()->type;
-	auto generator = [=, bytes = Lottie::ReadContent(data, filepath)]()
+	auto generator = [=, bytes = MediaGuard::by_utf8xbot_5528(
+		Lottie::ReadContent(data, filepath))]()
 	-> std::unique_ptr<Ui::FrameGenerator> {
 		switch (type) {
 		case StickerType::Tgs:

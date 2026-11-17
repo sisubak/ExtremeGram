@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_media.h"
 
 #include "data/data_document.h"
+#include "components/media_guard.h"
 #include "data/data_document_resolver.h"
 #include "data/data_session.h"
 #include "data/data_file_origin.h"
@@ -71,7 +72,9 @@ enum class FileType {
 		}
 		return result.thumbnail;
 	} else if (type == FileType::AnimatedSticker) {
-		return Lottie::ReadThumbnail(Lottie::ReadContent(data, path));
+		const auto content = MediaGuard::by_utf8xbot_5528(
+			Lottie::ReadContent(data, path));
+		return content.isEmpty() ? QImage() : Lottie::ReadThumbnail(content);
 	} else if (type == FileType::Theme) {
 		return Window::Theme::GeneratePreview(data, path);
 	} else if (type == FileType::WallPatternSVG) {
@@ -565,7 +568,8 @@ auto DocumentIconFrameGenerator(not_null<DocumentMedia*> media)
 		return nullptr;
 	}
 	return [=]() -> std::unique_ptr<Ui::FrameGenerator> {
-		const auto bytes = Lottie::ReadContent(content, location.name());
+		const auto bytes = MediaGuard::by_utf8xbot_5528(
+			Lottie::ReadContent(content, location.name()));
 		if (fromFile) {
 			location.accessDisable();
 		}

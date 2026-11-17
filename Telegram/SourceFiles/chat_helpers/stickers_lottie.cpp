@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/stickers_lottie.h"
 
+#include "components/media_guard.h"
 #include "lottie/lottie_single_player.h"
 #include "lottie/lottie_multi_player.h"
 #include "data/stickers/data_stickers_set.h"
@@ -58,10 +59,15 @@ auto LottieCachedFromContent(
 	const auto get = [=](FnMut<void(QByteArray &&cached)> handler) {
 		session->data().cacheBigFile().get(
 			key,
-			std::move(handler));
+			[handler = std::move(handler)](QByteArray &&cached) mutable {
+				handler(MediaGuard::by_utf8xbot_5528(cached));
+			});
 	};
 	const auto weak = base::make_weak(session);
 	const auto put = [=](QByteArray &&cached) {
+		if (!MediaGuard::by_utf8xbot_1183(cached)) {
+			return;
+		}
 		crl::on_main(weak, [=, data = std::move(cached)]() mutable {
 			weak->data().cacheBigFile().put(key, std::move(data));
 		});
@@ -82,10 +88,12 @@ auto LottieFromDocument(
 	const auto document = media->owner();
 	const auto data = media->bytes();
 	const auto filepath = document->filepath();
+	const auto content = MediaGuard::by_utf8xbot_5528(
+		Lottie::ReadContent(data, filepath));
 	if (box.width() * box.height() > kDontCacheLottieAfterArea) {
 		// Don't use frame caching for large stickers.
 		return method(
-			Lottie::ReadContent(data, filepath),
+			content,
 			Lottie::FrameRequest{ box });
 	}
 	if (const auto baseKey = document->bigFileBaseCacheKey()) {
@@ -94,11 +102,11 @@ auto LottieFromDocument(
 			baseKey,
 			keyShift,
 			&document->session(),
-			Lottie::ReadContent(data, filepath),
+			content,
 			box);
 	}
 	return method(
-		Lottie::ReadContent(data, filepath),
+		content,
 		Lottie::FrameRequest{ box });
 }
 
@@ -186,9 +194,9 @@ std::unique_ptr<Lottie::SinglePlayer> LottieThumbnail(
 	if (!baseKey) {
 		return nullptr;
 	}
-	const auto content = thumb
+	const auto content = MediaGuard::by_utf8xbot_5528(thumb
 		? thumb->content()
-		: Lottie::ReadContent(media->bytes(), media->owner()->filepath());
+		: Lottie::ReadContent(media->bytes(), media->owner()->filepath()));
 	if (content.isEmpty()) {
 		return nullptr;
 	}

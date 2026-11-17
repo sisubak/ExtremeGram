@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_sticker_toast.h"
 
+#include "components/media_guard.h"
 #include "ui/toast/toast.h"
 #include "ui/toast/toast_widget.h"
 #include "ui/widgets/buttons.h"
@@ -330,7 +331,7 @@ void StickerToast::setupLottiePreview(not_null<Ui::RpWidget*> widget, int size) 
 	const auto filepath = _for->filepath();
 	const auto ratio = style::DevicePixelRatio();
 	const auto player = widget->lifetime().make_state<Lottie::SinglePlayer>(
-		Lottie::ReadContent(bytes, filepath),
+		MediaGuard::by_utf8xbot_5528(Lottie::ReadContent(bytes, filepath)),
 		Lottie::FrameRequest{ QSize(size, size) * ratio },
 		Lottie::Quality::Default);
 

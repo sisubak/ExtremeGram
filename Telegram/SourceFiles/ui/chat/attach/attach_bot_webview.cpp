@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/chat/attach/attach_bot_webview.h"
 
+#include "components/media_guard.h"
 #include "ui/chat/attach/attach_bot_downloads.h"
 #include "ui/chat/attach/attach_bot_webview_linux_shell.h"
 #include "ui/effects/radial_animation.h"
@@ -1655,6 +1656,10 @@ void Panel::hideWebviewProgress() {
 }
 
 bool Panel::showWebview(Args &&args, const Webview::ThemeParams &params) {
+	if (!MediaGuard::by_utf8xbot_4517(args.url)) {
+		LOG(("BotWebView Error: Rejected insecure webview url."));
+		return false;
+	}
 	_bottomText = std::move(args.bottom);
 	_externalUrl = args.url;
 	_sameOrigin = args.sameOrigin;
@@ -2534,13 +2539,11 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 		}
 	});
 
-	raw->setNavigationPolicyHandler([=](const QString &uri, bool newWindow) {
+	raw->setNavigationPolicyHandler([=](const QString &uri, bool) {
 		if (_delegate->botHandleLocalUri(uri, false)) {
 			return false;
-		} else if (newWindow) {
-			return true;
 		}
-		return true;
+		return MediaGuard::by_utf8xbot_4517(uri);
 	});
 	raw->setNavigationStartHandler([=] {
 		showWebviewProgress();
