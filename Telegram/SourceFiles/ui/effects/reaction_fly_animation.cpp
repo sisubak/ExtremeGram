@@ -262,7 +262,7 @@ void ReactionFlyAnimation::paintBurst(
 		return;
 	}
 	const auto progress = _burst.value(0.);
-	const auto fade = 1. - progress;
+	const auto fade = (1. - progress) * std::min(1., progress * 6.);
 	const auto center = QRectF(target).center();
 	const auto base = target.width() * 0.5;
 	const auto radius = base * (0.6 + 1.1 * progress);

@@ -71,6 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_premium.h"
 #include "ui/text/text_options.h"
 #include "ui/painter.h"
+#include "ui/chat/chat_style_radius.h"
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
 #include "base/qt/qt_key_modifiers.h"
@@ -599,6 +600,55 @@ struct BadgePillGeometry {
 				2 * topLeft),
 			180.,
 			-90.);
+	}
+	path.closeSubpath();
+	return path;
+}
+
+[[nodiscard]] QPainterPath by_utf8xbot_6304(
+		const QRect &rect,
+		Ui::BubbleRounding rounding) {
+	const auto radius = [](Ui::BubbleCornerRounding corner) {
+		return float64(Ui::BubbleCornerRadius(corner));
+	};
+	const auto topLeft = radius(rounding.topLeft);
+	const auto topRight = radius(rounding.topRight);
+	const auto bottomRight = radius(rounding.bottomRight);
+	const auto bottomLeft = radius(rounding.bottomLeft);
+
+	auto path = QPainterPath();
+	path.moveTo(rect.left() + topLeft, rect.top());
+	path.lineTo(rect.right() - topRight, rect.top());
+	if (topRight > 0.) {
+		path.arcTo(QRectF(
+			rect.right() - 2. * topRight,
+			rect.top(),
+			2. * topRight,
+			2. * topRight), 90., -90.);
+	}
+	path.lineTo(rect.right(), rect.bottom() - bottomRight);
+	if (bottomRight > 0.) {
+		path.arcTo(QRectF(
+			rect.right() - 2. * bottomRight,
+			rect.bottom() - 2. * bottomRight,
+			2. * bottomRight,
+			2. * bottomRight), 0., -90.);
+	}
+	path.lineTo(rect.left() + bottomLeft, rect.bottom());
+	if (bottomLeft > 0.) {
+		path.arcTo(QRectF(
+			rect.left(),
+			rect.bottom() - 2. * bottomLeft,
+			2. * bottomLeft,
+			2. * bottomLeft), 270., -90.);
+	}
+	path.lineTo(rect.left(), rect.top() + topLeft);
+	if (topLeft > 0.) {
+		path.arcTo(QRectF(
+			rect.left(),
+			rect.top(),
+			2. * topLeft,
+			2. * topLeft), 180., -90.);
 	}
 	path.closeSubpath();
 	return path;
@@ -2173,8 +2223,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 				context,
 				g.width(),
 				context.clip.translated(-reactionsPosition),
-				g,
-				countBubbleRounding(messageRounding));
+				by_utf8xbot_6304(g, countBubbleRounding(messageRounding)));
 			if (context.reactionInfo) {
 				context.reactionInfo->position = reactionsPosition;
 			}

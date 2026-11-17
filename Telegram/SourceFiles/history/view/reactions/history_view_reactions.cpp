@@ -31,7 +31,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/ripple_animation.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
-#include "ui/chat/chat_style_radius.h"
 #include "ui/power_saving.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -43,55 +42,6 @@ constexpr auto kInNonChosenOpacity = 0.12;
 constexpr auto kOutNonChosenOpacity = 0.18;
 constexpr auto kMaxRecentUserpics = 3;
 constexpr auto kMaxNicePerRow = 5;
-
-[[nodiscard]] QPainterPath by_utf8xbot_6304(
-		const QRect &rect,
-		Ui::BubbleRounding rounding) {
-	const auto radius = [](Ui::BubbleCornerRounding corner) {
-		return float64(Ui::BubbleCornerRadius(corner));
-	};
-	const auto topLeft = radius(rounding.topLeft);
-	const auto topRight = radius(rounding.topRight);
-	const auto bottomRight = radius(rounding.bottomRight);
-	const auto bottomLeft = radius(rounding.bottomLeft);
-
-	auto path = QPainterPath();
-	path.moveTo(rect.left() + topLeft, rect.top());
-	path.lineTo(rect.right() - topRight, rect.top());
-	if (topRight > 0.) {
-		path.arcTo(QRectF(
-			rect.right() - 2. * topRight,
-			rect.top(),
-			2. * topRight,
-			2. * topRight), 90., -90.);
-	}
-	path.lineTo(rect.right(), rect.bottom() - bottomRight);
-	if (bottomRight > 0.) {
-		path.arcTo(QRectF(
-			rect.right() - 2. * bottomRight,
-			rect.bottom() - 2. * bottomRight,
-			2. * bottomRight,
-			2. * bottomRight), 0., -90.);
-	}
-	path.lineTo(rect.left() + bottomLeft, rect.bottom());
-	if (bottomLeft > 0.) {
-		path.arcTo(QRectF(
-			rect.left(),
-			rect.bottom() - 2. * bottomLeft,
-			2. * bottomLeft,
-			2. * bottomLeft), 270., -90.);
-	}
-	path.lineTo(rect.left(), rect.top() + topLeft);
-	if (topLeft > 0.) {
-		path.arcTo(QRectF(
-			rect.left(),
-			rect.top(),
-			2. * topLeft,
-			2. * topLeft), 180., -90.);
-	}
-	path.closeSubpath();
-	return path;
-}
 
 [[nodiscard]] QColor AdaptChosenServiceFg(QColor serviceBg) {
 	serviceBg.setAlpha(std::max(serviceBg.alpha(), 192));
@@ -503,8 +453,7 @@ void InlineList::paint(
 		const PaintContext &context,
 		int outerWidth,
 		const QRect &clip,
-		const QRect &bubble,
-		Ui::BubbleRounding bubbleRounding) const {
+		const QPainterPath &burstClip) const {
 	struct SingleAnimation {
 		not_null<Ui::ReactionFlyAnimation*> animation;
 		QColor textColor;
@@ -676,10 +625,6 @@ void InlineList::paint(
 	}
 	if (!animations.empty() && context.reactionInfo) {
 		const auto now = context.now;
-		auto burstClip = QPainterPath();
-		if (bubble.isValid()) {
-			burstClip = by_utf8xbot_6304(bubble, bubbleRounding);
-		}
 		context.reactionInfo->effectPaint = [
 			now,
 			burstClip,
